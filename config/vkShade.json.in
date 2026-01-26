@@ -1,0 +1,21 @@
+{
+  "file_format_version" : "1.0.0",
+  "layer" : {
+    "name": "VK_LAYER_VKSHADE_post_processing",
+    "type": "GLOBAL",
+    "library_path": "@ld_lib_dir_vkshade@libvkshade.so",
+    "api_version": "1.0.0",
+    "implementation_version": "1",
+    "description": "a post processing layer",
+    "functions": {
+      "vkGetInstanceProcAddr": "vkShade_GetInstanceProcAddr",
+      "vkGetDeviceProcAddr":   "vkShade_GetDeviceProcAddr"
+    },
+    "enable_environment": {
+      "ENABLE_VKSHADE": "1"
+    },
+    "disable_environment": {
+      "DISABLE_VKSHADE": "1"
+    }
+  }
+}
