@@ -1,0 +1,5 @@
+# Ignore everything except .wrap files, and packagefiles dir / subdirs
+*
+!*.wrap
+!packagefiles/
+!packagefiles/**

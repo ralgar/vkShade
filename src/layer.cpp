@@ -1,8 +1,6 @@
 #include "vulkan_hooks.hpp"
 
 #include <string.h>
-#include <stdio.h>
-
 #include <mutex>
 
 // Layer book-keeping information

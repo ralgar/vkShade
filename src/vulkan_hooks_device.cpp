@@ -1,8 +1,8 @@
 #include "vulkan_hooks.hpp"
 
+#include <magic_enum/magic_enum.hpp>
+#include <spdlog/spdlog.h>
 #include <vulkan/vk_layer.h>
-
-#include <stdio.h>
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     VkPhysicalDevice                            physicalDevice,
@@ -19,8 +19,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 
     if(!layerInfo)
     {
-        // No loader instance create info
-        fprintf(stderr, "[Layer] Failed to find device layer link info\n");
+        spdlog::error("Failed to find device layer link info");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -33,7 +32,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     PFN_vkCreateDevice create_func = (PFN_vkCreateDevice)gipa(VK_NULL_HANDLE, "vkCreateDevice");
     if (!create_func)
     {
-        fprintf(stderr, "[Layer] Failed to get vkCreateDevice\n");
+        spdlog::error("Failed to get vkCreateDevice");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -41,6 +40,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     VkResult result = create_func(physicalDevice, pCreateInfo, pAllocator, pDevice);
     if (result != VK_SUCCESS)
     {
+        spdlog::error("Failed to create device: {}", magic_enum::enum_name(result));
         return result;
     }
 
@@ -63,6 +63,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         g_vulkanDevices[dispatch_key_from_handle(*pDevice)] = data;
     }
 
+    spdlog::info("Layer initialized and ready");
     return VK_SUCCESS;
 }
 

@@ -14,7 +14,8 @@ shared_library(
   vkShade_src,
   include_directories : vkShade_include_path,
   dependencies : [
-
+    magic_enum,
+    spdlog,
   ],
   gnu_symbol_visibility: 'hidden',
   install : true,

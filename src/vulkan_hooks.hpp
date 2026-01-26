@@ -4,7 +4,6 @@
 #include <mutex>
 #include <unordered_map>
 
-#include <vulkan/vulkan.h>
 #include <vulkan/utility/vk_dispatch_table.h>
 
 #undef VK_LAYER_EXPORT
