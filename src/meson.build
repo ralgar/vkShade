@@ -2,6 +2,7 @@ vkShade_src = [
   'layer.cpp',
   'vulkan_hooks_device.cpp',
   'vulkan_hooks_instance.cpp',
+  'vulkan_hooks_surface.cpp',
   'vulkan_hooks_swapchain.cpp',
   'vulkan_swapchain.cpp',
 ]

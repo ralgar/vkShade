@@ -1,4 +1,5 @@
 #include "vulkan_hooks.hpp"
+#include "vulkan_hooks_surface.hpp"
 
 #include <string.h>
 #include <mutex>
@@ -53,6 +54,11 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInst
     GETPROCADDR(DestroyInstance);
     GETPROCADDR(CreateDevice);
     GETPROCADDR(DestroyDevice);
+
+    // Surface functions
+    GETPROCADDR(CreateWaylandSurfaceKHR);
+    GETPROCADDR(CreateXcbSurfaceKHR);
+    GETPROCADDR(CreateXlibSurfaceKHR);
 
     {
         std::lock_guard<std::mutex> lock(global_lock);
