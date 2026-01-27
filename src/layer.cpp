@@ -16,6 +16,7 @@ std::mutex global_lock;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // GetProcAddr functions, the entry points of the layer.
+// Here we define what Vulkan functions we actually want to hook into.
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 #define GETPROCADDR(func) if(!strcmp(pName, "vk" #func)) return (PFN_vkVoidFunction)&vkShade_##func;
@@ -30,6 +31,8 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
     GETPROCADDR(DestroyDevice);
 
     // Device chain functions we intercept
+    GETPROCADDR(CreateSwapchainKHR);
+    GETPROCADDR(DestroySwapchainKHR);
     GETPROCADDR(QueuePresentKHR);
 
     {

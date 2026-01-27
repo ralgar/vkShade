@@ -55,4 +55,6 @@ VkResult VKAPI_CALL vkShade_CreateDevice(VkPhysicalDevice physicalDevice, const 
 void     VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator);
 
 // Swapchain
+VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);
+void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator);
 VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo);

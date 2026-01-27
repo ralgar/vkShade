@@ -3,6 +3,7 @@ vkShade_src = [
   'vulkan_hooks_device.cpp',
   'vulkan_hooks_instance.cpp',
   'vulkan_hooks_swapchain.cpp',
+  'vulkan_swapchain.cpp',
 ]
 
 conf_paths = configuration_data()
