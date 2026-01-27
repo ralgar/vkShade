@@ -51,27 +51,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     //thisDevice.instance = g_physdev_to_instance[dispatch_key_from_handle(physicalDevice)];  // TODO: Set this
 
     // Initialize dispatch table
-    // Here we have to store every Vulkan function that we want to CALL (not HOOK) from the layer
-
-    // Core device functions
-    thisDevice.dispatch.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gdpa(*pDevice, "vkGetDeviceProcAddr");
-    thisDevice.dispatch.DestroyDevice = (PFN_vkDestroyDevice)gdpa(*pDevice, "vkDestroyDevice");
-
-    // Swapchain functions
-    thisDevice.dispatch.CreateSwapchainKHR = (PFN_vkCreateSwapchainKHR)gdpa(*pDevice, "vkCreateSwapchainKHR");
-    thisDevice.dispatch.DestroySwapchainKHR = (PFN_vkDestroySwapchainKHR)gdpa(*pDevice, "vkDestroySwapchainKHR");
-    thisDevice.dispatch.GetSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR)gdpa(*pDevice, "vkGetSwapchainImagesKHR");
-    thisDevice.dispatch.QueuePresentKHR = (PFN_vkQueuePresentKHR)gdpa(*pDevice, "vkQueuePresentKHR");
-
-    thisDevice.dispatch.CreateCommandPool = (PFN_vkCreateCommandPool)gdpa(*pDevice, "vkCreateCommandPool");
-    thisDevice.dispatch.AllocateCommandBuffers = (PFN_vkAllocateCommandBuffers)gdpa(*pDevice, "vkAllocateCommandBuffers");
-    thisDevice.dispatch.BeginCommandBuffer = (PFN_vkBeginCommandBuffer)gdpa(*pDevice, "vkBeginCommandBuffer");
-    thisDevice.dispatch.EndCommandBuffer = (PFN_vkEndCommandBuffer)gdpa(*pDevice, "vkEndCommandBuffer");
-    thisDevice.dispatch.CmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)gdpa(*pDevice, "vkCmdPipelineBarrier");
-    thisDevice.dispatch.CmdClearColorImage = (PFN_vkCmdClearColorImage)gdpa(*pDevice, "vkCmdClearColorImage");
-    thisDevice.dispatch.QueueSubmit = (PFN_vkQueueSubmit)gdpa(*pDevice, "vkQueueSubmit");
-    thisDevice.dispatch.QueueWaitIdle = (PFN_vkQueueWaitIdle)gdpa(*pDevice, "vkQueueWaitIdle");
-    thisDevice.dispatch.FreeCommandBuffers = (PFN_vkFreeCommandBuffers)gdpa(*pDevice, "vkFreeCommandBuffers");
+    vkuInitDeviceDispatchTable(*pDevice, &thisDevice.dispatch, gdpa);
 
     // Store device data
     {

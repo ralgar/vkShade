@@ -59,8 +59,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     thisInstance.handle = *pInstance;
 
     // Initialize dispatch table
-    thisInstance.dispatch.GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)gpa(*pInstance, "vkGetInstanceProcAddr");
-    thisInstance.dispatch.DestroyInstance = (PFN_vkDestroyInstance)gpa(*pInstance, "vkDestroyInstance");
+    vkuInitInstanceDispatchTable(*pInstance, &thisInstance.dispatch, gpa);
 
     // Store instance data
     {
