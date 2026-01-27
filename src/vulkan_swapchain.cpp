@@ -7,17 +7,17 @@
 
 vkShade::VulkanSwapchain::VulkanSwapchain(VkDevice device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
 {
-    // Store the swapchain info FIRST
+    // Store the swapchain info
     m_device = device;
     m_swapchain = swapchain;
     m_format = swapchainInfo.imageFormat;
     m_extent = swapchainInfo.imageExtent;
 
-    auto& deviceData = g_vulkanDevices[dispatch_key_from_handle(device)];
+    auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
 
     // Get swapchain images
     uint32_t imageCount = 0;
-    deviceData.dispatchTable.GetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+    thisDevice.dispatch.GetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
     std::vector<VkImage> images(imageCount);
-    deviceData.dispatchTable.GetSwapchainImagesKHR(device, swapchain, &imageCount, images.data());
+    thisDevice.dispatch.GetSwapchainImagesKHR(device, swapchain, &imageCount, images.data());
 }

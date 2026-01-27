@@ -13,19 +13,19 @@
 #error "Unsupported platform!"
 #endif
 
-// Data structures
-struct VulkanInstanceData
+// Structs to store our instances/devices and their dispatch tables
+struct VulkanInstance
 {
-    VkInstance instance;
-    VkuInstanceDispatchTable dispatchTable;
+    VkInstance handle;
+    VkuInstanceDispatchTable dispatch;
 };
 
-struct VulkanDeviceData
+struct VulkanDevice
 {
-    VkDevice device;
+    VkDevice handle;
     VkPhysicalDevice physicalDevice;
     VkInstance instance;
-    VkuDeviceDispatchTable dispatchTable;
+    VkuDeviceDispatchTable dispatch;
 };
 
 inline void* const dispatch_key_from_handle(const void* handle)
@@ -36,8 +36,8 @@ inline void* const dispatch_key_from_handle(const void* handle)
 
 // Layer book-keeping information
 // These are only modified during create/destroy
-extern std::unordered_map<void*, VulkanInstanceData> g_vulkanInstances;
-extern std::unordered_map<void*, VulkanDeviceData>   g_vulkanDevices;
+extern std::unordered_map<void*, VulkanInstance> g_vulkanInstances;
+extern std::unordered_map<void*, VulkanDevice>   g_vulkanDevices;
 
 // Single global lock, for simplicity
 // Only lock when WRITING (on create and destroy)
@@ -47,14 +47,14 @@ extern std::mutex global_lock;
 extern "C" PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice device, const char* pName);
 extern "C" PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInstance instance, const char* pName);
 
-// Layer init and shutdown
-VkResult VKAPI_CALL vkShade_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance);
-void     VKAPI_CALL vkShade_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator);
+// Layer init and shutdown hooks
+VkResult VKAPI_CALL vkShade_CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance);
+void     VKAPI_CALL vkShade_DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator);
 
-VkResult VKAPI_CALL vkShade_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDevice *pDevice);
-void     VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator);
+VkResult VKAPI_CALL vkShade_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice);
+void     VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator);
 
-// Swapchain
+// Swapchain hooks
 VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);
-void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator);
-VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo);
+void     VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator);
+VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);

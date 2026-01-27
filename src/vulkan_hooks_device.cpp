@@ -45,28 +45,31 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     }
 
     // Create device data
-    VulkanDeviceData data;
-    data.device = *pDevice;
-    data.physicalDevice = physicalDevice;
-    //data.instance = g_physdev_to_instance[dispatch_key_from_handle(physicalDevice)];  // TODO: Set this
+    VulkanDevice thisDevice;
+    thisDevice.handle = *pDevice;
+    thisDevice.physicalDevice = physicalDevice;
+    //thisDevice.instance = g_physdev_to_instance[dispatch_key_from_handle(physicalDevice)];  // TODO: Set this
 
     // Initialize dispatch table
-    data.dispatchTable.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gdpa(*pDevice, "vkGetDeviceProcAddr");
-    data.dispatchTable.DestroyDevice = (PFN_vkDestroyDevice)gdpa(*pDevice, "vkDestroyDevice");
+    // Here we have to store every Vulkan function that we want to CALL (not HOOK) from the layer
 
-    // Swapchain hooks
-    data.dispatchTable.CreateSwapchainKHR = (PFN_vkCreateSwapchainKHR)gdpa(*pDevice, "vkCreateSwapchainKHR");
-    data.dispatchTable.DestroySwapchainKHR = (PFN_vkDestroySwapchainKHR)gdpa(*pDevice, "vkDestroySwapchainKHR");
-    data.dispatchTable.GetSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR)gdpa(*pDevice, "vkGetSwapchainImagesKHR");
-    data.dispatchTable.QueuePresentKHR = (PFN_vkQueuePresentKHR)gdpa(*pDevice, "vkQueuePresentKHR");
+    // Core device functions
+    thisDevice.dispatch.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gdpa(*pDevice, "vkGetDeviceProcAddr");
+    thisDevice.dispatch.DestroyDevice = (PFN_vkDestroyDevice)gdpa(*pDevice, "vkDestroyDevice");
+
+    // Swapchain functions
+    thisDevice.dispatch.CreateSwapchainKHR = (PFN_vkCreateSwapchainKHR)gdpa(*pDevice, "vkCreateSwapchainKHR");
+    thisDevice.dispatch.DestroySwapchainKHR = (PFN_vkDestroySwapchainKHR)gdpa(*pDevice, "vkDestroySwapchainKHR");
+    thisDevice.dispatch.GetSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR)gdpa(*pDevice, "vkGetSwapchainImagesKHR");
+    thisDevice.dispatch.QueuePresentKHR = (PFN_vkQueuePresentKHR)gdpa(*pDevice, "vkQueuePresentKHR");
 
     // Store device data
     {
         std::lock_guard<std::mutex> lock(global_lock);
-        g_vulkanDevices[dispatch_key_from_handle(*pDevice)] = data;
+        g_vulkanDevices[dispatch_key_from_handle(*pDevice)] = thisDevice;
     }
 
-    spdlog::info("Layer initialized and ready");
+    spdlog::info("Layer initialization complete");
     return VK_SUCCESS;
 }
 

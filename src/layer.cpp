@@ -6,8 +6,8 @@
 // Layer book-keeping information
 // These are only modified during create/destroy
 // NOTE: These are declared in `vulkan_hooks.hpp`
-std::unordered_map<void*, VulkanInstanceData> g_vulkanInstances;
-std::unordered_map<void*, VulkanDeviceData>   g_vulkanDevices;
+std::unordered_map<void*, VulkanInstance> g_vulkanInstances;
+std::unordered_map<void*, VulkanDevice>   g_vulkanDevices;
 
 // Single global lock, for simplicity
 // Only lock when WRITING (on create and destroy)
@@ -37,7 +37,9 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
 
     {
         std::lock_guard<std::mutex> lock(global_lock);
-        return g_vulkanDevices[dispatch_key_from_handle(device)].dispatchTable.GetDeviceProcAddr(device, pName);
+
+        auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
+        return thisDevice.dispatch.GetDeviceProcAddr(device, pName);
     }
 }
 
@@ -54,6 +56,8 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInst
 
     {
         std::lock_guard<std::mutex> lock(global_lock);
-        return g_vulkanInstances[dispatch_key_from_handle(instance)].dispatchTable.GetInstanceProcAddr(instance, pName);
+
+        auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
+        return thisInstance.dispatch.GetInstanceProcAddr(instance, pName);
     }
 }

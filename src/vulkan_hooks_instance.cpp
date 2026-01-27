@@ -55,17 +55,17 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     }
 
     // Create our instance data
-    VulkanInstanceData data;
-    data.instance = *pInstance;
+    VulkanInstance thisInstance;
+    thisInstance.handle = *pInstance;
 
     // Initialize dispatch table
-    data.dispatchTable.GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)gpa(*pInstance, "vkGetInstanceProcAddr");
-    data.dispatchTable.DestroyInstance = (PFN_vkDestroyInstance)gpa(*pInstance, "vkDestroyInstance");
+    thisInstance.dispatch.GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)gpa(*pInstance, "vkGetInstanceProcAddr");
+    thisInstance.dispatch.DestroyInstance = (PFN_vkDestroyInstance)gpa(*pInstance, "vkDestroyInstance");
 
     // Store instance data
     {
         std::lock_guard<std::mutex> lock(global_lock);
-        g_vulkanInstances[dispatch_key_from_handle(*pInstance)] = data;
+        g_vulkanInstances[dispatch_key_from_handle(*pInstance)] = thisInstance;
     }
 
     return VK_SUCCESS;
