@@ -12,6 +12,7 @@ namespace vkShade
     public:
         VulkanSwapchain(VkDevice device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo);
 
+        VkImage image(size_t index) const;
         uint32_t image_count() const { return m_images.size(); }
 
     private:

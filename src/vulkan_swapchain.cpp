@@ -18,6 +18,12 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VkDevice device, VkSwapchainKHR swapch
     // Get swapchain images
     uint32_t imageCount = 0;
     thisDevice.dispatch.GetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
-    std::vector<VkImage> images(imageCount);
-    thisDevice.dispatch.GetSwapchainImagesKHR(device, swapchain, &imageCount, images.data());
+    m_images.resize(imageCount);
+    thisDevice.dispatch.GetSwapchainImagesKHR(device, swapchain, &imageCount, m_images.data());
+}
+
+VkImage vkShade::VulkanSwapchain::image(size_t index) const
+{
+    assert(index < m_images.size());
+    return m_images[index];
 }
