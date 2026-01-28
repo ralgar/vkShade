@@ -6,9 +6,9 @@
 #include "vulkan_hooks.hpp"
 
 vkShade::VulkanSwapchain::VulkanSwapchain(VkDevice device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
+    : VulkanObject(device)
 {
     // Store the swapchain info
-    m_device = device;
     m_swapchain = swapchain;
     m_format = swapchainInfo.imageFormat;
     m_extent = swapchainInfo.imageExtent;
