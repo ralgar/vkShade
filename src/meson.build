@@ -1,4 +1,7 @@
 vkShade_src = [
+  'input/input_manager.cpp',
+  'input/input_manager_wayland.cpp',
+  'input/wayland_callbacks.cpp',
   'layer.cpp',
   'vulkan_hooks_device.cpp',
   'vulkan_hooks_instance.cpp',
@@ -18,6 +21,8 @@ shared_library(
   dependencies : [
     magic_enum,
     spdlog,
+    xkbcommon,
+    wayland_client,
   ],
   gnu_symbol_visibility: 'hidden',
   install : true,

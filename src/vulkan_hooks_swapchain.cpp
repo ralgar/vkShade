@@ -3,6 +3,9 @@
 
 #include <spdlog/spdlog.h>
 
+#include "core/service_locator.hpp"
+#include "input/input_manager.hpp"
+
 std::unordered_map<VkSwapchainKHR, vkShade::VulkanSwapchain> g_swapchains;
 std::mutex g_swapchainMutex;
 
@@ -53,6 +56,15 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo)
 {
     spdlog::trace("vkQueuePresentKHR called");
+
+    // Get manager handles
+    auto& input = vkShade::Locator<vkShade::InputManager>::get();
+
+    // Update managers
+    input.update();
+
+    if (input.is_action_just_pressed("TestAction"))
+        spdlog::debug("Toggling effects!");
 
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(queue)];
 

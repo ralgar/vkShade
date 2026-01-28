@@ -1,7 +1,11 @@
+#include "input/input_manager_wayland.hpp"
 #include "vulkan_hooks.hpp"
 #include "vulkan_hooks_surface.hpp"
 
 #include <spdlog/spdlog.h>
+
+#include "core/service_locator.hpp"
+#include "input/input_manager.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance                           instance,
                                                                     const VkWaylandSurfaceCreateInfoKHR* pCreateInfo,
@@ -9,6 +13,9 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance  
                                                                     VkSurfaceKHR*                        pSurface)
 {
     spdlog::debug("vkCreateWaylandSurfaceKHR called");
+
+    // Initialize InputManager
+    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerWayland>(pCreateInfo->display);
 
     auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
 

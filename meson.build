@@ -16,6 +16,9 @@ endif
 magic_enum = dependency('magic_enum', fallback: ['magic_enum', 'magic_enum_dep'])
 spdlog = dependency('spdlog', fallback: ['spdlog', 'spdlog_dep'])
 
+wayland_client = dependency('wayland-client')
+xkbcommon = dependency('xkbcommon')
+
 if get_option('with_so')
     subdir('src')
 endif
