@@ -3,3 +3,6 @@ build/
 
 # clangd cache directory
 .cache/
+
+# ImGui persistence file
+imgui.ini

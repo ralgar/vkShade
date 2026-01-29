@@ -11,6 +11,7 @@
 
 #include "core/service_locator.hpp"
 #include "core/resource_cache.hpp"
+#include "gui/gui_manager.hpp"
 #include "vk/shader_module.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
@@ -47,24 +48,63 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    // Call through to next layer
-    VkResult result = create_func(physicalDevice, pCreateInfo, pAllocator, pDevice);
+    // Check if dynamic rendering is enabled
+    const VkPhysicalDeviceVulkan13Features* features13 = nullptr;
+    const void* pNext = pCreateInfo->pNext;
+    while (pNext)
+    {
+        auto* header = (VkBaseInStructure*)pNext;
+        if (header->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES)
+        {
+            features13 = (VkPhysicalDeviceVulkan13Features*)header;
+            break;
+        }
+        pNext = header->pNext;
+    }
+
+    // If not enabled, inject it
+    VkPhysicalDeviceVulkan13Features myFeatures13 = {};
+    VkDeviceCreateInfo modifiedCreateInfo = *pCreateInfo;
+    const VkDeviceCreateInfo* finalCreateInfo = pCreateInfo;
+
+    if (!features13 || !features13->dynamicRendering)
+    {
+        spdlog::debug("Injecting Dynamic Rendering feature");
+
+        if (features13)
+        {
+            myFeatures13 = *features13;
+            myFeatures13.dynamicRendering = VK_TRUE;
+        }
+        else
+        {
+            myFeatures13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+            myFeatures13.pNext = const_cast<void*>(pCreateInfo->pNext);
+            myFeatures13.dynamicRendering = VK_TRUE;
+        }
+
+        modifiedCreateInfo.pNext = &myFeatures13;
+        finalCreateInfo = &modifiedCreateInfo;
+    }
+
+    // Call through to next layer with modified createInfo
+    VkResult result = create_func(physicalDevice, finalCreateInfo, pAllocator, pDevice);
     if (result != VK_SUCCESS)
     {
         spdlog::error("Failed to create device: {}", magic_enum::enum_name(result));
         return result;
     }
 
+    auto& thisInstance = get_instance_from_handle(physicalDevice);
+
     // Create device data
     VulkanDevice thisDevice;
     thisDevice.handle = *pDevice;
     thisDevice.physicalDevice = physicalDevice;
-    //thisDevice.instance = g_physdev_to_instance[dispatch_key_from_handle(physicalDevice)];  // TODO: Set this
+    thisDevice.instance = thisInstance.handle;
 
     // Initialize dispatch table
     vkuInitDeviceDispatchTable(*pDevice, &thisDevice.dispatch, gdpa);
-
-    auto& thisInstance = get_instance_from_handle(physicalDevice);
 
     // Get a graphics queue
     uint32_t queueFamilyCount = 0;
@@ -80,7 +120,9 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 		// Find the first queue family which supports graphics and has at least one queue
 		if (queueProperties[queueInfo.queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 		{
-			if (pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0] < 1.0f)
+            spdlog::debug("Found graphics capable queue");
+
+            if (pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0] < 1.0f)
 				spdlog::warn("Selected graphics queue has a low priority: {}", pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0]);
 
 			thisDevice.queueFamilyIndex = queueInfo.queueFamilyIndex;
@@ -93,7 +135,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
             commandPoolCreateInfo.queueFamilyIndex = thisDevice.queueFamilyIndex;
 
             thisDevice.dispatch.CreateCommandPool(thisDevice.handle, &commandPoolCreateInfo, nullptr, &thisDevice.commandPool);
-            spdlog::debug("Found graphics capable queue");
 
             break;
 		}
@@ -168,6 +209,11 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator)
 {
     spdlog::trace("Intercepted VkDestroyDevice");
+
+    // First destroy any subsystems that call into Vulkan
+    vkShade::Locator<vkShade::GuiManager>::reset();
+
+    // Remove the VulkanDevice from layer's bookkeeping
     std::lock_guard<std::mutex> lock(global_lock);
     g_vulkanDevices.erase(dispatch_key_from_handle(device));
 }

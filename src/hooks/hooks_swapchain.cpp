@@ -1,10 +1,12 @@
+#include "gui/gui_manager.hpp"
 #include "hooks.hpp"
-#include "vk/shader_module.hpp"
 #include "vk/swapchain.hpp"
 
+#include <imgui.h>
+#include <imgui_impl_vulkan.h>
+#include <vulkan/vulkan_core.h>
 #include <spdlog/spdlog.h>
 
-#include "core/resource_cache.hpp"
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
 
@@ -60,8 +62,23 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     // Get device
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(queue)];
 
+    // Get swapchain data
+    auto it = g_swapchains.find(pPresentInfo->pSwapchains[0]);
+    if (it == g_swapchains.end())
+    {
+        spdlog::error("Swapchain not found in present");
+        return thisDevice.dispatch.QueuePresentKHR(queue, pPresentInfo);
+    }
+
+    auto& swapchainData = it->second;
+
+    // Create the GUI Manager if it doesn't exist yet
+    if (!vkShade::Locator<vkShade::GuiManager>::has())
+        vkShade::Locator<vkShade::GuiManager>::emplace(thisDevice, swapchainData.format());
+
     // Get manager handles
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
+    auto& gui = vkShade::Locator<vkShade::GuiManager>::get();
 
     // Update managers
     input.update();
@@ -69,10 +86,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     // Test input and shader loading
     if (input.is_action_just_pressed("TestAction"))
     {
-        auto& cache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
-        std::string filePath = "/home/ralgar/Projects/ZEngine/dist/x86_64-linux/data/shaders/vertex/fullscreen.vert.spv";
-        auto shader = cache.load(filePath, thisDevice.handle, filePath);
+        gui.visible(!gui.visible());
     }
+
+    gui.update(1.f/60.f, it->second.extent());
 
     // For each swapchain being presented
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++)
@@ -108,13 +125,13 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         };
         thisDevice.dispatch.BeginCommandBuffer(cmd, &beginInfo);
 
-        // Transition to TRANSFER_DST
+        // Transition to COLOR_ATTACHMENT_OPTIMAL for rendering
         VkImageMemoryBarrier barrier1 = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = image,
@@ -129,27 +146,34 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         thisDevice.dispatch.CmdPipelineBarrier(
             cmd,
             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             0, 0, nullptr, 0, nullptr, 1, &barrier1
         );
 
-        // Clear to bright green
-        VkClearColorValue clearColor = {{0.0f, 1.0f, 0.0f, 1.0f}};
-        VkImageSubresourceRange range = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
+        // Begin dynamic rendering
+        VkRenderingAttachmentInfo colorAttachment = {
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = swapchainData.image_view(imageIndex),  // You need to track image views
+            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,  // Keep existing content
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
         };
-        thisDevice.dispatch.CmdClearColorImage(
-            cmd,
-            image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            &clearColor,
-            1,
-            &range
-        );
+
+        VkRenderingInfo renderingInfo = {
+            .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+            .renderArea = {.extent = swapchainData.extent()},
+            .layerCount = 1,
+            .colorAttachmentCount = 1,
+            .pColorAttachments = &colorAttachment,
+        };
+
+        // Draw ImGui
+        thisDevice.dispatch.CmdBeginRendering(cmd, &renderingInfo);
+
+        ImDrawData* draw_data = ImGui::GetDrawData();
+        ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
+
+        thisDevice.dispatch.CmdEndRendering(cmd);
 
         // Transition back to PRESENT_SRC
         VkImageMemoryBarrier barrier2 = {

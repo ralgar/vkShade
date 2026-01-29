@@ -12,7 +12,11 @@ if get_option('append_libdir_vkshade')
     ld_lib_dir_vkshade = get_option('prefix') + '/$LIB/vkshade/'
 endif
 
+add_project_arguments('-DVK_NO_PROTOTYPES', language: 'cpp')
+add_project_arguments('-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES', language: 'cpp')
+
 # Dependencies
+imgui = dependency('imgui', fallback: ['imgui', 'imgui_dep'], static: true)
 magic_enum = dependency('magic_enum', fallback: ['magic_enum', 'magic_enum_dep'])
 spdlog = dependency('spdlog', fallback: ['spdlog', 'spdlog_dep'])
 vma = dependency('vma', fallback: ['vulkan-memory-allocator', 'vma_allocator_dep'])

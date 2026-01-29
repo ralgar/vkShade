@@ -1,4 +1,5 @@
 vkShade_src = [
+  'gui/gui_manager.cpp',
   'hooks/hooks_device.cpp',
   'hooks/hooks_entrypoints.cpp',
   'hooks/hooks_instance.cpp',
@@ -20,6 +21,7 @@ shared_library(
   vkShade_src,
   include_directories : vkShade_include_path,
   dependencies : [
+    imgui,
     magic_enum,
     spdlog,
     xkbcommon,

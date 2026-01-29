@@ -60,8 +60,12 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 		appInfo.apiVersion = VK_API_VERSION_1_3;
 	}
 
+    // Create modified create info with our app info
+    VkInstanceCreateInfo modifiedCreateInfo = *pCreateInfo;
+    modifiedCreateInfo.pApplicationInfo = &appInfo;
+
     // Call through to next layer
-    VkResult result = create_func(pCreateInfo, pAllocator, pInstance);
+    VkResult result = create_func(&modifiedCreateInfo, pAllocator, pInstance);
     if (result != VK_SUCCESS)
     {
         spdlog::error("Failed to create instance: {}", magic_enum::enum_name(result));
