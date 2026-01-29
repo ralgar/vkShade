@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include <vulkan/utility/vk_dispatch_table.h>
+#include <vulkan/vulkan_core.h>
 
 #undef VK_LAYER_EXPORT
 #if defined(__GNUC__) && __GNUC__ >= 4
@@ -26,6 +27,10 @@ struct VulkanDevice
     VkPhysicalDevice physicalDevice;
     VkInstance instance;
     VkuDeviceDispatchTable dispatch;
+
+    VkQueue       queue;
+    uint32_t      queueFamilyIndex;
+    VkCommandPool commandPool;
 };
 
 inline void* const dispatch_key_from_handle(const void* handle)

@@ -91,23 +91,11 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         VkImage image = swapchainData.image(imageIndex);
         VkDevice device = swapchainData.device();
 
-        // Create command pool if we don't have one yet
-        static VkCommandPool commandPool = VK_NULL_HANDLE;
-        if (commandPool == VK_NULL_HANDLE)
-        {
-            VkCommandPoolCreateInfo poolInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-                .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                .queueFamilyIndex = 0, // FIXME: get actual queue family
-            };
-            thisDevice.dispatch.CreateCommandPool(device, &poolInfo, nullptr, &commandPool);
-        }
-
         // Allocate command buffer
         VkCommandBuffer cmd;
         VkCommandBufferAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            .commandPool = commandPool,
+            .commandPool = thisDevice.commandPool,
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             .commandBufferCount = 1,
         };
@@ -200,7 +188,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         thisDevice.dispatch.QueueWaitIdle(queue);
 
         // Free command buffer
-        thisDevice.dispatch.FreeCommandBuffers(device, commandPool, 1, &cmd);
+        thisDevice.dispatch.FreeCommandBuffers(device, thisDevice.commandPool, 1, &cmd);
     }
 
     // Present normally

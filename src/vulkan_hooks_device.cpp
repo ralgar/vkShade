@@ -1,5 +1,7 @@
 #include "vulkan_hooks.hpp"
 
+#include <set>
+
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
 #include <vulkan/vk_layer.h>
@@ -58,6 +60,41 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 
     // Initialize dispatch table
     vkuInitDeviceDispatchTable(*pDevice, &thisDevice.dispatch, gdpa);
+
+    auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(physicalDevice)];
+
+    // Get a graphics queue
+    uint32_t queueFamilyCount = 0;
+	thisInstance.dispatch.GetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+	std::vector<VkQueueFamilyProperties> queueProperties(queueFamilyCount);
+	thisInstance.dispatch.GetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueProperties.data());
+
+	for (uint32_t i = 0; i < pCreateInfo->queueCreateInfoCount; i++)
+	{
+		const auto& queueInfo = pCreateInfo->pQueueCreateInfos[i];
+		assert(queueInfo.queueFamilyIndex < queueFamilyCount);
+
+		// Find the first queue family which supports graphics and has at least one queue
+		if (queueProperties[queueInfo.queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+		{
+			if (pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0] < 1.0f)
+				spdlog::warn("Selected graphics queue has a low priority: {}", pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0]);
+
+			thisDevice.queueFamilyIndex = queueInfo.queueFamilyIndex;
+            thisDevice.dispatch.GetDeviceQueue(thisDevice.handle, thisDevice.queueFamilyIndex, 0, &thisDevice.queue);
+
+            VkCommandPoolCreateInfo commandPoolCreateInfo;
+            commandPoolCreateInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            commandPoolCreateInfo.pNext            = nullptr;
+            commandPoolCreateInfo.flags            = 0;
+            commandPoolCreateInfo.queueFamilyIndex = thisDevice.queueFamilyIndex;
+
+            thisDevice.dispatch.CreateCommandPool(thisDevice.handle, &commandPoolCreateInfo, nullptr, &thisDevice.commandPool);
+            spdlog::debug("Found graphics capable queue");
+
+            break;
+		}
+	}
 
     // Store device data
     {
