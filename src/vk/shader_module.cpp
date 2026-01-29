@@ -1,4 +1,4 @@
-#include "vulkan_shader_module.hpp"
+#include "shader_module.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -6,7 +6,7 @@
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
 
-#include "vulkan_hooks.hpp"
+#include "hooks/hooks.hpp"
 
 vkShade::ShaderModule::ShaderModule(VkDevice device, const std::string& filePath)
     : VulkanObject(device)

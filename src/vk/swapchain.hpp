@@ -3,7 +3,7 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-#include "vulkan_object.hpp"
+#include "object.hpp"
 
 namespace vkShade
 {

@@ -1,4 +1,4 @@
-#include "vulkan_hooks.hpp"
+#include "hooks.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
@@ -11,7 +11,7 @@
 
 #include "core/service_locator.hpp"
 #include "core/resource_cache.hpp"
-#include "vulkan_shader_module.hpp"
+#include "vk/shader_module.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     VkPhysicalDevice                            physicalDevice,

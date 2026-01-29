@@ -1,4 +1,4 @@
-#include "vulkan_hooks.hpp"
+#include "hooks.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/sinks/stdout_color_sinks.h>

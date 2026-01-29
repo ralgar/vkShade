@@ -1,6 +1,6 @@
 #include "input/input_manager_wayland.hpp"
-#include "vulkan_hooks.hpp"
-#include "vulkan_hooks_surface.hpp"
+#include "hooks.hpp"
+#include "hooks_surface.hpp"
 
 #include <spdlog/spdlog.h>
 

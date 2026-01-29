@@ -1,14 +1,14 @@
 vkShade_src = [
+  'hooks/hooks_device.cpp',
+  'hooks/hooks_entrypoints.cpp',
+  'hooks/hooks_instance.cpp',
+  'hooks/hooks_surface.cpp',
+  'hooks/hooks_swapchain.cpp',
   'input/input_manager.cpp',
   'input/input_manager_wayland.cpp',
   'input/wayland_callbacks.cpp',
-  'layer.cpp',
-  'vulkan_hooks_device.cpp',
-  'vulkan_hooks_instance.cpp',
-  'vulkan_hooks_surface.cpp',
-  'vulkan_hooks_swapchain.cpp',
-  'vulkan_shader_module.cpp',
-  'vulkan_swapchain.cpp',
+  'vk/shader_module.cpp',
+  'vk/swapchain.cpp',
 ]
 
 conf_paths = configuration_data()

@@ -1,6 +1,6 @@
-#include "vulkan_hooks.hpp"
-#include "vulkan_shader_module.hpp"
-#include "vulkan_swapchain.hpp"
+#include "hooks.hpp"
+#include "vk/shader_module.hpp"
+#include "vk/swapchain.hpp"
 
 #include <spdlog/spdlog.h>
 

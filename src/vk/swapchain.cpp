@@ -1,9 +1,9 @@
-#include "vulkan_swapchain.hpp"
+#include "swapchain.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
 
-#include "vulkan_hooks.hpp"
+#include "hooks/hooks.hpp"
 
 vkShade::VulkanSwapchain::VulkanSwapchain(VkDevice device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
     : VulkanObject(device)

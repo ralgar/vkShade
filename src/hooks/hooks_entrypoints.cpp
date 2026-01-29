@@ -1,5 +1,5 @@
-#include "vulkan_hooks.hpp"
-#include "vulkan_hooks_surface.hpp"
+#include "hooks/hooks.hpp"
+#include "hooks/hooks_surface.hpp"
 
 #include <string.h>
 #include <mutex>
