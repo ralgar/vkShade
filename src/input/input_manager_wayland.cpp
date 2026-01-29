@@ -10,8 +10,6 @@
 
 vkShade::InputManagerWayland::InputManagerWayland(wl_display* waylandDisplay)
 {
-    spdlog::debug("Initializing InputManagerWayland");
-
     // Set up input
     m_display = waylandDisplay;
     m_xkbContext = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
@@ -63,18 +61,12 @@ void vkShade::InputManagerWayland::on_keyboard_modifiers(uint32_t modsDepressed,
 
 void vkShade::InputManagerWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
 {
-    printf("on_registry_global: this=%p, interface=%s\n", this, interface);
-    fflush(stdout);
-
     if (strcmp(interface, wl_seat_interface.name) == 0) {
         wl_seat* seat = static_cast<wl_seat*>(
             wl_registry_bind(reg, name, &wl_seat_interface, 1));
 
-        printf("About to add seat listener, passing this=%p\n", this);
-        fflush(stdout);
-
         wl_seat_add_listener(seat, &seat_listener, this);  // ← Pass 'this'!
-        spdlog::info("Bound to wl_seat");
+        spdlog::trace("Bound to wl_seat");
     }
     /*if (strcmp(interface, "wl_seat") == 0)
     {
@@ -90,7 +82,7 @@ void vkShade::InputManagerWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     {
         m_keyboard = wl_seat_get_keyboard(seat);
         wl_keyboard_add_listener(m_keyboard, &kb_listener, this);  // Pass 'this' as data* in callbacks
-        spdlog::info("Got keyboard!");
+        spdlog::trace("Bound to wl_keyboard");
     }
 }
 

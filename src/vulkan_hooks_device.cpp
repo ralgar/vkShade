@@ -10,6 +10,8 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     const VkAllocationCallbacks*                pAllocator,
     VkDevice*                                   pDevice)
 {
+    spdlog::trace("Intercepted VkCreateDevice");
+
     // Step through the pNext chain until we get to the layer link info
     VkLayerDeviceCreateInfo* layerInfo = (VkLayerDeviceCreateInfo*)pCreateInfo->pNext;
     while(layerInfo && (layerInfo->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO || layerInfo->function != VK_LAYER_LINK_INFO))
@@ -65,6 +67,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 
 VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator)
 {
+    spdlog::trace("Intercepted VkDestroyDevice");
     std::lock_guard<std::mutex> lock(global_lock);
     g_vulkanDevices.erase(dispatch_key_from_handle(device));
 }

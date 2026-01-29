@@ -17,9 +17,11 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
         auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         auto logger = std::make_shared<spdlog::logger>("vkShade", consoleSink);
         spdlog::set_default_logger(logger);
-        spdlog::set_level(spdlog::level::debug);    // TODO: Provide an env var for this
+        spdlog::set_level(spdlog::level::trace);    // TODO: Provide an env var for this
         spdlogInitialized = true;
     }
+
+    spdlog::trace("Intercepted VkCreateInstance");
 
     // Step through the pNext chain until we get to the layer link info
     VkLayerInstanceCreateInfo* layerInfo = (VkLayerInstanceCreateInfo*)pCreateInfo->pNext;
@@ -72,6 +74,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 
 VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator)
 {
+    spdlog::trace("Intercepted VkDestroyInstance");
     std::lock_guard<std::mutex> lock(global_lock);
     g_vulkanInstances.erase(dispatch_key_from_handle(instance));
 }

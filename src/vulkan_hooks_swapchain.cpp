@@ -14,7 +14,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice         
                                                                const VkAllocationCallbacks*    pAllocator,
                                                                VkSwapchainKHR*                 pSwapchain)
 {
-    spdlog::trace("vkCreateSwapchainKHR called");
+    spdlog::trace("Intercepted VkCreateSwapchainKHR");
 
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
 
@@ -38,7 +38,7 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
                                                             VkSwapchainKHR               swapchain,
                                                             const VkAllocationCallbacks* pAllocator)
 {
-    spdlog::trace("vkDestroySwapchainKHR called");
+    spdlog::trace("Intercepted VkDestroySwapchainKHR");
 
     // Clean up our bookkeeping data
     {
@@ -55,8 +55,6 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo)
 {
-    spdlog::trace("vkQueuePresentKHR called");
-
     // Get manager handles
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
 

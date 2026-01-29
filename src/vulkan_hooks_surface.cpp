@@ -12,7 +12,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance  
                                                                     const VkAllocationCallbacks*         pAllocator,
                                                                     VkSurfaceKHR*                        pSurface)
 {
-    spdlog::debug("vkCreateWaylandSurfaceKHR called");
+    spdlog::trace("Intercepted VkCreateWaylandSurfaceKHR");
 
     // Initialize InputManager
     vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerWayland>(pCreateInfo->display);
@@ -38,7 +38,7 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
                                                      const VkAllocationCallbacks*     pAllocator,
                                                      VkSurfaceKHR*                    pSurface)
 {
-    spdlog::debug("vkCreateXcbSurfaceKHR called");
+    spdlog::trace("Intercepted VkCreateXcbSurfaceKHR");
 
     auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
 
@@ -60,7 +60,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
                                                                  const VkAllocationCallbacks*      pAllocator,
                                                                  VkSurfaceKHR*                     pSurface)
 {
-    spdlog::debug("vkCreateXlibSurfaceKHR called");
+    spdlog::trace("Intercepted VkCreateXlibSurfaceKHR");
 
     auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
 
