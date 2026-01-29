@@ -23,6 +23,7 @@ shared_library(
     magic_enum,
     spdlog,
     xkbcommon,
+    vma,
     wayland_client,
   ],
   gnu_symbol_visibility: 'hidden',

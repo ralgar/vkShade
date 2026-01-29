@@ -15,7 +15,7 @@ endif
 # Dependencies
 magic_enum = dependency('magic_enum', fallback: ['magic_enum', 'magic_enum_dep'])
 spdlog = dependency('spdlog', fallback: ['spdlog', 'spdlog_dep'])
-
+vma = dependency('vma', fallback: ['vulkan-memory-allocator', 'vma_allocator_dep'])
 wayland_client = dependency('wayland-client')
 xkbcommon = dependency('xkbcommon')
 

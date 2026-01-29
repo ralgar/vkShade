@@ -48,6 +48,18 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
+    // Get info from underlying application
+	VkApplicationInfo appInfo { VK_STRUCTURE_TYPE_APPLICATION_INFO };
+	if (pCreateInfo->pApplicationInfo != nullptr)
+		appInfo = *pCreateInfo->pApplicationInfo;
+
+	// vkShade requires at least Vulkan 1.3
+	if (appInfo.apiVersion < VK_API_VERSION_1_3)
+	{
+        spdlog::info("Replacing requested Vulkan API version with 1.3");
+		appInfo.apiVersion = VK_API_VERSION_1_3;
+	}
+
     // Call through to next layer
     VkResult result = create_func(pCreateInfo, pAllocator, pInstance);
     if (result != VK_SUCCESS)
@@ -56,17 +68,14 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
         return result;
     }
 
-    // Create our instance data
-    VulkanInstance thisInstance;
-    thisInstance.handle = *pInstance;
-
-    // Initialize dispatch table
+    // Create our instance data struct and fill out the dispatch table
+    VulkanInstance thisInstance { *pInstance, appInfo.apiVersion };
     vkuInitInstanceDispatchTable(*pInstance, &thisInstance.dispatch, gpa);
 
     // Store instance data
     {
         std::lock_guard<std::mutex> lock(global_lock);
-        g_vulkanInstances[dispatch_key_from_handle(*pInstance)] = thisInstance;
+        g_vulkanInstances.emplace(dispatch_key_from_handle(*pInstance), thisInstance);
     }
 
     return VK_SUCCESS;

@@ -17,7 +17,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance  
     // Initialize InputManager
     vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerWayland>(pCreateInfo->display);
 
-    auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
+    auto& thisInstance = get_instance_from_handle(instance);
 
     // Get the function pointer manually since extensions aren't in the dispatch table
     PFN_vkCreateWaylandSurfaceKHR createWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)
@@ -40,7 +40,7 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
 {
     spdlog::trace("Intercepted VkCreateXcbSurfaceKHR");
 
-    auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
+    auto& thisInstance = get_instance_from_handle(instance);
 
     // Get the function pointer manually since extensions aren't in the dispatch table
     PFN_vkCreateXcbSurfaceKHR createXcbSurfaceKHR = (PFN_vkCreateXcbSurfaceKHR)
@@ -62,7 +62,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
 {
     spdlog::trace("Intercepted VkCreateXlibSurfaceKHR");
 
-    auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
+    auto& thisInstance = get_instance_from_handle(instance);
 
     // Get the function pointer manually since extensions aren't in the dispatch table
     PFN_vkCreateXlibSurfaceKHR createXlibSurfaceKHR = (PFN_vkCreateXlibSurfaceKHR)

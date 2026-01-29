@@ -4,6 +4,7 @@
 #include <mutex>
 #include <unordered_map>
 
+#include <vk_mem_alloc.h>
 #include <vulkan/utility/vk_dispatch_table.h>
 #include <vulkan/vulkan_core.h>
 
@@ -18,6 +19,7 @@
 struct VulkanInstance
 {
     VkInstance handle;
+    const uint32_t apiVersion;
     VkuInstanceDispatchTable dispatch;
 };
 
@@ -27,6 +29,7 @@ struct VulkanDevice
     VkPhysicalDevice physicalDevice;
     VkInstance instance;
     VkuDeviceDispatchTable dispatch;
+    VmaAllocator allocator;
 
     VkQueue       queue;
     uint32_t      queueFamilyIndex;
@@ -35,6 +38,7 @@ struct VulkanDevice
 
 inline void* const dispatch_key_from_handle(const void* handle)
 {
+    // Vulkan handles are pointers to dispatch tables - dereference to get the key
     assert(handle != nullptr);
     return *(void**)handle;
 }
@@ -43,6 +47,21 @@ inline void* const dispatch_key_from_handle(const void* handle)
 // These are only modified during create/destroy
 extern std::unordered_map<void*, VulkanInstance> g_vulkanInstances;
 extern std::unordered_map<void*, VulkanDevice>   g_vulkanDevices;
+
+// Convenience functions for getting handles
+inline VulkanInstance& get_instance_from_handle(const void* handle)
+{
+    auto it = g_vulkanInstances.find(dispatch_key_from_handle(handle));
+    assert(it != g_vulkanInstances.end() && "Invalid instance key");
+    return it->second;
+}
+
+inline VulkanDevice& get_device_from_handle(const void* handle)
+{
+    auto it = g_vulkanDevices.find(dispatch_key_from_handle(handle));
+    assert(it != g_vulkanDevices.end() && "Invalid device key");
+    return it->second;
+}
 
 // Single global lock, for simplicity
 // Only lock when WRITING (on create and destroy)

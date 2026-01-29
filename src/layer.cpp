@@ -39,7 +39,7 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
     {
         std::lock_guard<std::mutex> lock(global_lock);
 
-        auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
+        auto& thisDevice = get_device_from_handle(device);
         return thisDevice.dispatch.GetDeviceProcAddr(device, pName);
     }
 }
@@ -63,7 +63,7 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInst
     {
         std::lock_guard<std::mutex> lock(global_lock);
 
-        auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(instance)];
+        auto& thisInstance = get_instance_from_handle(instance);
         return thisInstance.dispatch.GetInstanceProcAddr(instance, pName);
     }
 }

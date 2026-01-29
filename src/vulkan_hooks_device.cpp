@@ -1,9 +1,12 @@
 #include "vulkan_hooks.hpp"
 
-#include <set>
-
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+
 #include <vulkan/vk_layer.h>
 
 #include "core/service_locator.hpp"
@@ -61,7 +64,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     // Initialize dispatch table
     vkuInitDeviceDispatchTable(*pDevice, &thisDevice.dispatch, gdpa);
 
-    auto& thisInstance = g_vulkanInstances[dispatch_key_from_handle(physicalDevice)];
+    auto& thisInstance = get_instance_from_handle(physicalDevice);
 
     // Get a graphics queue
     uint32_t queueFamilyCount = 0;
@@ -96,10 +99,63 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 		}
 	}
 
+    // Initialize the Vulkan Memory Allocator
+    {
+        VmaVulkanFunctions vulkanFunctions = {};
+
+        // Core functions
+        vulkanFunctions.vkGetPhysicalDeviceProperties = thisInstance.dispatch.GetPhysicalDeviceProperties;
+        vulkanFunctions.vkGetPhysicalDeviceMemoryProperties = thisInstance.dispatch.GetPhysicalDeviceMemoryProperties;
+        vulkanFunctions.vkAllocateMemory = thisDevice.dispatch.AllocateMemory;
+        vulkanFunctions.vkFreeMemory = thisDevice.dispatch.FreeMemory;
+        vulkanFunctions.vkMapMemory = thisDevice.dispatch.MapMemory;
+        vulkanFunctions.vkUnmapMemory = thisDevice.dispatch.UnmapMemory;
+        vulkanFunctions.vkFlushMappedMemoryRanges = thisDevice.dispatch.FlushMappedMemoryRanges;
+        vulkanFunctions.vkInvalidateMappedMemoryRanges = thisDevice.dispatch.InvalidateMappedMemoryRanges;
+        vulkanFunctions.vkBindBufferMemory = thisDevice.dispatch.BindBufferMemory;
+        vulkanFunctions.vkBindImageMemory = thisDevice.dispatch.BindImageMemory;
+        vulkanFunctions.vkGetBufferMemoryRequirements = thisDevice.dispatch.GetBufferMemoryRequirements;
+        vulkanFunctions.vkGetImageMemoryRequirements = thisDevice.dispatch.GetImageMemoryRequirements;
+        vulkanFunctions.vkCreateBuffer = thisDevice.dispatch.CreateBuffer;
+        vulkanFunctions.vkDestroyBuffer = thisDevice.dispatch.DestroyBuffer;
+        vulkanFunctions.vkCreateImage = thisDevice.dispatch.CreateImage;
+        vulkanFunctions.vkDestroyImage = thisDevice.dispatch.DestroyImage;
+        vulkanFunctions.vkCmdCopyBuffer = thisDevice.dispatch.CmdCopyBuffer;
+
+        // Vulkan 1.1+ (Dedicated Allocation)
+        vulkanFunctions.vkGetBufferMemoryRequirements2KHR = thisDevice.dispatch.GetBufferMemoryRequirements2;
+        vulkanFunctions.vkGetImageMemoryRequirements2KHR = thisDevice.dispatch.GetImageMemoryRequirements2;
+
+        // Vulkan 1.1+ (BindMemory2)
+        vulkanFunctions.vkBindBufferMemory2KHR = thisDevice.dispatch.BindBufferMemory2;
+        vulkanFunctions.vkBindImageMemory2KHR = thisDevice.dispatch.BindImageMemory2;
+
+        // Vulkan 1.1+ (Memory Budget)
+        vulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = thisInstance.dispatch.GetPhysicalDeviceMemoryProperties2;
+
+        // Vulkan 1.3 (Maintenance4)
+        vulkanFunctions.vkGetDeviceBufferMemoryRequirements = thisDevice.dispatch.GetDeviceBufferMemoryRequirements;
+        vulkanFunctions.vkGetDeviceImageMemoryRequirements = thisDevice.dispatch.GetDeviceImageMemoryRequirements;
+
+        VmaAllocatorCreateInfo allocatorInfo = {};
+        allocatorInfo.physicalDevice = thisDevice.physicalDevice;
+        allocatorInfo.device = thisDevice.handle;
+        allocatorInfo.instance = thisInstance.handle;
+        allocatorInfo.pVulkanFunctions = &vulkanFunctions;
+        allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+        VkResult vmaResult = vmaCreateAllocator(&allocatorInfo, &thisDevice.allocator);
+        if (vmaResult != VK_SUCCESS)
+        {
+            spdlog::error("Failed to create memory allocator: {}", magic_enum::enum_name(result));
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+    }
+
     // Store device data
     {
         std::lock_guard<std::mutex> lock(global_lock);
-        g_vulkanDevices[dispatch_key_from_handle(*pDevice)] = thisDevice;
+        g_vulkanDevices.emplace(dispatch_key_from_handle(*pDevice), thisDevice);
     }
 
     // Initialize resource caches
