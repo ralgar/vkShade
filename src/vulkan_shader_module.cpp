@@ -1,5 +1,6 @@
 #include "vulkan_shader_module.hpp"
 
+#include <filesystem>
 #include <fstream>
 
 #include <magic_enum/magic_enum.hpp>
@@ -7,18 +8,28 @@
 
 #include "vulkan_hooks.hpp"
 
-vkShade::VulkanShaderModule::VulkanShaderModule(VkDevice device, const std::string& filePath)
+vkShade::ShaderModule::ShaderModule(VkDevice device, const std::string& filePath)
     : VulkanObject(device)
 {
-    // Store the device handle
     m_device = device;
+    m_filePath = filePath;
 
+    if (!std::filesystem::exists(m_filePath) || !std::filesystem::is_regular_file(m_filePath))
+    {
+        spdlog::error("File does not exist: {}", m_filePath);
+        m_valid = false;
+    }
+}
+
+bool vkShade::ShaderModule::load()
+{
     // Read file into temporary buffer
-    std::ifstream file(filePath.c_str(), std::ios::ate | std::ios::binary);
+    std::ifstream file(m_filePath.c_str(), std::ios::ate | std::ios::binary);
 
     if (!file.is_open())
     {
-        throw std::runtime_error("Failed to open shader file: " + filePath);
+        spdlog::error("Failed to open file: {}", m_filePath);
+        return false;
     }
 
     size_t fileSize = static_cast<size_t>(file.tellg());
@@ -39,18 +50,21 @@ vkShade::VulkanShaderModule::VulkanShaderModule(VkDevice device, const std::stri
 
     if (result != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to create shader module from: " + filePath);
+        spdlog::error("Failed to create shader module: {}", m_filePath);
+        return false;
     }
 
-    spdlog::debug("Created shader module from: {}", filePath);
+    this->set_ready(true);
+    spdlog::trace("Created VkShaderModule from: {}", m_filePath);
+    return true;
 }
 
-vkShade::VulkanShaderModule::~VulkanShaderModule()
+vkShade::ShaderModule::~ShaderModule()
 {
     if (m_module != VK_NULL_HANDLE)
     {
         auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(m_device)];
         thisDevice.dispatch.DestroyShaderModule(m_device, m_module, nullptr);
-        spdlog::debug("Destroyed shader module");
+        spdlog::trace("Destroyed VkShaderModule");
     }
 }

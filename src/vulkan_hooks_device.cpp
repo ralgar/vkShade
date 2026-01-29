@@ -4,6 +4,10 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vk_layer.h>
 
+#include "core/service_locator.hpp"
+#include "core/resource_cache.hpp"
+#include "vulkan_shader_module.hpp"
+
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     VkPhysicalDevice                            physicalDevice,
     const VkDeviceCreateInfo*                   pCreateInfo,
@@ -60,6 +64,9 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         std::lock_guard<std::mutex> lock(global_lock);
         g_vulkanDevices[dispatch_key_from_handle(*pDevice)] = thisDevice;
     }
+
+    // Initialize resource caches
+    vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();
 
     spdlog::info("Layer initialization complete");
     return VK_SUCCESS;

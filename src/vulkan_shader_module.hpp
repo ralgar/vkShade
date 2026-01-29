@@ -2,19 +2,23 @@
 
 #include <string>
 
+#include "core/resource.hpp"
 #include "vulkan_object.hpp"
 
 namespace vkShade
 {
-    class VulkanShaderModule : public VulkanObject
+    class ShaderModule : public Resource, VulkanObject
     {
     public:
-        VulkanShaderModule(VkDevice device, const std::string& filePath);
-        ~VulkanShaderModule();
+        ShaderModule(VkDevice device, const std::string& filePath);
+        ~ShaderModule();
+
+        bool load() override;
 
         VkShaderModule module() const { return m_module; }
 
     private:
         VkShaderModule m_module {VK_NULL_HANDLE};
+        std::string m_filePath;
     };
 } // namespace vkShade

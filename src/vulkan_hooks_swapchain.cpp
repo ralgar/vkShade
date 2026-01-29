@@ -1,8 +1,10 @@
 #include "vulkan_hooks.hpp"
+#include "vulkan_shader_module.hpp"
 #include "vulkan_swapchain.hpp"
 
 #include <spdlog/spdlog.h>
 
+#include "core/resource_cache.hpp"
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
 
@@ -55,16 +57,22 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo)
 {
+    // Get device
+    auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(queue)];
+
     // Get manager handles
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
 
     // Update managers
     input.update();
 
+    // Test input and shader loading
     if (input.is_action_just_pressed("TestAction"))
-        spdlog::debug("Toggling effects!");
-
-    auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(queue)];
+    {
+        auto& cache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
+        std::string filePath = "/home/ralgar/Projects/ZEngine/dist/x86_64-linux/data/shaders/vertex/fullscreen.vert.spv";
+        auto shader = cache.load(filePath, thisDevice.handle, filePath);
+    }
 
     // For each swapchain being presented
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++)
