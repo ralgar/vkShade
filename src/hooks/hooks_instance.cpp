@@ -88,6 +88,17 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator)
 {
     spdlog::trace("Intercepted VkDestroyInstance");
+
+    // Lock here to prevent race conditions.
     std::lock_guard<std::mutex> lock(global_lock);
+
+    if (!instance)
+        return;
+
+    // Call down the chain to destroy the instance.
+    auto& thisInstance = get_instance_from_handle(instance);
+    thisInstance.dispatch.DestroyInstance(instance, pAllocator);
+
+    // Remove from layer's bookkeeping
     g_vulkanInstances.erase(dispatch_key_from_handle(instance));
 }

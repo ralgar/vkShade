@@ -211,6 +211,14 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkA
 {
     spdlog::trace("Intercepted VkDestroyDevice");
 
+    // Lock here to prevent race conditions.
+    std::lock_guard<std::mutex> lock(global_lock);
+
+    if (!device)
+        return;
+
+    auto& thisDevice = get_device_from_handle(device);
+
     // First destroy anything that calls into Vulkan
     if (vkShade::Locator<vkShade::GuiManager>::has())
         vkShade::Locator<vkShade::GuiManager>::reset();
@@ -218,7 +226,11 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkA
     if (vkShade::Locator<vkShade::Effect>::has())
         vkShade::Locator<vkShade::Effect>::reset();
 
+    vmaDestroyAllocator(thisDevice.allocator);
+
+    // Call down the chain to complete device destruction.
+    thisDevice.dispatch.DestroyDevice(device, pAllocator);
+
     // Remove the VulkanDevice from layer's bookkeeping
-    std::lock_guard<std::mutex> lock(global_lock);
     g_vulkanDevices.erase(dispatch_key_from_handle(device));
 }
