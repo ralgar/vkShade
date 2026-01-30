@@ -14,7 +14,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     static bool spdlogInitialized = false;
     if (!spdlogInitialized)
     {
-        auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        auto consoleSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
         auto logger = std::make_shared<spdlog::logger>("vkShade", consoleSink);
         spdlog::set_default_logger(logger);
         spdlog::set_level(spdlog::level::trace);    // TODO: Provide an env var for this
