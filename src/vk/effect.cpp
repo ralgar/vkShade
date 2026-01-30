@@ -11,13 +11,13 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
     auto& shaderCache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
 
     // Load the vertex shader module
-    std::string vertShaderPath = "build/shaders/fullscreen.vert.spv";
+    std::string vertShaderPath = "/home/ralgar/Projects/vklayer/build/shaders/fullscreen.vert.spv";
     m_vertShader = shaderCache.load(vertShaderPath, m_device, vertShaderPath);
 	if (m_vertShader == nullptr)
         spdlog::error("Vertex shader not found");
 
     // Load the fragment shader module
-    std::string fragShaderPath = "build/shaders/simple_grid.frag.spv";
+    std::string fragShaderPath = "/home/ralgar/Projects/vklayer/build/shaders/simple_grid.frag.spv";
     m_fragShader = shaderCache.load(fragShaderPath, m_device, fragShaderPath);
 	if (m_fragShader == nullptr)
         spdlog::error("Fragment shader not found");
