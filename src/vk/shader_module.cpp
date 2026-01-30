@@ -8,10 +8,9 @@
 
 #include "hooks/hooks.hpp"
 
-vkShade::ShaderModule::ShaderModule(VkDevice device, const std::string& filePath)
+vkShade::ShaderModule::ShaderModule(VulkanDevice& device, const std::string& filePath)
     : VulkanObject(device)
 {
-    m_device = device;
     m_filePath = filePath;
 
     if (!std::filesystem::exists(m_filePath) || !std::filesystem::is_regular_file(m_filePath))
@@ -45,8 +44,7 @@ bool vkShade::ShaderModule::load()
     createInfo.codeSize = buffer.size();
     createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
 
-    auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(m_device)];
-    VkResult result = thisDevice.dispatch.CreateShaderModule(m_device, &createInfo, nullptr, &m_module);
+    VkResult result = m_device.dispatch.CreateShaderModule(m_device.handle, &createInfo, nullptr, &m_module);
 
     if (result != VK_SUCCESS)
     {
@@ -63,8 +61,7 @@ vkShade::ShaderModule::~ShaderModule()
 {
     if (m_module != VK_NULL_HANDLE)
     {
-        auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(m_device)];
-        thisDevice.dispatch.DestroyShaderModule(m_device, m_module, nullptr);
+        m_device.dispatch.DestroyShaderModule(m_device.handle, m_module, nullptr);
         spdlog::trace("Destroyed VkShaderModule");
     }
 }

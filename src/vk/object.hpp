@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vulkan/vulkan_core.h>
+#include "hooks/hooks.hpp"
 
 namespace vkShade
 {
@@ -17,11 +17,11 @@ namespace vkShade
         VulkanObject(VulkanObject&&) noexcept = default;
         VulkanObject& operator=(VulkanObject&&) noexcept = default;
 
-        VkDevice device() const { return m_device; }
+        VulkanDevice& device() const { return m_device; }
 
     protected:
-        VulkanObject(VkDevice device) : m_device(device) {}
+        VulkanObject(VulkanDevice& device) : m_device(device) {}
 
-        VkDevice m_device {VK_NULL_HANDLE};
+        VulkanDevice& m_device;
     };
 }  // namespace vkShade

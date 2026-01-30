@@ -5,7 +5,7 @@
 
 #include "hooks/hooks.hpp"
 
-vkShade::VulkanSwapchain::VulkanSwapchain(VkDevice device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
+vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
     : VulkanObject(device)
 {
     // Store the swapchain info
@@ -13,13 +13,11 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VkDevice device, VkSwapchainKHR swapch
     m_format = swapchainInfo.imageFormat;
     m_extent = swapchainInfo.imageExtent;
 
-    auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
-
     // Get swapchain images
     uint32_t imageCount = 0;
-    thisDevice.dispatch.GetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+    m_device.dispatch.GetSwapchainImagesKHR(m_device.handle, swapchain, &imageCount, nullptr);
     m_images.resize(imageCount);
-    thisDevice.dispatch.GetSwapchainImagesKHR(device, swapchain, &imageCount, m_images.data());
+    m_device.dispatch.GetSwapchainImagesKHR(m_device.handle, swapchain, &imageCount, m_images.data());
 
     // Create image views
     m_imageViews.resize(imageCount);
@@ -38,7 +36,7 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VkDevice device, VkSwapchainKHR swapch
                 .layerCount = 1,
             },
         };
-        thisDevice.dispatch.CreateImageView(device, &viewInfo, nullptr, &m_imageViews[i]);
+        m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_imageViews[i]);
     }
 }
 

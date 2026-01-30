@@ -10,7 +10,7 @@ namespace vkShade
     class VulkanSwapchain : public VulkanObject
     {
     public:
-        VulkanSwapchain(VkDevice device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo);
+        VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo);
 
         VkExtent2D extent() const { return m_extent; }
         VkFormat format() const { return m_format; }

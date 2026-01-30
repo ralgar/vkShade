@@ -6,19 +6,19 @@
 #include "core/service_locator.hpp"
 
 vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
-    : VulkanObject(device.handle)
+    : VulkanObject(device)
 {
     auto& shaderCache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
 
     // Load the vertex shader module
     std::string vertShaderPath = "build/shaders/fullscreen.vert.spv";
-    m_vertShader = shaderCache.load(vertShaderPath, device.handle, vertShaderPath);
+    m_vertShader = shaderCache.load(vertShaderPath, m_device, vertShaderPath);
 	if (m_vertShader == nullptr)
         spdlog::error("Vertex shader not found");
 
     // Load the fragment shader module
     std::string fragShaderPath = "build/shaders/simple_grid.frag.spv";
-    m_fragShader = shaderCache.load(fragShaderPath, device.handle, fragShaderPath);
+    m_fragShader = shaderCache.load(fragShaderPath, m_device, fragShaderPath);
 	if (m_fragShader == nullptr)
         spdlog::error("Fragment shader not found");
 
@@ -36,7 +36,7 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
         .pBindings = &binding,
     };
 
-    device.dispatch.CreateDescriptorSetLayout(m_device, &layoutInfo, nullptr, &m_descriptorSetLayout);
+    m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &layoutInfo, nullptr, &m_descriptorSetLayout);
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
@@ -45,7 +45,7 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
         .pSetLayouts = &m_descriptorSetLayout,
     };
 
-    device.dispatch.CreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+    m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
 
     // Create graphics pipeline
     VkPipelineShaderStageCreateInfo shaderStages[] = {
@@ -133,7 +133,7 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
         .layout = m_pipelineLayout,
     };
 
-    VkResult result = device.dispatch.CreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+    VkResult result = m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
 
     if (result != VK_SUCCESS)
     {
@@ -151,19 +151,15 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
 
 vkShade::Effect::~Effect()
 {
-    auto& device = get_device_from_handle(m_device);
-
-    device.dispatch.DestroyPipeline(m_device, m_pipeline, nullptr);
-    device.dispatch.DestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-    device.dispatch.DestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, nullptr);
+    m_device.dispatch.DestroyPipeline(m_device.handle, m_pipeline, nullptr);
+    m_device.dispatch.DestroyPipelineLayout(m_device.handle, m_pipelineLayout, nullptr);
+    m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_descriptorSetLayout, nullptr);
 }
 
 void vkShade::Effect::render(VkCommandBuffer cmd, VkImageView input, VkExtent2D extent)
 {
-    auto& device = get_device_from_handle(m_device);
-
     // Bind pipeline
-    device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
     // Set viewport and scissor
     VkViewport viewport = {
@@ -174,17 +170,17 @@ void vkShade::Effect::render(VkCommandBuffer cmd, VkImageView input, VkExtent2D 
         .minDepth = 0.0f,
         .maxDepth = 1.0f,
     };
-    device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
+    m_device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
 
     VkRect2D scissor = {
         .offset = {0, 0},
         .extent = extent,
     };
-    device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
+    m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
 
     // TODO: Bind descriptor set with input texture
     // For now, just draw without sampling input
 
     // Draw fullscreen triangle (3 vertices, no vertex buffer)
-    device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
+    m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
 }

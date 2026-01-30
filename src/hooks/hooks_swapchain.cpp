@@ -29,7 +29,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice         
         return result;
 
     // Create and store swapchain object
-    vkShade::VulkanSwapchain swapchain(thisDevice.handle, *pSwapchain, *pCreateInfo);
+    vkShade::VulkanSwapchain swapchain(thisDevice, *pSwapchain, *pCreateInfo);
     {
         std::lock_guard<std::mutex> lock(g_swapchainMutex);
         g_swapchains.insert({*pSwapchain, std::move(swapchain)});
@@ -112,7 +112,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
 
         auto& swapchainData = it->second;
         VkImage image = swapchainData.image(imageIndex);
-        VkDevice device = swapchainData.device();
+        VkDevice device = swapchainData.device().handle;
 
         // Allocate command buffer
         VkCommandBuffer cmd;
