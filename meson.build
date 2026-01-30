@@ -22,6 +22,8 @@ spdlog = dependency('spdlog', fallback: ['spdlog', 'spdlog_dep'])
 vma = dependency('vma', fallback: ['vulkan-memory-allocator', 'vma_allocator_dep'])
 wayland_client = dependency('wayland-client')
 xkbcommon = dependency('xkbcommon')
+xcb = dependency('xcb', required: false)
+x11 = dependency('x11')
 
 subdir('shaders')
 

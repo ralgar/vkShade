@@ -16,8 +16,6 @@ vkShade::InputManagerWayland::InputManagerWayland(wl_display* waylandDisplay)
     wl_registry* reg = wl_display_get_registry(m_display);
     wl_registry_add_listener(reg, &reg_listener, this);     // Pass 'this' as void* in callbacks
     wl_display_roundtrip(m_display);  // Get globals
-
-    bind_action("TestAction", vkShade::KeyCode::KEY_HOME);
 }
 
 void vkShade::InputManagerWayland::on_keyboard_key(uint32_t key, uint32_t state)
@@ -61,19 +59,12 @@ void vkShade::InputManagerWayland::on_keyboard_modifiers(uint32_t modsDepressed,
 
 void vkShade::InputManagerWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
 {
-    if (strcmp(interface, wl_seat_interface.name) == 0) {
-        wl_seat* seat = static_cast<wl_seat*>(
-            wl_registry_bind(reg, name, &wl_seat_interface, 1));
-
-        wl_seat_add_listener(seat, &seat_listener, this);  // ← Pass 'this'!
+    if (strcmp(interface, wl_seat_interface.name) == 0)
+    {
+        wl_seat* seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, 1));
+        wl_seat_add_listener(seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
         spdlog::trace("Bound to wl_seat");
     }
-    /*if (strcmp(interface, "wl_seat") == 0)
-    {
-        wl_seat* seat = (wl_seat*)wl_registry_bind(reg, name, &wl_seat_interface, 1);
-        wl_seat_add_listener(seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
-        printf("Found wl_seat!\n");
-    }*/
 }
 
 void vkShade::InputManagerWayland::on_seat_capabilities(wl_seat* seat, uint32_t caps)

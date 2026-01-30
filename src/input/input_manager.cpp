@@ -8,7 +8,64 @@ vkShade::InputManager::InputManager()
 {
     spdlog::debug("Initializing InputManager");
 
+    // Initialize XKB context
+    m_xkbContext = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    if (!m_xkbContext)
+    {
+        spdlog::error("[InputManager] Failed to create XKB context");
+        return;
+    }
+
+    // Load keymap from the system
+    // We need to get the current keymap - try reading from xkbcomp or use default
+    struct xkb_rule_names names = {
+        .rules = nullptr,
+        .model = nullptr,
+        .layout = nullptr,
+        .variant = nullptr,
+        .options = nullptr
+    };
+
+    m_xkbKeymap = xkb_keymap_new_from_names(m_xkbContext, &names,
+                                            XKB_KEYMAP_COMPILE_NO_FLAGS);
+
+    if (!m_xkbKeymap)
+    {
+        spdlog::error("[InputManager] Failed to create XKB keymap");
+        return;
+    }
+
+    // Create XKB state
+    m_xkbState = xkb_state_new(m_xkbKeymap);
+    if (!m_xkbState)
+    {
+        spdlog::error("[InputManager] Failed to create XKB state");
+        return;
+    }
+
+    // Hardcoded keybinds
+    // TODO: Add proper configuration for this
     bind_action("TestAction", vkShade::KeyCode::KEY_HOME);
+}
+
+vkShade::InputManager::~InputManager()
+{
+    // Clean up XKB data
+    if (m_xkbState)
+    {
+        xkb_state_unref(m_xkbState);
+        m_xkbState = nullptr;
+    }
+    if (m_xkbKeymap)
+    {
+        xkb_keymap_unref(m_xkbKeymap);
+        m_xkbKeymap = nullptr;
+    }
+    if (m_xkbContext)
+    {
+        xkb_context_unref(m_xkbContext);
+        m_xkbContext = nullptr;
+    }
 }
 
 void vkShade::InputManager::bind_action(const std::string& actionName, vkShade::KeyCode keyCode)

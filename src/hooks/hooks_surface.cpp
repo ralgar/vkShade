@@ -1,4 +1,3 @@
-#include "input/input_manager_wayland.hpp"
 #include "hooks.hpp"
 #include "hooks_surface.hpp"
 
@@ -6,6 +5,9 @@
 
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
+#include "input/input_manager_wayland.hpp"
+#include "input/input_manager_xcb.hpp"
+#include "input/input_manager_xlib.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance                           instance,
                                                                     const VkWaylandSurfaceCreateInfoKHR* pCreateInfo,
@@ -40,6 +42,12 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
 {
     spdlog::trace("Intercepted VkCreateXcbSurfaceKHR");
 
+    // Initialize InputManager
+    auto* xcbCreateInfo = reinterpret_cast<const VkXcbSurfaceCreateInfoKHR*>(pCreateInfo);
+    xcb_connection_t* connection = xcbCreateInfo->connection;
+    xcb_window_t window = xcbCreateInfo->window;
+    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerXcb>(connection, window);
+
     auto& thisInstance = get_instance_from_handle(instance);
 
     // Get the function pointer manually since extensions aren't in the dispatch table
@@ -49,7 +57,8 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
     VkResult result = createXcbSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
     if (result == VK_SUCCESS)
     {
-        spdlog::debug("X11 (xcb) surface created");
+        spdlog::debug("X11 (XCB) surface created");
+        spdlog::warn("XCB input is currently unsupported");
     }
 
     return result;
@@ -61,6 +70,11 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
                                                                  VkSurfaceKHR*                     pSurface)
 {
     spdlog::trace("Intercepted VkCreateXlibSurfaceKHR");
+
+    // Initialize InputManager
+    auto* xlibCreateInfo = reinterpret_cast<const VkXlibSurfaceCreateInfoKHR*>(pCreateInfo);
+    Display* display = xlibCreateInfo->dpy;
+    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerXlib>(display);
 
     auto& thisInstance = get_instance_from_handle(instance);
 

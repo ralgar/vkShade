@@ -25,7 +25,5 @@ namespace vkShade
     private:
         wl_display*  m_display;
         wl_keyboard* m_keyboard;
-        xkb_context* m_xkbContext;
-        xkb_state*   m_xkbState;
     };
 }// namespace vkShade

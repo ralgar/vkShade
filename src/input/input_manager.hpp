@@ -3,16 +3,19 @@
 #include <string>
 #include <unordered_map>
 
-#include <xkbcommon/xkbcommon.h>
-
 #include "key_codes.hpp"
+
+typedef struct xkb_context xkb_context;
+typedef struct xkb_keymap xkb_keymap;
+typedef struct xkb_state xkb_state;
+typedef uint32_t xkb_keysym_t;
 
 namespace vkShade
 {
     class InputManager
     {
     public:
-        InputManager();
+        virtual ~InputManager();
 
         void bind_action(const std::string& actionName, vkShade::KeyCode key);
 
@@ -25,6 +28,13 @@ namespace vkShade
         virtual void process_events() = 0;
 
         void update();
+
+    protected:
+        InputManager();  // Prevent direct instantiation
+
+        xkb_context* m_xkbContext {nullptr};
+        xkb_keymap*  m_xkbKeymap  {nullptr};
+        xkb_state*   m_xkbState   {nullptr};
 
     private:
         struct ActionBinding
