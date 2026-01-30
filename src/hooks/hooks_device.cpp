@@ -12,6 +12,7 @@
 #include "core/service_locator.hpp"
 #include "core/resource_cache.hpp"
 #include "gui/gui_manager.hpp"
+#include "vk/effect.hpp"
 #include "vk/shader_module.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
@@ -210,8 +211,12 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkA
 {
     spdlog::trace("Intercepted VkDestroyDevice");
 
-    // First destroy any subsystems that call into Vulkan
-    vkShade::Locator<vkShade::GuiManager>::reset();
+    // First destroy anything that calls into Vulkan
+    if (vkShade::Locator<vkShade::GuiManager>::has())
+        vkShade::Locator<vkShade::GuiManager>::reset();
+
+    if (vkShade::Locator<vkShade::Effect>::has())
+        vkShade::Locator<vkShade::Effect>::reset();
 
     // Remove the VulkanDevice from layer's bookkeeping
     std::lock_guard<std::mutex> lock(global_lock);

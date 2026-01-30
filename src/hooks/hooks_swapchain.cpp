@@ -9,6 +9,7 @@
 
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
+#include "vk/effect.hpp"
 
 std::unordered_map<VkSwapchainKHR, vkShade::VulkanSwapchain> g_swapchains;
 std::mutex g_swapchainMutex;
@@ -76,9 +77,14 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     if (!vkShade::Locator<vkShade::GuiManager>::has())
         vkShade::Locator<vkShade::GuiManager>::emplace(thisDevice, swapchainData.format());
 
+    // Create the Effect if it doesn't exist yet
+    if (!vkShade::Locator<vkShade::Effect>::has())
+        vkShade::Locator<vkShade::Effect>::emplace(thisDevice, swapchainData.format());
+
     // Get manager handles
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
     auto& gui = vkShade::Locator<vkShade::GuiManager>::get();
+    auto& effect = vkShade::Locator<vkShade::Effect>::get();
 
     // Update managers
     input.update();
@@ -153,7 +159,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         // Begin dynamic rendering
         VkRenderingAttachmentInfo colorAttachment = {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = swapchainData.image_view(imageIndex),  // You need to track image views
+            .imageView = swapchainData.image_view(imageIndex),
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,  // Keep existing content
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -167,8 +173,11 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
             .pColorAttachments = &colorAttachment,
         };
 
-        // Draw ImGui
+        // Render ImGui on top
         thisDevice.dispatch.CmdBeginRendering(cmd, &renderingInfo);
+
+        // Render effect
+        effect.render(cmd, VK_NULL_HANDLE, swapchainData.extent());
 
         ImDrawData* draw_data = ImGui::GetDrawData();
         ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);

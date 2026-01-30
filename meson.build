@@ -23,6 +23,8 @@ vma = dependency('vma', fallback: ['vulkan-memory-allocator', 'vma_allocator_dep
 wayland_client = dependency('wayland-client')
 xkbcommon = dependency('xkbcommon')
 
+subdir('shaders')
+
 if get_option('with_so')
     subdir('src')
 endif
