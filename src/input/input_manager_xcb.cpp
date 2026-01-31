@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 #include <xcb/xcb.h>
+#include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon.h>
 
 vkShade::InputManagerXcb::InputManagerXcb(xcb_connection_t* connection, xcb_window_t window)
@@ -14,8 +15,15 @@ vkShade::InputManagerXcb::InputManagerXcb(xcb_connection_t* connection, xcb_wind
         return;
     }
 
-    // Select keyboard events from the window
-    const uint32_t values[] = { XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE };
+    // Select keyboard and mouse events from the window
+    const uint32_t values[] = {
+        XCB_EVENT_MASK_KEY_PRESS |
+        XCB_EVENT_MASK_KEY_RELEASE |
+        XCB_EVENT_MASK_BUTTON_PRESS |
+        XCB_EVENT_MASK_BUTTON_RELEASE |
+        XCB_EVENT_MASK_POINTER_MOTION
+    };
+
     xcb_change_window_attributes(m_connection, m_window, XCB_CW_EVENT_MASK, values);
     xcb_flush(m_connection);
 }
@@ -47,6 +55,24 @@ void vkShade::InputManagerXcb::process_events()
                 auto* key_event = reinterpret_cast<xcb_key_release_event_t*>(event);
                 update_modifiers(key_event->state);
                 handle_key_event(key_event->detail, false);
+                break;
+            }
+            case XCB_BUTTON_PRESS:
+            {
+                auto* button_event = reinterpret_cast<xcb_button_press_event_t*>(event);
+                on_mouse_button(button_event->detail, true);
+                break;
+            }
+            case XCB_BUTTON_RELEASE:
+            {
+                auto* button_event = reinterpret_cast<xcb_button_release_event_t*>(event);
+                on_mouse_button(button_event->detail, false);
+                break;
+            }
+            case XCB_MOTION_NOTIFY:
+            {
+                auto* motion_event = reinterpret_cast<xcb_motion_notify_event_t*>(event);
+                on_mouse_motion(motion_event->event_x, motion_event->event_y);
                 break;
             }
         }
@@ -83,6 +109,31 @@ void vkShade::InputManagerXcb::handle_key_event(uint32_t keyCode, bool pressed)
 
     // Call base class to update key state map
     this->handle_keyboard_event(keysym, pressed);
+}
+
+void vkShade::InputManagerXcb::on_mouse_button(uint8_t button, bool pressed)
+{
+    // XCB button codes: 1=left, 2=middle, 3=right, 4=scroll up, 5=scroll down
+    MouseButton mouseButton;
+    switch (button) {
+        case 1: mouseButton = MouseButton::LEFT; break;
+        case 2: mouseButton = MouseButton::MIDDLE; break;
+        case 3: mouseButton = MouseButton::RIGHT; break;
+        case 4:  // Scroll up
+        case 5:  // Scroll down
+            return;  // Ignore scroll for now
+        default: return;
+    }
+
+    handle_mouse_button_event(mouseButton, pressed);
+
+    spdlog::debug("[InputManagerXcb] Mouse button {} {}",
+                  (int)mouseButton, pressed ? "pressed" : "released");
+}
+
+void vkShade::InputManagerXcb::on_mouse_motion(int16_t x, int16_t y)
+{
+    handle_mouse_motion_event(static_cast<float>(x), static_cast<float>(y));
 }
 
 void vkShade::InputManagerXcb::update_modifiers(uint16_t state)

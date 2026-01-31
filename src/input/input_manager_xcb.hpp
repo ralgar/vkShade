@@ -19,6 +19,8 @@ namespace vkShade
         xcb_window_t      m_window     {0};
 
         void handle_key_event(uint32_t keyCode, bool pressed);
+        void on_mouse_button(uint8_t button, bool pressed);
+        void on_mouse_motion(int16_t x, int16_t y);
         void update_modifiers(uint16_t state);
     };
 } // namespace vkShade
