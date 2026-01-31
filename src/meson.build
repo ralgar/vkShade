@@ -12,6 +12,7 @@ vkShade_src = [
   'input/wayland_callbacks.cpp',
   'vk/buffer.cpp',
   'vk/effect.cpp',
+  'vk/image.cpp',
   'vk/shader_module.cpp',
   'vk/swapchain.cpp',
 ]
