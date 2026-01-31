@@ -1,4 +1,4 @@
-#include "input_manager_wayland.hpp"
+#include "input_backend_wayland.hpp"
 
 #include <sys/mman.h>
 #include <unistd.h>
@@ -9,7 +9,7 @@
 #include "mouse_button_codes.hpp"
 #include "wayland_callbacks.hpp"
 
-vkShade::InputManagerWayland::InputManagerWayland(wl_display* waylandDisplay)
+vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
 {
     // Set up input
     m_display = waylandDisplay;
@@ -19,7 +19,7 @@ vkShade::InputManagerWayland::InputManagerWayland(wl_display* waylandDisplay)
     wl_display_roundtrip(m_display);  // Get globals
 }
 
-void vkShade::InputManagerWayland::on_keyboard_key(uint32_t key, uint32_t state)
+void vkShade::InputBackendWayland::on_keyboard_key(uint32_t key, uint32_t state)
 {
     uint32_t keycode = key + 8;  // Wayland uses evdev codes, XKB expects +8
     xkb_keysym_t sym = xkb_state_key_get_one_sym(m_xkbState, keycode);
@@ -28,7 +28,7 @@ void vkShade::InputManagerWayland::on_keyboard_key(uint32_t key, uint32_t state)
     handle_keyboard_event(sym, pressed);
 }
 
-void vkShade::InputManagerWayland::on_keyboard_keymap(uint32_t format, int32_t fd, uint32_t size)
+void vkShade::InputBackendWayland::on_keyboard_keymap(uint32_t format, int32_t fd, uint32_t size)
 {
     if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1)
     {
@@ -47,7 +47,7 @@ void vkShade::InputManagerWayland::on_keyboard_keymap(uint32_t format, int32_t f
     xkb_keymap_unref(keymap);
 }
 
-void vkShade::InputManagerWayland::on_keyboard_modifiers(uint32_t modsDepressed,
+void vkShade::InputBackendWayland::on_keyboard_modifiers(uint32_t modsDepressed,
                                                          uint32_t modsLatched,
                                                          uint32_t modsLocked,
                                                          uint32_t group)
@@ -58,7 +58,7 @@ void vkShade::InputManagerWayland::on_keyboard_modifiers(uint32_t modsDepressed,
     }
 }
 
-void vkShade::InputManagerWayland::on_pointer_enter(wl_surface* surface, wl_fixed_t x, wl_fixed_t y)
+void vkShade::InputBackendWayland::on_pointer_enter(wl_surface* surface, wl_fixed_t x, wl_fixed_t y)
 {
     float fx = wl_fixed_to_double(x);
     float fy = wl_fixed_to_double(y);
@@ -66,19 +66,19 @@ void vkShade::InputManagerWayland::on_pointer_enter(wl_surface* surface, wl_fixe
     spdlog::trace("Pointer entered at ({}, {})", fx, fy);
 }
 
-void vkShade::InputManagerWayland::on_pointer_leave(wl_surface* surface)
+void vkShade::InputBackendWayland::on_pointer_leave(wl_surface* surface)
 {
     spdlog::trace("Pointer left surface");
 }
 
-void vkShade::InputManagerWayland::on_pointer_motion(uint32_t time, wl_fixed_t x, wl_fixed_t y)
+void vkShade::InputBackendWayland::on_pointer_motion(uint32_t time, wl_fixed_t x, wl_fixed_t y)
 {
     float fx = wl_fixed_to_double(x);
     float fy = wl_fixed_to_double(y);
     handle_mouse_motion_event(fx, fy);
 }
 
-void vkShade::InputManagerWayland::on_pointer_button(uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
+void vkShade::InputBackendWayland::on_pointer_button(uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
 {
     // Wayland button codes: BTN_LEFT=0x110, BTN_RIGHT=0x111, BTN_MIDDLE=0x112
     MouseButton mouseButton;
@@ -94,14 +94,14 @@ void vkShade::InputManagerWayland::on_pointer_button(uint32_t serial, uint32_t t
     handle_mouse_button_event(mouseButton, pressed);
 }
 
-void vkShade::InputManagerWayland::on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value)
+void vkShade::InputBackendWayland::on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value)
 {
     // Handle scroll wheel
     float scroll = wl_fixed_to_double(value);
     spdlog::trace("Scroll axis {} value {}", axis, scroll);
 }
 
-void vkShade::InputManagerWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
+void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
 {
     if (strcmp(interface, wl_seat_interface.name) == 0)
     {
@@ -111,7 +111,7 @@ void vkShade::InputManagerWayland::on_registry_global(wl_registry* reg, uint32_t
     }
 }
 
-void vkShade::InputManagerWayland::on_seat_capabilities(wl_seat* seat, uint32_t caps)
+void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t caps)
 {
     // Add keyboard handling
     if (caps & WL_SEAT_CAPABILITY_KEYBOARD)
@@ -130,7 +130,7 @@ void vkShade::InputManagerWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     }
 }
 
-void vkShade::InputManagerWayland::process_events()
+void vkShade::InputBackendWayland::process_events()
 {
     // Process Wayland events on default queue (non-blocking)
     if (m_display)

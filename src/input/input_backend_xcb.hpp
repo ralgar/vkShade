@@ -7,10 +7,10 @@ typedef uint32_t xcb_window_t;
 
 namespace vkShade
 {
-    class InputManagerXcb : public InputManager
+    class InputBackendXcb : public InputManager
     {
     public:
-        InputManagerXcb(xcb_connection_t* connection, xcb_window_t window);
+        InputBackendXcb(xcb_connection_t* connection, xcb_window_t window);
 
         void process_events() override;
 

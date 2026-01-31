@@ -7,11 +7,11 @@ typedef unsigned long Window;
 
 namespace vkShade
 {
-    class InputManagerXlib : public InputManager
+    class InputBackendXlib : public InputManager
     {
     public:
-        InputManagerXlib(Display* display, Window window);
-        ~InputManagerXlib();
+        InputBackendXlib(Display* display, Window window);
+        ~InputBackendXlib();
 
         void process_events() override;
 

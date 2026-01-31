@@ -1,4 +1,4 @@
-#include "input_manager_xlib.hpp"
+#include "input_backend_xlib.hpp"
 
 #include <spdlog/spdlog.h>
 #include <X11/Xlib.h>
@@ -6,7 +6,7 @@
 #include <X11/keysym.h>
 #include <xkbcommon/xkbcommon.h>
 
-vkShade::InputManagerXlib::InputManagerXlib(Display* display, Window window)
+vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
     : m_display(display),
       m_window(window)
 {
@@ -20,7 +20,7 @@ vkShade::InputManagerXlib::InputManagerXlib(Display* display, Window window)
     std::memset(m_previousKeymap, 0, sizeof(m_previousKeymap));
 }
 
-vkShade::InputManagerXlib::~InputManagerXlib()
+vkShade::InputBackendXlib::~InputBackendXlib()
 {
     if (m_xkbState)
         xkb_state_unref(m_xkbState);
@@ -30,7 +30,7 @@ vkShade::InputManagerXlib::~InputManagerXlib()
         xkb_context_unref(m_xkbContext);
 }
 
-void vkShade::InputManagerXlib::process_events()
+void vkShade::InputBackendXlib::process_events()
 {
     if (!m_display || !m_xkbState)
         return;
@@ -61,7 +61,7 @@ void vkShade::InputManagerXlib::process_events()
     query_mouse_state();
 }
 
-void vkShade::InputManagerXlib::handle_key_event(uint32_t keyCode, bool pressed)
+void vkShade::InputBackendXlib::handle_key_event(uint32_t keyCode, bool pressed)
 {
     if (!m_xkbState)
         return;
@@ -84,7 +84,7 @@ void vkShade::InputManagerXlib::handle_key_event(uint32_t keyCode, bool pressed)
 }
 
 
-void vkShade::InputManagerXlib::query_mouse_state()
+void vkShade::InputBackendXlib::query_mouse_state()
 {
     Window root_return, child_return;
     int root_x, root_y, win_x, win_y;

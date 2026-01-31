@@ -1,17 +1,17 @@
-#include "input_manager_xcb.hpp"
+#include "input_backend_xcb.hpp"
 
 #include <spdlog/spdlog.h>
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon.h>
 
-vkShade::InputManagerXcb::InputManagerXcb(xcb_connection_t* connection, xcb_window_t window)
+vkShade::InputBackendXcb::InputBackendXcb(xcb_connection_t* connection, xcb_window_t window)
     : m_connection(connection),
       m_window(window)
 {
     if (!m_connection)
     {
-        spdlog::error("[InputManagerXcb] Invalid connection");
+        spdlog::error("[InputBackendXcb] Invalid connection");
         return;
     }
 
@@ -28,7 +28,7 @@ vkShade::InputManagerXcb::InputManagerXcb(xcb_connection_t* connection, xcb_wind
     xcb_flush(m_connection);
 }
 
-void vkShade::InputManagerXcb::process_events()
+void vkShade::InputBackendXcb::process_events()
 {
     if (!m_connection)
         return;
@@ -93,7 +93,7 @@ void vkShade::InputManagerXcb::process_events()
         xcb_flush(m_connection);
 }
 
-void vkShade::InputManagerXcb::handle_key_event(uint32_t keyCode, bool pressed)
+void vkShade::InputBackendXcb::handle_key_event(uint32_t keyCode, bool pressed)
 {
     if (!m_xkbState)
         return;
@@ -111,7 +111,7 @@ void vkShade::InputManagerXcb::handle_key_event(uint32_t keyCode, bool pressed)
     this->handle_keyboard_event(keysym, pressed);
 }
 
-void vkShade::InputManagerXcb::on_mouse_button(uint8_t button, bool pressed)
+void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
 {
     // XCB button codes: 1=left, 2=middle, 3=right, 4=scroll up, 5=scroll down
     MouseButton mouseButton;
@@ -127,16 +127,16 @@ void vkShade::InputManagerXcb::on_mouse_button(uint8_t button, bool pressed)
 
     handle_mouse_button_event(mouseButton, pressed);
 
-    spdlog::debug("[InputManagerXcb] Mouse button {} {}",
+    spdlog::debug("[InputBackendXcb] Mouse button {} {}",
                   (int)mouseButton, pressed ? "pressed" : "released");
 }
 
-void vkShade::InputManagerXcb::on_mouse_motion(int16_t x, int16_t y)
+void vkShade::InputBackendXcb::on_mouse_motion(int16_t x, int16_t y)
 {
     handle_mouse_motion_event(static_cast<float>(x), static_cast<float>(y));
 }
 
-void vkShade::InputManagerXcb::update_modifiers(uint16_t state)
+void vkShade::InputBackendXcb::update_modifiers(uint16_t state)
 {
     if (!m_xkbState || !m_xkbKeymap)
         return;

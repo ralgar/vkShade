@@ -4,10 +4,10 @@
 #include <spdlog/spdlog.h>
 
 #include "core/service_locator.hpp"
+#include "input/input_backend_wayland.hpp"
+#include "input/input_backend_xcb.hpp"
+#include "input/input_backend_xlib.hpp"
 #include "input/input_manager.hpp"
-#include "input/input_manager_wayland.hpp"
-#include "input/input_manager_xcb.hpp"
-#include "input/input_manager_xlib.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance                           instance,
                                                                     const VkWaylandSurfaceCreateInfoKHR* pCreateInfo,
@@ -17,7 +17,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance  
     spdlog::trace("Intercepted VkCreateWaylandSurfaceKHR");
 
     // Initialize InputManager
-    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerWayland>(pCreateInfo->display);
+    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendWayland>(pCreateInfo->display);
 
     auto& thisInstance = get_instance_from_handle(instance);
 
@@ -46,7 +46,7 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
     auto* xcbCreateInfo = reinterpret_cast<const VkXcbSurfaceCreateInfoKHR*>(pCreateInfo);
     xcb_connection_t* connection = xcbCreateInfo->connection;
     xcb_window_t window = xcbCreateInfo->window;
-    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerXcb>(connection, window);
+    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendXcb>(connection, window);
 
     auto& thisInstance = get_instance_from_handle(instance);
 
@@ -75,7 +75,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
     auto* xlibCreateInfo = reinterpret_cast<const VkXlibSurfaceCreateInfoKHR*>(pCreateInfo);
     Window window = xlibCreateInfo->window;
     Display* display = xlibCreateInfo->dpy;
-    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerXlib>(display, window);
+    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendXlib>(display, window);
 
     auto& thisInstance = get_instance_from_handle(instance);
 

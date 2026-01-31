@@ -6,10 +6,10 @@
 
 namespace vkShade
 {
-    class InputManagerWayland : public InputManager
+    class InputBackendWayland : public InputManager
     {
     public:
-        InputManagerWayland(wl_display* waylandDisplay);
+        InputBackendWayland(wl_display* waylandDisplay);
 
         // These get called by the static C callbacks
         void on_registry_global(wl_registry* reg, uint32_t name,
