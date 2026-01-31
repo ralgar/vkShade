@@ -1,6 +1,9 @@
 #include "hooks.hpp"
 
+#include <cstdlib>
+
 #include <magic_enum/magic_enum.hpp>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <vulkan/vk_layer.h>
@@ -14,10 +17,44 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     static bool spdlogInitialized = false;
     if (!spdlogInitialized)
     {
+        std::vector<spdlog::sink_ptr> sinks;
+
+        // Always add console sink
         auto consoleSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
-        auto logger = std::make_shared<spdlog::logger>("vkShade", consoleSink);
+        sinks.push_back(consoleSink);
+
+        // Optionally add file sink
+        const char* logFileEnv = std::getenv("VKSHADE_LOG_FILE");
+        if (logFileEnv != nullptr)
+        {
+            auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFileEnv, true);
+            sinks.push_back(fileSink);
+        }
+
+        auto logger = std::make_shared<spdlog::logger>("vkShade", sinks.begin(), sinks.end());
         spdlog::set_default_logger(logger);
-        spdlog::set_level(spdlog::level::trace);    // TODO: Provide an env var for this
+
+        // Set log level
+        const char* logLevelEnv = std::getenv("VKSHADE_LOG_LEVEL");
+        std::string level = logLevelEnv ? logLevelEnv : "";
+
+        if (level == "trace")
+            spdlog::set_level(spdlog::level::trace);
+        else if (level == "debug")
+            spdlog::set_level(spdlog::level::debug);
+        else if (level == "info")
+            spdlog::set_level(spdlog::level::info);
+        else if (level == "warn" || level == "warning")
+            spdlog::set_level(spdlog::level::warn);
+        else if (level == "error")
+            spdlog::set_level(spdlog::level::err);
+        else if (level == "critical")
+            spdlog::set_level(spdlog::level::critical);
+        else if (level == "off")
+            spdlog::set_level(spdlog::level::off);
+        else
+            spdlog::set_level(spdlog::level::info);
+
         spdlogInitialized = true;
     }
 

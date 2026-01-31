@@ -6,3 +6,6 @@ build/
 
 # ImGui persistence file
 imgui.ini
+
+# Log files
+*.log
