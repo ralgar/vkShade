@@ -4,7 +4,9 @@
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#include "core/service_locator.hpp"
 #include "hooks/hooks.hpp"
+#include "input/input_manager.hpp"
 #include "vk/macros.hpp"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
@@ -101,7 +103,17 @@ vkShade::GuiManager::~GuiManager()
 
 void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
 {
+    auto& input = vkShade::Locator<InputManager>::get();
+
     ImGuiIO& io = ImGui::GetIO();
+
+    // Update mouse state
+    glm::vec2 mousePos = input.mouse_position();
+    io.AddMousePosEvent(mousePos.x, mousePos.y);
+    io.AddMouseButtonEvent(0, input.is_mouse_button_pressed(MouseButton::LEFT));
+    io.AddMouseButtonEvent(1, input.is_mouse_button_pressed(MouseButton::RIGHT));
+    io.AddMouseButtonEvent(2, input.is_mouse_button_pressed(MouseButton::MIDDLE));
+
     io.DisplaySize = ImVec2((float)swapchainExtent.width, (float)swapchainExtent.height);
     io.DeltaTime = deltaTime;
 
