@@ -6,6 +6,7 @@
 #include <spdlog/spdlog.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "mouse_button_codes.hpp"
 #include "wayland_callbacks.hpp"
 
 vkShade::InputManagerWayland::InputManagerWayland(wl_display* waylandDisplay)
@@ -57,6 +58,49 @@ void vkShade::InputManagerWayland::on_keyboard_modifiers(uint32_t modsDepressed,
     }
 }
 
+void vkShade::InputManagerWayland::on_pointer_enter(wl_surface* surface, wl_fixed_t x, wl_fixed_t y)
+{
+    float fx = wl_fixed_to_double(x);
+    float fy = wl_fixed_to_double(y);
+    handle_mouse_motion_event(fx, fy);
+    spdlog::trace("Pointer entered at ({}, {})", fx, fy);
+}
+
+void vkShade::InputManagerWayland::on_pointer_leave(wl_surface* surface)
+{
+    spdlog::trace("Pointer left surface");
+}
+
+void vkShade::InputManagerWayland::on_pointer_motion(uint32_t time, wl_fixed_t x, wl_fixed_t y)
+{
+    float fx = wl_fixed_to_double(x);
+    float fy = wl_fixed_to_double(y);
+    handle_mouse_motion_event(fx, fy);
+}
+
+void vkShade::InputManagerWayland::on_pointer_button(uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
+{
+    // Wayland button codes: BTN_LEFT=0x110, BTN_RIGHT=0x111, BTN_MIDDLE=0x112
+    MouseButton mouseButton;
+    switch (button)
+    {
+        case 0x110: mouseButton = MouseButton::LEFT; break;
+        case 0x111: mouseButton = MouseButton::RIGHT; break;
+        case 0x112: mouseButton = MouseButton::MIDDLE; break;
+        default: return;  // Unknown button
+    }
+
+    bool pressed = (state == WL_POINTER_BUTTON_STATE_PRESSED);
+    handle_mouse_button_event(mouseButton, pressed);
+}
+
+void vkShade::InputManagerWayland::on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value)
+{
+    // Handle scroll wheel
+    float scroll = wl_fixed_to_double(value);
+    spdlog::trace("Scroll axis {} value {}", axis, scroll);
+}
+
 void vkShade::InputManagerWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
 {
     if (strcmp(interface, wl_seat_interface.name) == 0)
@@ -69,11 +113,20 @@ void vkShade::InputManagerWayland::on_registry_global(wl_registry* reg, uint32_t
 
 void vkShade::InputManagerWayland::on_seat_capabilities(wl_seat* seat, uint32_t caps)
 {
+    // Add keyboard handling
     if (caps & WL_SEAT_CAPABILITY_KEYBOARD)
     {
         m_keyboard = wl_seat_get_keyboard(seat);
         wl_keyboard_add_listener(m_keyboard, &kb_listener, this);  // Pass 'this' as data* in callbacks
         spdlog::trace("Bound to wl_keyboard");
+    }
+
+    // Add pointer handling
+    if (caps & WL_SEAT_CAPABILITY_POINTER)
+    {
+        m_pointer = wl_seat_get_pointer(seat);
+        wl_pointer_add_listener(m_pointer, &pointer_listener, this);
+        spdlog::trace("Bound to wl_pointer");
     }
 }
 

@@ -20,10 +20,18 @@ namespace vkShade
         void on_keyboard_modifiers(uint32_t modsDepressed, uint32_t modsLatched,
                                    uint32_t modsLocked, uint32_t group);
 
+        // Pointer callbacks
+        void on_pointer_enter(wl_surface* surface, wl_fixed_t x, wl_fixed_t y);
+        void on_pointer_leave(wl_surface* surface);
+        void on_pointer_motion(uint32_t time, wl_fixed_t x, wl_fixed_t y);
+        void on_pointer_button(uint32_t serial, uint32_t time, uint32_t button, uint32_t state);
+        void on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value);
+
         void process_events() override;
 
     private:
         wl_display*  m_display;
         wl_keyboard* m_keyboard;
+        wl_pointer*  m_pointer;
     };
 }// namespace vkShade
