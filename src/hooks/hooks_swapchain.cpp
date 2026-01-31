@@ -10,6 +10,7 @@
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
 #include "vk/effect.hpp"
+#include "vk/image.hpp"
 
 std::unordered_map<VkSwapchainKHR, vkShade::VulkanSwapchain> g_swapchains;
 std::mutex g_swapchainMutex;
@@ -111,7 +112,8 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         }
 
         auto& swapchainData = it->second;
-        VkImage image = swapchainData.image(imageIndex);
+        vkShade::VulkanImage& swapchainImage = swapchainData.image(imageIndex);
+        vkShade::VulkanImage& pingPongA = swapchainData.ping_pong_a();
         VkDevice device = swapchainData.device().handle;
 
         // Allocate command buffer
@@ -131,35 +133,28 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         };
         thisDevice.dispatch.BeginCommandBuffer(cmd, &beginInfo);
 
-        // Transition to COLOR_ATTACHMENT_OPTIMAL for rendering
-        VkImageMemoryBarrier barrier1 = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = image,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-        };
-        thisDevice.dispatch.CmdPipelineBarrier(
-            cmd,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &barrier1
-        );
+        // 1. Transition swapchain image to TRANSFER_SRC (to read from it)
+        swapchainImage.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+        // 2. Transition ping-pong to TRANSFER_DST (to write to it)
+        pingPongA.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        // 3. Blit swapchain -> ping-pong
+        swapchainImage.blit_to(cmd, pingPongA.image());
+
+        // 4. Transition ping-pong to TRANSFER_SRC (to read back from it)
+        pingPongA.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+        // 5. Blit ping-pong -> swapchain
+        swapchainImage.blit_from(cmd, pingPongA.image());
+
+        // 6. Transition swapchain to COLOR_ATTACHMENT for rendering
+        swapchainImage.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
         // Begin dynamic rendering
         VkRenderingAttachmentInfo colorAttachment = {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = swapchainData.image_view(imageIndex),
+            .imageView = swapchainImage.image_view(),
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,  // Keep existing content
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -182,32 +177,11 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         ImDrawData* draw_data = ImGui::GetDrawData();
         ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
 
+        // End dynamic rendering
         thisDevice.dispatch.CmdEndRendering(cmd);
 
         // Transition back to PRESENT_SRC
-        VkImageMemoryBarrier barrier2 = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = 0,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = image,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-        };
-        thisDevice.dispatch.CmdPipelineBarrier(
-            cmd,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &barrier2
-        );
+        swapchainImage.transition_layout(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
         // End and submit
         thisDevice.dispatch.EndCommandBuffer(cmd);
