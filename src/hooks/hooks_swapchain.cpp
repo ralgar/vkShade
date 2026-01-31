@@ -133,28 +133,16 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         };
         thisDevice.dispatch.BeginCommandBuffer(cmd, &beginInfo);
 
-        // 1. Transition swapchain image to TRANSFER_SRC (to read from it)
+        // Blit swapchain image to ping-pong and transition to COLOR_ATTACHMENT
         swapchainImage.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-        // 2. Transition ping-pong to TRANSFER_DST (to write to it)
         pingPongA.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-        // 3. Blit swapchain -> ping-pong
         swapchainImage.blit_to(cmd, pingPongA.image());
-
-        // 4. Transition ping-pong to TRANSFER_SRC (to read back from it)
-        pingPongA.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-        // 5. Blit ping-pong -> swapchain
-        swapchainImage.blit_from(cmd, pingPongA.image());
-
-        // 6. Transition swapchain to COLOR_ATTACHMENT for rendering
-        swapchainImage.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        pingPongA.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
         // Begin dynamic rendering
         VkRenderingAttachmentInfo colorAttachment = {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = swapchainImage.image_view(),
+            .imageView = pingPongA.image_view(),
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,  // Keep existing content
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -168,19 +156,24 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
             .pColorAttachments = &colorAttachment,
         };
 
-        // Render ImGui on top
+        // Begin dynamic rendering
         thisDevice.dispatch.CmdBeginRendering(cmd, &renderingInfo);
 
         // Render effect
-        effect.render(cmd, VK_NULL_HANDLE, swapchainData.extent());
+        effect.bind_input(swapchainImage.image_view());
+        effect.render(cmd, swapchainData.extent());
 
+        // Render ImGui on top of everything
         ImDrawData* draw_data = ImGui::GetDrawData();
         ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
 
         // End dynamic rendering
         thisDevice.dispatch.CmdEndRendering(cmd);
 
-        // Transition back to PRESENT_SRC
+        // Blit ping-pong image back to swapchain and transition to PRESENT_SRC
+        pingPongA.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        swapchainImage.transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        pingPongA.blit_to(cmd, swapchainImage.image());
         swapchainImage.transition_layout(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
         // End and submit
@@ -198,6 +191,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         thisDevice.dispatch.FreeCommandBuffers(device, thisDevice.commandPool, 1, &cmd);
     }
 
-    // Present normally
+    // Call down the chain to present
     return thisDevice.dispatch.QueuePresentKHR(queue, pPresentInfo);
 }

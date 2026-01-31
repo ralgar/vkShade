@@ -15,16 +15,22 @@ namespace vkShade
         Effect(VulkanDevice& device, VkFormat outputFormat);
         ~Effect();
 
-        void render(VkCommandBuffer cmd, VkImageView input, VkExtent2D extent);
+        void bind_input(VkImageView inputView);
+        void render(VkCommandBuffer cmd, VkExtent2D extent);
 
     private:
         VkPipeline m_pipeline;
         VkPipelineLayout m_pipelineLayout;
-        VkDescriptorSetLayout m_descriptorSetLayout;
+        VkDescriptorPool m_descriptorPool;
         VkDescriptorSet m_descriptorSet;
+        VkDescriptorSetLayout m_descriptorSetLayout;
+        VkSampler m_sampler;
 
         // Shaders
         std::shared_ptr<vkShade::ShaderModule> m_vertShader;
         std::shared_ptr<vkShade::ShaderModule> m_fragShader;
+
+        void create_descriptor_pool();
+        void allocate_descriptor_set();
     };
 } // namespace vkShade

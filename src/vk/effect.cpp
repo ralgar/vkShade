@@ -22,6 +22,20 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
 	if (m_fragShader == nullptr)
         spdlog::error("Fragment shader not found");
 
+    // Create sampler for input texture
+    VkSamplerCreateInfo samplerInfo = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .minLod = 0.0f,
+        .maxLod = 0.0f,
+    };
+    m_device.dispatch.CreateSampler(m_device.handle, &samplerInfo, nullptr, &m_sampler);
+
     // Create descriptor set layout (for sampling input texture)
     VkDescriptorSetLayoutBinding binding = {
         .binding = 0,
@@ -37,6 +51,9 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
     };
 
     m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &layoutInfo, nullptr, &m_descriptorSetLayout);
+
+    create_descriptor_pool();
+    allocate_descriptor_set();
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
@@ -156,7 +173,57 @@ vkShade::Effect::~Effect()
     m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_descriptorSetLayout, nullptr);
 }
 
-void vkShade::Effect::render(VkCommandBuffer cmd, VkImageView input, VkExtent2D extent)
+void vkShade::Effect::allocate_descriptor_set()
+{
+    VkDescriptorSetAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = m_descriptorPool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &m_descriptorSetLayout,
+    };
+
+    m_device.dispatch.AllocateDescriptorSets(m_device.handle, &allocInfo, &m_descriptorSet);
+}
+
+void vkShade::Effect::bind_input(VkImageView inputView)
+{
+    VkDescriptorImageInfo imageInfo = {
+        .sampler = m_sampler,
+        .imageView = inputView,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+
+    VkWriteDescriptorSet descriptorWrite = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = m_descriptorSet,
+        .dstBinding = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .pImageInfo = &imageInfo,
+    };
+
+    m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
+}
+
+void vkShade::Effect::create_descriptor_pool()
+{
+    VkDescriptorPoolSize poolSize = {
+        .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = 1,
+        .poolSizeCount = 1,
+        .pPoolSizes = &poolSize,
+    };
+
+    m_device.dispatch.CreateDescriptorPool(m_device.handle, &poolInfo, nullptr, &m_descriptorPool);
+}
+
+void vkShade::Effect::render(VkCommandBuffer cmd, VkExtent2D extent)
 {
     // Bind pipeline
     m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
@@ -178,8 +245,9 @@ void vkShade::Effect::render(VkCommandBuffer cmd, VkImageView input, VkExtent2D 
     };
     m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
 
-    // TODO: Bind descriptor set with input texture
-    // For now, just draw without sampling input
+    // Bind descriptor set
+    m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
 
     // Draw fullscreen triangle (3 vertices, no vertex buffer)
     m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
