@@ -63,6 +63,10 @@ uninstall-lib32:
 	rm -f "$(VK_LAYER_DIR)/vkShade.x86.json"
 	rm -f "$(HOME)/.local/lib32/libvkshade.so"
 
+.PHONY: test
+test: install
+	ENABLE_VKSHADE=1 VKSHADE_LOG_LEVEL=trace vkcube
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
