@@ -16,6 +16,7 @@ add_project_arguments('-DVK_NO_PROTOTYPES', language: 'cpp')
 add_project_arguments('-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES', language: 'cpp')
 
 # Dependencies
+glm = dependency('glm', fallback: ['glm', 'glm_dep'])
 imgui = dependency('imgui', fallback: ['imgui', 'imgui_dep'], static: true)
 magic_enum = dependency('magic_enum', fallback: ['magic_enum', 'magic_enum_dep'])
 spdlog = dependency('spdlog', fallback: ['spdlog', 'spdlog_dep'])

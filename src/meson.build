@@ -26,6 +26,7 @@ shared_library(
   vkShade_src,
   include_directories : vkShade_include_path,
   dependencies : [
+    glm,
     imgui,
     magic_enum,
     spdlog,
