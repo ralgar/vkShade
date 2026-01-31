@@ -6,8 +6,9 @@
 #include <X11/keysym.h>
 #include <xkbcommon/xkbcommon.h>
 
-vkShade::InputManagerXlib::InputManagerXlib(Display* display)
-    : m_display(display)
+vkShade::InputManagerXlib::InputManagerXlib(Display* display, Window window)
+    : m_display(display),
+      m_window(window)
 {
     if (!m_display)
     {
@@ -55,6 +56,9 @@ void vkShade::InputManagerXlib::process_events()
 
     // Update previous state
     std::memcpy(m_previousKeymap, keymap, sizeof(keymap));
+
+    // Query mouse state
+    query_mouse_state();
 }
 
 void vkShade::InputManagerXlib::handle_key_event(uint32_t keyCode, bool pressed)
@@ -77,4 +81,54 @@ void vkShade::InputManagerXlib::handle_key_event(uint32_t keyCode, bool pressed)
 
     // Call base class to update key state map
     this->handle_keyboard_event(keysym, pressed);
+}
+
+
+void vkShade::InputManagerXlib::query_mouse_state()
+{
+    Window root_return, child_return;
+    int root_x, root_y, win_x, win_y;
+    unsigned int mask_return;
+
+    // Query pointer position and button state
+    Bool result = XQueryPointer(m_display, m_window,
+                                &root_return, &child_return,
+                                &root_x, &root_y,
+                                &win_x, &win_y,
+                                &mask_return);
+
+    if (!result)
+        return;  // Pointer not in our window
+
+    // Current state
+    glm::vec2 currentPos(static_cast<float>(win_x), static_cast<float>(win_y));
+    bool left_pressed = (mask_return & Button1Mask) != 0;
+    bool middle_pressed = (mask_return & Button2Mask) != 0;
+    bool right_pressed = (mask_return & Button3Mask) != 0;
+
+    // Only update if position changed
+    if (currentPos != m_prevMousePos)
+    {
+        handle_mouse_motion_event(currentPos.x, currentPos.y);
+        m_prevMousePos = currentPos;
+    }
+
+    // Only update if button state changed
+    if (left_pressed != m_prevLeftButton)
+    {
+        handle_mouse_button_event(MouseButton::LEFT, left_pressed);
+        m_prevLeftButton = left_pressed;
+    }
+
+    if (middle_pressed != m_prevMiddleButton)
+    {
+        handle_mouse_button_event(MouseButton::MIDDLE, middle_pressed);
+        m_prevMiddleButton = middle_pressed;
+    }
+
+    if (right_pressed != m_prevRightButton)
+    {
+        handle_mouse_button_event(MouseButton::RIGHT, right_pressed);
+        m_prevRightButton = right_pressed;
+    }
 }

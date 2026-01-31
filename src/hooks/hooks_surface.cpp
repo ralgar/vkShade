@@ -73,8 +73,9 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
 
     // Initialize InputManager
     auto* xlibCreateInfo = reinterpret_cast<const VkXlibSurfaceCreateInfoKHR*>(pCreateInfo);
+    Window window = xlibCreateInfo->window;
     Display* display = xlibCreateInfo->dpy;
-    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerXlib>(display);
+    vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputManagerXlib>(display, window);
 
     auto& thisInstance = get_instance_from_handle(instance);
 
