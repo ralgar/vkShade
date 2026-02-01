@@ -1,5 +1,7 @@
 #include "effect.hpp"
 
+#include <filesystem>
+
 #include <magic_enum/magic_enum.hpp>
 
 #include "core/resource_cache.hpp"
@@ -10,14 +12,19 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
 {
     auto& shaderCache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
 
+    const char* homeDir = std::getenv("HOME");
+    if (!homeDir)
+        spdlog::critical("HOME environment variable not set!");
+    std::filesystem::path dataDir = std::filesystem::path(homeDir) / ".local/share/vkShade";
+
     // Load the vertex shader module
-    std::string vertShaderPath = "/home/ralgar/Projects/vklayer/build/shaders/fullscreen.vert.spv";
+    std::filesystem::path vertShaderPath = dataDir / "fullscreen.vert.spv";
     m_vertShader = shaderCache.load(vertShaderPath, m_device, vertShaderPath);
 	if (m_vertShader == nullptr)
         spdlog::error("Vertex shader not found");
 
     // Load the fragment shader module
-    std::string fragShaderPath = "/home/ralgar/Projects/vklayer/build/shaders/simple_grid.frag.spv";
+    std::filesystem::path fragShaderPath = dataDir / "simple_grid.frag.spv";
     m_fragShader = shaderCache.load(fragShaderPath, m_device, fragShaderPath);
 	if (m_fragShader == nullptr)
         spdlog::error("Fragment shader not found");
