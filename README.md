@@ -1,11 +1,11 @@
 <p align="center">
   <img src=".github/svg/logo-with-text.svg" width="512">
   <br><br>
-  <img src="https://img.shields.io/github/v/tag/ralgar/vkShade?label=Release">
+  <img src="https://img.shields.io/github/v/tag/ralgar/vkShade?color=blue&label=Release">
   <img src="https://img.shields.io/github/issues/ralgar/vkShade?label=Issues&color=indigo">
   <img src="https://img.shields.io/github/issues-pr-closed/ralgar/vkShade?label=Pull%20Requests&color=indigo">
   <img src="https://img.shields.io/badge/License-BSD_2--clause-red?logo=freebsd&logoColor=red">
-  <img src="https://img.shields.io/github/stars/ralgar/vkShade?color=gold&label=Stars">
+  <img src="https://img.shields.io/github/stars/ralgar/vkShade?style=flat&logo=github&color=gold&label=Stars">
 </p>
 
 <p align="center">
