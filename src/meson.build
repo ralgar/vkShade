@@ -21,7 +21,7 @@ conf_paths = configuration_data()
 conf_paths.set_quoted('SYSCONFDIR', join_paths(get_option('prefix'), get_option('sysconfdir')))
 conf_paths.set_quoted('DATADIR', join_paths(get_option('prefix'), get_option('datadir')))
 
-shared_library(
+vkshade = shared_library(
   meson.project_name().to_lower(),
   vkShade_src,
   include_directories : vkShade_include_path,
@@ -38,5 +38,5 @@ shared_library(
   ],
   gnu_symbol_visibility: 'hidden',
   install : true,
-  install_dir : lib_dir
+  install_dir : libdir
 )

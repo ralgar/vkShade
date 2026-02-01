@@ -4,13 +4,8 @@ cpp = meson.get_compiler('cpp')
 
 vkShade_include_path = include_directories(['./src'])
 
-lib_dir = get_option('libdir')
-ld_lib_dir_vkshade = ''
-
-if get_option('append_libdir_vkshade')
-    lib_dir = join_paths(lib_dir, 'vkshade')
-    ld_lib_dir_vkshade = get_option('prefix') + '/$LIB/vkshade/'
-endif
+datadir = join_paths(get_option('datadir'), 'vkShade')
+libdir = get_option('libdir')
 
 add_project_arguments('-DVK_NO_PROTOTYPES', language: 'cpp')
 add_project_arguments('-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES', language: 'cpp')

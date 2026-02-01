@@ -15,6 +15,6 @@ foreach shader : shaders
     input : shader,
     output : '@PLAINNAME@.spv',
     install : true,
-    install_dir : 'data/shaders/vertex'
+    install_dir : datadir
   )
 endforeach
