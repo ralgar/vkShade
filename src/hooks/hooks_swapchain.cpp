@@ -91,7 +91,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     input.update();
 
     // Test input and shader loading
-    if (input.is_action_just_pressed("TestAction"))
+    if (input.is_action_just_pressed("ToggleGui"))
     {
         gui.visible(!gui.visible());
     }
@@ -160,8 +160,15 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         thisDevice.dispatch.CmdBeginRendering(cmd, &renderingInfo);
 
         // Render effect
-        effect.bind_input(swapchainImage.image_view());
-        effect.render(cmd, swapchainData.extent());
+        static bool enabled = true;
+        if (input.is_action_just_pressed("ToggleEffect"))
+            enabled = !enabled;
+
+        if (enabled)
+        {
+            effect.bind_input(swapchainImage.image_view());
+            effect.render(cmd, swapchainData.extent());
+        }
 
         // Render ImGui on top of everything
         ImDrawData* draw_data = ImGui::GetDrawData();

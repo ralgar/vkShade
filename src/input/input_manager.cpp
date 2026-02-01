@@ -45,7 +45,8 @@ vkShade::InputManager::InputManager()
 
     // Hardcoded keybinds
     // TODO: Add proper configuration for this
-    bind_action("TestAction", vkShade::KeyCode::KEY_HOME);
+    bind_action("ToggleEffect", vkShade::KeyCode::KEY_HOME);
+    bind_action("ToggleGui", vkShade::KeyCode::KEY_F2);
 }
 
 vkShade::InputManager::~InputManager()
