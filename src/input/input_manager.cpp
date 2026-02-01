@@ -82,8 +82,6 @@ void vkShade::InputManager::handle_keyboard_event(const xkb_keysym_t& keysym, bo
 void vkShade::InputManager::handle_mouse_button_event(MouseButton button, bool pressed)
 {
     m_currentMouseStates[button] = pressed;
-    spdlog::trace("Mouse button {} {} at ({}, {})", (uint32_t)button, pressed ? "pressed" : "released",
-        m_currentMousePosition.x, m_currentMousePosition.y);
 }
 
 void vkShade::InputManager::handle_mouse_motion_event(float x, float y)
@@ -91,7 +89,6 @@ void vkShade::InputManager::handle_mouse_motion_event(float x, float y)
     m_previousMousePosition = m_currentMousePosition;
     m_currentMousePosition = glm::vec2(x, y);
     m_mouseDelta = m_currentMousePosition - m_previousMousePosition;
-    spdlog::trace("Mouse moved to ({}, {}) with delta ({}, {})", x, y, m_mouseDelta.x, m_mouseDelta.y);
 }
 
 bool vkShade::InputManager::is_action_pressed(const std::string& actionName) const
