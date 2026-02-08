@@ -12,7 +12,7 @@ namespace vkShade
     class Effect : public VulkanObject
     {
     public:
-        Effect(VulkanDevice& device, VkFormat outputFormat);
+        Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName);
         ~Effect();
 
         void bind_input(VkImageView inputView);

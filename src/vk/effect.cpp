@@ -7,7 +7,7 @@
 #include "core/resource_cache.hpp"
 #include "core/service_locator.hpp"
 
-vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
+vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName)
     : VulkanObject(device)
 {
     auto& shaderCache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
@@ -24,7 +24,7 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat)
         spdlog::error("Vertex shader not found");
 
     // Load the fragment shader module
-    std::filesystem::path fragShaderPath = dataDir / "simple_grid.frag.spv";
+    std::filesystem::path fragShaderPath = dataDir / fileName;
     m_fragShader = shaderCache.load(fragShaderPath, m_device, fragShaderPath);
 	if (m_fragShader == nullptr)
         spdlog::error("Fragment shader not found");

@@ -80,7 +80,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
 
     // Create the Effect if it doesn't exist yet
     if (!vkShade::Locator<vkShade::Effect>::has())
-        vkShade::Locator<vkShade::Effect>::emplace(thisDevice, swapchainData.format());
+        vkShade::Locator<vkShade::Effect>::emplace(thisDevice, swapchainData.format(), "simple_grid.frag.spv");
 
     // Get manager handles
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
