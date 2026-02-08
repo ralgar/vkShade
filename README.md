@@ -213,8 +213,8 @@ A big thank you to these amazing projects, without which vkShade wouldn't be
 
 ## License
 
-Copyright: (c) 2026 Ryan Algar
- ([ralgar/homelab](https://gitlab.com/ralgar/vkShade))
+Copyright (c) 2026 Ryan Algar
+ ([ralgar/vkShade](https://github.com/ralgar/vkShade))
 
 BSD 2-clause License (see [LICENSE](LICENSE) or
  [BSD 2-clause](https://choosealicense.com/licenses/bsd-2-clause/))
