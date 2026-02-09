@@ -13,6 +13,7 @@ vkShade_src = [
   'vk/buffer.cpp',
   'vk/effect.cpp',
   'vk/image.cpp',
+  'vk/initializers.cpp',
   'vk/shader_module.cpp',
   'vk/swapchain.cpp',
 ]

@@ -58,7 +58,7 @@ This project is still in the **ALPHA** phase of development - meaning
 
 #### Near-term (v0.1.x)
 
-- [ ] Ping-pong rendering for multiple effects
+- [x] Ping-pong rendering for multiple effects
 - [ ] Multi-pass effect support (shader chaining)
 - [ ] Shader reflection for auto-generating UI controls
 - [ ] Configuration system (save/load settings)

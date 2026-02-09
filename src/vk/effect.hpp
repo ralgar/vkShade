@@ -15,8 +15,8 @@ namespace vkShade
         Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName);
         ~Effect();
 
+        void apply(VkCommandBuffer cmd, VkExtent2D extent);
         void bind_input(VkImageView inputView);
-        void render(VkCommandBuffer cmd, VkExtent2D extent);
 
     private:
         VkPipeline m_pipeline;

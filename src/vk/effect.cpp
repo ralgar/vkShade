@@ -192,6 +192,36 @@ void vkShade::Effect::allocate_descriptor_set()
     m_device.dispatch.AllocateDescriptorSets(m_device.handle, &allocInfo, &m_descriptorSet);
 }
 
+void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
+{
+    // Bind pipeline
+    m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+    // Set viewport and scissor
+    VkViewport viewport = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (float)extent.width,
+        .height = (float)extent.height,
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+    m_device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {
+        .offset = {0, 0},
+        .extent = extent,
+    };
+    m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
+
+    // Bind descriptor set
+    m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
+
+    // Draw fullscreen triangle (3 vertices, no vertex buffer)
+    m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
+}
+
 void vkShade::Effect::bind_input(VkImageView inputView)
 {
     VkDescriptorImageInfo imageInfo = {
@@ -228,34 +258,4 @@ void vkShade::Effect::create_descriptor_pool()
     };
 
     m_device.dispatch.CreateDescriptorPool(m_device.handle, &poolInfo, nullptr, &m_descriptorPool);
-}
-
-void vkShade::Effect::render(VkCommandBuffer cmd, VkExtent2D extent)
-{
-    // Bind pipeline
-    m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-
-    // Set viewport and scissor
-    VkViewport viewport = {
-        .x = 0.0f,
-        .y = 0.0f,
-        .width = (float)extent.width,
-        .height = (float)extent.height,
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    };
-    m_device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {
-        .offset = {0, 0},
-        .extent = extent,
-    };
-    m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
-
-    // Bind descriptor set
-    m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
-
-    // Draw fullscreen triangle (3 vertices, no vertex buffer)
-    m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
 }
