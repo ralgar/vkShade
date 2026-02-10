@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-<b>VKSHADE IS BACK IN A BIG WAY!</b>
+<b>VKSHADE IS BACK!</b>
 </p>
 
 **What happened to the original vkShade project?**
@@ -40,11 +40,11 @@ This project is still in the **ALPHA** phase of development - meaning
 
 ### Current Features
 
-- [x] Post-processing pipeline (single shader pass)
+- [x] Post-processing pipeline (single-pass effects)
 - [x] Interactive ImGui overlay with mouse support
 - [x] Cross-platform input (Wayland, Xlib, XCB)
 - [x] Modern C++ RAII wrappers around the Vulkan C API
-- [x] Demo shader effect (grid overlay)
+- [x] Demo shader effects (greyscale and grid overlay)
 
 <p align="center">
   <a href="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.1-demo.png">
@@ -59,18 +59,18 @@ This project is still in the **ALPHA** phase of development - meaning
 #### Near-term (v0.1.x)
 
 - [x] Ping-pong rendering for multiple effects
-- [ ] Multi-pass effect support (shader chaining)
-- [ ] Shader reflection for auto-generating UI controls
-- [ ] Configuration system (save/load settings)
-- [ ] Hot-reload shaders and configuration
+- [ ] Configuration system (global options and per-game presets)
+- [ ] Browse and apply shaders in the in-game GUI
+- [ ] Hot-reload configuration
+- [ ] Shader reflection (for UI/config options)
 
 #### Mid-term (v0.2.x+)
 
-- [ ] ReShade FX compiler and configuration support
-- [ ] libshaderc integration (GLSL support)
+- [ ] ReShade FX compilation and configuration support
+- [ ] GLSL/HLSL compilation (libshaderc)
+- [ ] Hot-reloadable shaders
+- [ ] Multi-pass effect support
 - [ ] Depth buffer access
-- [ ] Effect presets/profiles
-- [ ] Per-game configurations
 
 #### Long-term
 
@@ -97,9 +97,9 @@ vkShade provides a full-featured and easy to use build system, which will
 Before building, you will need:
 
 - GCC >= 9
-- X11 headers (`libx11`, `libxcb`)
-- Wayland headers (`wayland-client`)
-- xkbcommon headers (`libxkbcommon`)
+- X11 development files (`libx11`, `libxcb`)
+- Wayland development files (`wayland-client`)
+- xkbcommon development files (`libxkbcommon`)
 - glslc
 - SPIR-V Headers
 - Vulkan Headers
