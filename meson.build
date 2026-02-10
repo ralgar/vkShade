@@ -1,4 +1,4 @@
-project('vkShade', ['c', 'cpp'], default_options: ['c_std=c11', 'cpp_std=c++2a'])
+project('vkShade', ['c', 'cpp'], default_options: ['c_std=c11', 'cpp_std=c++23'])
 
 cpp = meson.get_compiler('cpp')
 
