@@ -149,7 +149,7 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
             effect->bind_input(readImage->image_view());
 
             // Begin dynamic rendering using our write image
-            std::array<VkRenderingAttachmentInfo, 3> colorAttachments = {
+            std::array<VkRenderingAttachmentInfo, 1> colorAttachments = {
                 vkinit::rendering_attachment_info(writeImage->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
             };
 
@@ -191,7 +191,7 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
     m_device.dispatch.CmdPipelineBarrier2(m_commandBuffer, &depInfo);
 
     // Begin dynamic rendering using our final image
-    std::array<VkRenderingAttachmentInfo, 3> colorAttachments = {
+    std::array<VkRenderingAttachmentInfo, 1> colorAttachments = {
         vkinit::rendering_attachment_info(finalImage->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
     };
 
