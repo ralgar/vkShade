@@ -34,6 +34,10 @@ install: build
 install-lib32: build-lib32
 	meson install -C "$(BUILD32_DIR)" --skip-subprojects
 
+.PHONY: tests
+tests: config
+	meson test -C build --suite vkShade
+
 .PHONY: uninstall
 uninstall:
 	ninja uninstall -C "$(BUILD_DIR)"

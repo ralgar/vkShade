@@ -1,0 +1,2 @@
+option('tests', type: 'boolean', value: false, description: 'Build the unit tests')
+option('install', type: 'boolean', value: false, description: 'Install the library')

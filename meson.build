@@ -24,9 +24,13 @@ x11 = dependency('x11')
 subdir('shaders')
 
 if get_option('with_so')
-    subdir('src')
+  subdir('src')
 endif
 
 if get_option('with_json')
-    subdir('config')
+  subdir('config')
+endif
+
+if get_option('tests')
+  subdir('tests')
 endif
