@@ -9,6 +9,7 @@
 
 #include <vulkan/vk_layer.h>
 
+#include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 #include "core/resource_cache.hpp"
 #include "gui/gui_manager.hpp"
@@ -199,6 +200,16 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         std::lock_guard<std::mutex> lock(global_lock);
         g_vulkanDevices.emplace(dispatch_key_from_handle(*pDevice), thisDevice);
     }
+
+    // Initialize ConfigManager
+    // FIXME: Clean this up
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::emplace();
+    std::string testKey = "ConfigKey";
+    auto optFoo = config.get("vkShade", testKey);
+    if (optFoo.has_value())
+        spdlog::debug("{}: {}", testKey, optFoo.value());
+    else
+        spdlog::warn("{}: No value", testKey);
 
     // Initialize resource caches
     vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();
