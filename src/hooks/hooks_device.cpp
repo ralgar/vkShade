@@ -205,11 +205,18 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     // FIXME: Clean this up
     auto& config = vkShade::Locator<vkShade::ConfigManager>::emplace();
     std::string testKey = "ConfigKey";
-    auto optFoo = config.get("vkShade", testKey);
+    auto optFoo = config.get<std::string>("vkShade", testKey);
     if (optFoo.has_value())
         spdlog::debug("{}: {}", testKey, optFoo.value());
     else
         spdlog::warn("{}: No value", testKey);
+
+    config.set("SomeEffect", "Uniform1", 3.14159f);
+    auto optBar = config.get<float>("SomeEffect", "Uniform1");
+    if (optBar.has_value())
+        spdlog::debug("{}: {}", "Uniform1", optBar.value());
+    else
+        spdlog::warn("{}: No value or error parsing", testKey);
 
     // Initialize resource caches
     vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();

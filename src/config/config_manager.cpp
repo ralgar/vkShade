@@ -25,18 +25,6 @@ vkShade::ConfigManager::ConfigManager()
     load_config_file(path);
 }
 
-std::expected<std::string, vkShade::ConfigManager::Error>
-vkShade::ConfigManager::get(const std::string& section, const std::string& key) const
-{
-    std::string mapKey = section + "::" + key;
-
-    auto it = m_config.find(mapKey);
-    if (it == m_config.end())
-        return std::unexpected(Error::SectionNotFound);
-
-    return it->second;
-}
-
 void vkShade::ConfigManager::load_config_file(const std::filesystem::path& filePath)
 {
     if (!std::filesystem::exists(filePath))
@@ -46,10 +34,4 @@ void vkShade::ConfigManager::load_config_file(const std::filesystem::path& fileP
     int result = ini_parse(filePath.string().c_str(), config_ini_handler, &m_config);
     if (result != 0)
         spdlog::error("Failed to load or parse config file: {}", filePath.c_str());
-}
-
-void vkShade::ConfigManager::set(const std::string& section, const std::string& key, const std::string& value)
-{
-    std::string mapKey = section + "::" + key;
-    m_config[mapKey] = value;
 }
