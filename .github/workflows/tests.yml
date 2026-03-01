@@ -38,6 +38,32 @@ jobs:
       - name: Compile
         run: meson compile -C build
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: *install-deps
+
+      - name: Setup build directory
+        run: meson setup build
+
+      - name: Lint
+        run: |
+          cppcheck \
+            --project=build/compile_commands.json \
+            --file-filter="$PWD/src/*" \
+            --enable=warning \
+            --std=c++23 \
+            -D__GNUC__=4 \
+            --suppress="*:/usr/**" \
+            --suppress="*:subprojects/**" \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=1 \
+            --inline-suppr
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
