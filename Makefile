@@ -36,7 +36,9 @@ install-lib32: build-lib32
 
 .PHONY: tests
 tests: config
+	meson configure build -Dtests=true
 	meson test -C build --suite vkShade
+	meson configure build -Dtests=false
 
 .PHONY: uninstall
 uninstall:

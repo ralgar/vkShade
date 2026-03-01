@@ -1,0 +1,81 @@
+---
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: &install-deps |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc \
+            g++ \
+            libx11-dev \
+            libxcb1-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libxkbcommon-dev \
+            glslc \
+            spirv-headers \
+            vulkan-utility-libraries-dev \
+            libvulkan-dev \
+            make \
+            meson \
+            ninja-build \
+            pkg-config \
+            cppcheck
+
+      - name: Setup build directory
+        run: meson setup build
+
+      - name: Compile
+        run: meson compile -C build
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: *install-deps
+
+      - name: Setup build directory
+        run: meson setup build
+
+      - name: Lint
+        run: |
+          cppcheck \
+            --project=build/compile_commands.json \
+            --enable=information,warning,style,performance,portability \
+            --check-level=exhaustive \
+            --std=c++23 \
+            -D__GNUC__=4 \
+            -i subprojects \
+            --suppress="*:subprojects/*" \
+            --suppress=missingIncludeSystem \
+            --inline-suppr \
+            --error-exitcode=1
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: *install-deps
+
+      - name: Setup build directory
+        run: meson setup build -Dtests=true
+
+      - name: Run tests
+        run: meson test -C build --suite vkShade

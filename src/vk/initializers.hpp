@@ -15,14 +15,14 @@ namespace vkinit
     VkImageCreateInfo           image_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
     VkImageSubresourceRange     image_subresource_range(VkImageAspectFlags aspectMask);
     VkImageViewCreateInfo       imageview_create_info(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags);
-    VkRenderingAttachmentInfo   rendering_attachment_info(VkImageView   view,
-                                                          VkClearValue* clear,
-                                                          VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo   rendering_attachment_info(VkImageView         view,
+                                                          const VkClearValue* clear,
+                                                          VkImageLayout       layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingInfo             rendering_info(VkExtent2D                           renderExtent,
                                                std::span<VkRenderingAttachmentInfo> colorAttachments,
-                                               VkRenderingAttachmentInfo*           depthAttachment);
+                                               const VkRenderingAttachmentInfo*     depthAttachment);
     VkSemaphoreSubmitInfo       semaphore_submit_info(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore);
-    VkSubmitInfo2               submit_info(VkCommandBufferSubmitInfo* cmd,
-                                            VkSemaphoreSubmitInfo* signalSemaphoreInfo,
-                                            VkSemaphoreSubmitInfo* waitSemaphoreInfo);
+    VkSubmitInfo2               submit_info(const VkCommandBufferSubmitInfo* cmd,
+                                            const VkSemaphoreSubmitInfo*     signalSemaphoreInfo,
+                                            const VkSemaphoreSubmitInfo*     waitSemaphoreInfo);
 } // namespace vkinit

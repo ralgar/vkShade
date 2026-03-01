@@ -1,5 +1,6 @@
 #include "input_backend_wayland.hpp"
 
+#include <cstring>
 #include <sys/mman.h>
 #include <unistd.h>
 

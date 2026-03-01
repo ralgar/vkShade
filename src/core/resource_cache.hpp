@@ -85,6 +85,7 @@ namespace vkShade
         mutable std::shared_mutex m_mutex;
 
         // Optional initialization hook. Does nothing by default.
+        // cppcheck-suppress functionStatic
         void load_default_resources() {}
     };
 } // namespace vkShade

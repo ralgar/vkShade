@@ -12,7 +12,7 @@ namespace vkShade
     {
     public:
         VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage);
-        ~VulkanBuffer();
+        ~VulkanBuffer() override;
 
         // Copy the source buffer into this one. Mostly used for uploading to GPU-only buffers.
         bool copy(VkCommandBuffer cmd, VkBuffer source, size_t size, size_t srcOffset = 0, size_t dstOffset = 0);

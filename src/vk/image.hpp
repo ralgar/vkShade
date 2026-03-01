@@ -16,7 +16,7 @@ namespace vkShade
         // Non-owning constructor: wraps existing image + creates its own view
         VulkanImage(VulkanDevice& device, VkImage image, VkExtent2D size, VkFormat format);
 
-        ~VulkanImage();
+        ~VulkanImage() override;
 
         // Blit FROM another image INTO this image (assumes same size, mip 0)
         void blit_from(VkCommandBuffer cmd, VkImage source);

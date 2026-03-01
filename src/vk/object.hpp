@@ -20,7 +20,7 @@ namespace vkShade
         VulkanDevice& device() const { return m_device; }
 
     protected:
-        VulkanObject(VulkanDevice& device) : m_device(device) {}
+        explicit VulkanObject(VulkanDevice& device) : m_device(device) {}
 
         VulkanDevice& m_device;
     };

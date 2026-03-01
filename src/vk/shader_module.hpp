@@ -11,7 +11,7 @@ namespace vkShade
     {
     public:
         ShaderModule(VulkanDevice& device, const std::string& filePath);
-        ~ShaderModule();
+        ~ShaderModule() override;
 
         bool load() override;
 

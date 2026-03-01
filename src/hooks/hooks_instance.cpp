@@ -61,10 +61,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     spdlog::trace("Intercepted VkCreateInstance");
 
     // Step through the pNext chain until we get to the layer link info
-    VkLayerInstanceCreateInfo* layerInfo = (VkLayerInstanceCreateInfo*)pCreateInfo->pNext;
+    const VkLayerInstanceCreateInfo* layerInfo = reinterpret_cast<const VkLayerInstanceCreateInfo*>(pCreateInfo->pNext);
     while(layerInfo && (layerInfo->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO || layerInfo->function != VK_LAYER_LINK_INFO))
     {
-        layerInfo = (VkLayerInstanceCreateInfo*)layerInfo->pNext;
+        layerInfo = reinterpret_cast<const VkLayerInstanceCreateInfo*>(layerInfo->pNext);
     }
 
     if(!layerInfo)
@@ -74,8 +74,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     }
 
     // Get the next layer's vkGetInstanceProcAddr
-    PFN_vkGetInstanceProcAddr gpa = layerInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
-    layerInfo->u.pLayerInfo = layerInfo->u.pLayerInfo->pNext;  // Move chain on for next layer
+    // The Vulkan loader contract allows layers to modify the pNext chain during instance creation
+    VkLayerInstanceCreateInfo* mutableLayerInfo = const_cast<VkLayerInstanceCreateInfo*>(layerInfo);
+    PFN_vkGetInstanceProcAddr gpa = mutableLayerInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
+    mutableLayerInfo->u.pLayerInfo = mutableLayerInfo->u.pLayerInfo->pNext;  // Move chain on for next layer
 
     // Get vkCreateInstance from the next layer
     PFN_vkCreateInstance create_func = (PFN_vkCreateInstance)gpa(VK_NULL_HANDLE, "vkCreateInstance");

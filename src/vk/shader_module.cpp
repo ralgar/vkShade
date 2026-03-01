@@ -9,10 +9,9 @@
 #include "hooks/hooks.hpp"
 
 vkShade::ShaderModule::ShaderModule(VulkanDevice& device, const std::string& filePath)
-    : VulkanObject(device)
+    : VulkanObject(device),
+      m_filePath(filePath)
 {
-    m_filePath = filePath;
-
     if (!std::filesystem::exists(m_filePath) || !std::filesystem::is_regular_file(m_filePath))
     {
         spdlog::error("File does not exist: {}", m_filePath);

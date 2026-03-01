@@ -13,7 +13,7 @@ namespace vkShade
     {
     public:
         Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName);
-        ~Effect();
+        ~Effect() override;
 
         void apply(VkCommandBuffer cmd, VkExtent2D extent);
         void bind_input(VkImageView inputView);

@@ -40,7 +40,7 @@ inline void* const dispatch_key_from_handle(const void* handle)
 {
     // Vulkan handles are pointers to dispatch tables - dereference to get the key
     assert(handle != nullptr);
-    return *(void**)handle;
+    return *reinterpret_cast<void* const*>(handle);
 }
 
 // Layer book-keeping information
