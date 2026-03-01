@@ -30,7 +30,8 @@ jobs:
             make \
             meson \
             ninja-build \
-            pkg-config
+            pkg-config \
+            cppcheck
 
       - name: Setup build directory
         run: meson setup build
