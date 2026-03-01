@@ -4,6 +4,11 @@
 #include <filesystem>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 #include "core/type_traits.hpp"
 
@@ -72,6 +77,12 @@ namespace vkShade
                 return parse_float<DecayedT>(str);
             else if constexpr (std::is_integral_v<DecayedT>)
                 return parse_integral<DecayedT>(str);
+            else if constexpr (std::is_same_v<DecayedT, glm::vec2>)
+                return parse_vec2(str);
+            else if constexpr (std::is_same_v<DecayedT, glm::vec3>)
+                return parse_vec3(str);
+            else if constexpr (std::is_same_v<DecayedT, glm::vec4>)
+                return parse_vec4(str);
             else
                 static_assert(always_false<T>::value, "Unsupported type for config parsing");
         }
@@ -115,6 +126,85 @@ namespace vkShade
             }
         }
 
+        std::expected<glm::vec2, Error> parse_vec2(const std::string& str) const
+        {
+            auto components = this->split_list(str);
+            if (components.size() != 2)
+                return std::unexpected(Error::ParseError);
+
+            auto x = parse_float<float>(components[0]);
+            auto y = parse_float<float>(components[1]);
+
+            if (!x || !y)
+                return std::unexpected(Error::ParseError);
+
+            return glm::vec2(*x, *y);
+        }
+
+        std::expected<glm::vec3, Error> parse_vec3(const std::string& str) const
+        {
+            auto components = this->split_list(str);
+            if (components.size() != 3)
+                return std::unexpected(Error::ParseError);
+
+            auto x = parse_float<float>(components[0]);
+            auto y = parse_float<float>(components[1]);
+            auto z = parse_float<float>(components[2]);
+
+            if (!x || !y || !z)
+                return std::unexpected(Error::ParseError);
+
+            return glm::vec3(*x, *y, *z);
+        }
+
+        std::expected<glm::vec4, Error> parse_vec4(const std::string& str) const
+        {
+            auto components = this->split_list(str);
+            if (components.size() != 4)
+                return std::unexpected(Error::ParseError);
+
+            auto x = parse_float<float>(components[0]);
+            auto y = parse_float<float>(components[1]);
+            auto z = parse_float<float>(components[2]);
+            auto w = parse_float<float>(components[3]);
+
+            if (!x || !y || !z || !w)
+                return std::unexpected(Error::ParseError);
+
+            return glm::vec4(*x, *y, *z, *w);
+        }
+
+        std::vector<std::string> split_list(const std::string& str) const
+        {
+            std::vector<std::string> items;
+            size_t start = 0;                // Start of current item
+            size_t end = str.find(',');      // Find first comma
+
+            // Loop through all commas except the last item
+            while (end != std::string::npos)
+            {
+                std::string item = str.substr(start, end - start);  // Extract item
+                item.erase(0, item.find_first_not_of(" \t"));       // Trim leading whitespace
+                item.erase(item.find_last_not_of(" \t") + 1);       // Trim trailing whitespace
+
+                if (!item.empty())
+                    items.push_back(item);
+
+                start = end + 1;              // Move past the comma
+                end = str.find(',', start);   // Find next comma
+            }
+
+            // Manually handle the last item (no comma after it)
+            std::string item = str.substr(start);
+            item.erase(0, item.find_first_not_of(" \t"));
+            item.erase(item.find_last_not_of(" \t") + 1);
+
+            if (!item.empty())
+                items.push_back(item);
+
+            return items;
+        }
+
         // Handle string conversions not supported by std::to_string
         template<typename T>
         std::string to_string(const T& value) const
@@ -129,6 +219,13 @@ namespace vkShade
                 return std::string(value);
             else if constexpr (std::is_same_v<DecayedT, bool>)
                 return value ? "true" : "false";
+            else if constexpr (std::is_same_v<DecayedT, glm::vec2>)
+                return std::to_string(value.x) + "," + std::to_string(value.y);
+            else if constexpr (std::is_same_v<DecayedT, glm::vec3>)
+                return std::to_string(value.x) + "," + std::to_string(value.y) + "," + std::to_string(value.z);
+            else if constexpr (std::is_same_v<DecayedT, glm::vec4>)
+                return std::to_string(value.x) + "," + std::to_string(value.y) + "," +
+                       std::to_string(value.z) + "," + std::to_string(value.w);
             else
                 return std::to_string(value);
         }

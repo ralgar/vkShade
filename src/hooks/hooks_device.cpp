@@ -211,10 +211,14 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     else
         spdlog::warn("{}: No value", testKey);
 
-    config.set("SomeEffect", "Uniform1", 3.14159f);
-    auto optBar = config.get<float>("SomeEffect", "Uniform1");
+    glm::vec3 bar = glm::vec3(1.5f, 0.9f, -2.0f);
+    config.set("SomeEffect", "Uniform1", bar);
+    auto optBar = config.get<glm::vec3>("SomeEffect", "Uniform1");
     if (optBar.has_value())
-        spdlog::debug("{}: {}", "Uniform1", optBar.value());
+    {
+        glm::vec3 value = optBar.value();
+        spdlog::debug("{}: {}, {}, {}", "Uniform1", value.x, value.y, value.z);
+    }
     else
         spdlog::warn("{}: No value or error parsing", testKey);
 
