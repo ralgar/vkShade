@@ -59,8 +59,8 @@ jobs:
             --enable=warning \
             --std=c++23 \
             -D__GNUC__=4 \
-            --suppress="*:/usr/**" \
-            --suppress="*:subprojects/**" \
+            --suppress="*:/usr/include/*" \
+            --suppress="*:subprojects/*" \
             --suppress=missingIncludeSystem \
             --error-exitcode=1 \
             --inline-suppr
