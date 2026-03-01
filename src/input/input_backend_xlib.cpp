@@ -1,5 +1,7 @@
 #include "input_backend_xlib.hpp"
 
+#include <cstring>
+
 #include <spdlog/spdlog.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
