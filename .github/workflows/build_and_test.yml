@@ -1,5 +1,5 @@
 ---
-name: Build and Test
+name: Tests
 
 on:
   pull_request:
@@ -9,81 +9,46 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Cache APT packages
-      uses: actions/cache@v4
-      with:
-        path: /var/cache/apt/archives
-        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/build.yml') }}
-        restore-keys: |
-          ${{ runner.os }}-apt-
+      - name: Install dependencies
+        run: &install-deps |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc \
+            g++ \
+            libx11-dev \
+            libxcb1-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libxkbcommon-dev \
+            glslc \
+            spirv-headers \
+            vulkan-utility-libraries-dev \
+            libvulkan-dev \
+            make \
+            meson \
+            ninja-build \
+            pkg-config
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          gcc \
-          g++ \
-          libx11-dev \
-          libxcb1-dev \
-          libwayland-dev \
-          wayland-protocols \
-          libxkbcommon-dev \
-          glslc \
-          spirv-headers \
-          vulkan-utility-libraries-dev \
-          libvulkan-dev \
-          make \
-          meson \
-          ninja-build \
-          pkg-config
+      - name: Setup build directory
+        run: meson setup build
 
-    - name: Setup build directory
-      run: meson setup build
+      - name: Compile
+        run: meson compile -C build
 
-    - name: Compile
-      run: meson compile -C build
-
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
-    needs: build
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Cache APT packages
-      uses: actions/cache@v4
-      with:
-        path: /var/cache/apt/archives
-        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/build.yml') }}
-        restore-keys: |
-          ${{ runner.os }}-apt-
+      - name: Install dependencies
+        run: *install-deps
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          gcc \
-          g++ \
-          libx11-dev \
-          libxcb1-dev \
-          libwayland-dev \
-          wayland-protocols \
-          libxkbcommon-dev \
-          glslc \
-          spirv-headers \
-          vulkan-utility-libraries-dev \
-          libvulkan-dev \
-          make \
-          meson \
-          ninja-build \
-          pkg-config
+      - name: Setup build directory
+        run: meson setup build -Dtests=true
 
-    - name: Setup build directory
-      run: meson setup build -Dtests=true
-
-    - name: Run tests
-      run: meson test -C build --suite vkShade
+      - name: Run tests
+        run: meson test -C build --suite vkShade
