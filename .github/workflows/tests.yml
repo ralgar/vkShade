@@ -55,7 +55,8 @@ jobs:
         run: |
           cppcheck \
             --project=build/compile_commands.json \
-            --enable=warning \
+            --enable=information,warning,style,performance,portability \
+            --check-level=exhaustive \
             --std=c++23 \
             -D__GNUC__=4 \
             -i subprojects \

@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <mutex>
+#include <vulkan/vulkan_core.h>
 
 // Layer book-keeping information
 // These are only modified during create/destroy
@@ -40,7 +41,7 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
         std::lock_guard<std::mutex> lock(global_lock);
 
         auto& thisDevice = get_device_from_handle(device);
-        return thisDevice.dispatch.GetDeviceProcAddr(device, pName);
+        return reinterpret_cast<PFN_vkVoidFunction>(thisDevice.dispatch.GetDeviceProcAddr(device, pName));
     }
 }
 
@@ -64,6 +65,6 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInst
         std::lock_guard<std::mutex> lock(global_lock);
 
         auto& thisInstance = get_instance_from_handle(instance);
-        return thisInstance.dispatch.GetInstanceProcAddr(instance, pName);
+        return reinterpret_cast<PFN_vkVoidFunction>(thisInstance.dispatch.GetInstanceProcAddr(instance, pName));
     }
 }

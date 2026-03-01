@@ -115,9 +115,9 @@ VkImageViewCreateInfo vkinit::imageview_create_info(VkFormat format, VkImage ima
     return info;
 }
 
-VkRenderingAttachmentInfo vkinit::rendering_attachment_info(VkImageView   view,
-                                                            VkClearValue* clear,
-                                                            VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/)
+VkRenderingAttachmentInfo vkinit::rendering_attachment_info(VkImageView         view,
+                                                            const VkClearValue* clear,
+                                                            VkImageLayout       layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/)
 {
     VkRenderingAttachmentInfo colorAttachment {};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -136,7 +136,7 @@ VkRenderingAttachmentInfo vkinit::rendering_attachment_info(VkImageView   view,
 
 VkRenderingInfo vkinit::rendering_info(VkExtent2D                           renderExtent,
                                        std::span<VkRenderingAttachmentInfo> colorAttachments,
-                                       VkRenderingAttachmentInfo*           depthAttachment)
+                                       const VkRenderingAttachmentInfo*     depthAttachment)
 {
     VkRenderingInfo renderInfo {};
     renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -165,8 +165,9 @@ VkSemaphoreSubmitInfo vkinit::semaphore_submit_info(VkPipelineStageFlags2 stageM
 	return submitInfo;
 }
 
-VkSubmitInfo2 vkinit::submit_info(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmitInfo* signalSemaphoreInfo,
-    VkSemaphoreSubmitInfo* waitSemaphoreInfo)
+VkSubmitInfo2 vkinit::submit_info(const VkCommandBufferSubmitInfo* cmd,
+                                  const VkSemaphoreSubmitInfo*     signalSemaphoreInfo,
+                                  const VkSemaphoreSubmitInfo*     waitSemaphoreInfo)
 {
     VkSubmitInfo2 info = {};
     info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
