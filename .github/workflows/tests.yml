@@ -55,15 +55,15 @@ jobs:
         run: |
           cppcheck \
             --project=build/compile_commands.json \
-            --file-filter="$PWD/src/*" \
             --enable=warning \
             --std=c++23 \
             -D__GNUC__=4 \
+            -i subprojects \
             --suppress="*:/usr/include/*" \
             --suppress="*:subprojects/*" \
             --suppress=missingIncludeSystem \
-            --error-exitcode=1 \
-            --inline-suppr
+            --inline-suppr \
+            --error-exitcode=1
 
   unit-tests:
     runs-on: ubuntu-latest
