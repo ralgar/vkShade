@@ -14,6 +14,7 @@ vkshade = shared_library(
     libgui,
     libinput,
     libvk,
+    glm,
     imgui,
     magic_enum,
     spdlog,
