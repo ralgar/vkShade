@@ -1,4 +1,2 @@
-option('with_so', type : 'boolean', value : true, description : 'install the library')
-option('with_json', type : 'boolean', value : true, description : 'install the json')
-option('append_libdir_vkshade', type : 'boolean', value : false, description: 'Append "vkshade" to libdir path or not.')
+option('shaders', type: 'boolean', value: true, description: 'Build shaders')
 option('tests', type: 'boolean', value: false, description: 'Build tests')

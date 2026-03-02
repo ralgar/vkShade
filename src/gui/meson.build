@@ -1,0 +1,18 @@
+libgui_source = [
+  'gui_manager.cpp',
+]
+
+libgui_library = static_library(
+  'gui',
+  libgui_source,
+  dependencies : [
+    imgui,
+    magic_enum,
+    vma,
+  ],
+  include_directories : vkShade_include_path
+)
+
+libgui = declare_dependency(
+  link_with : libgui_library,
+)
