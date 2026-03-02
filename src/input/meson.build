@@ -10,6 +10,7 @@ libinput_library = static_library(
   'input',
   libinput_source,
   dependencies : [
+    glm,
     xcb,
     x11,
     xkbcommon,
