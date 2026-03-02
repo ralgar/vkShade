@@ -9,6 +9,7 @@ libgui_library = static_library(
     glm,
     imgui,
     magic_enum,
+    spdlog,
     vma,
   ],
   include_directories : vkShade_include_path
