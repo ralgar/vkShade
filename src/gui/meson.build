@@ -6,6 +6,7 @@ libgui_library = static_library(
   'gui',
   libgui_source,
   dependencies : [
+    glm,
     imgui,
     magic_enum,
     vma,
