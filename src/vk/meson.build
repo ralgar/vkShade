@@ -11,6 +11,7 @@ libvk_library = static_library(
   'vk',
   libvk_source,
   dependencies : [
+    glm,
     imgui,
     magic_enum,
     spdlog,
