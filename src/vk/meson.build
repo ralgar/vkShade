@@ -13,6 +13,7 @@ libvk_library = static_library(
   dependencies : [
     imgui,
     magic_enum,
+    spdlog,
     vma,
   ],
   include_directories : vkShade_include_path
