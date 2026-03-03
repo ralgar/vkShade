@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <expected>
 #include <string>
+#include <sstream>
 #include <vector>
 
 #include <glm/vec2.hpp>
@@ -21,16 +22,16 @@ namespace vkShade
         template<typename T>
         std::expected<T, ConfigError> parse(const std::string& str) const
         {
+            // Strip references, const qualifiers, and decay arrays to pointers for type checking.
+            // Needed for passing string literals, but also improves robustness in general.
             using DecayedT = std::decay_t<T>;
 
             if constexpr (std::is_same_v<DecayedT, std::string>)
                 return str;
             else if constexpr (std::is_same_v<DecayedT, bool>)
                 return parse_bool<DecayedT>(str);
-            else if constexpr (std::is_floating_point_v<DecayedT>)
+            else if constexpr (std::is_same_v<DecayedT, float>)
                 return parse_float<DecayedT>(str);
-            else if constexpr (std::is_integral_v<DecayedT>)
-                return parse_integral<DecayedT>(str);
             else if constexpr (std::is_same_v<DecayedT, glm::vec2>)
                 return parse_vec2(str);
             else if constexpr (std::is_same_v<DecayedT, glm::vec3>)
@@ -45,8 +46,6 @@ namespace vkShade
         template<typename T>
         std::string to_string(const T& value) const
         {
-            // Strip references, const qualifiers, and decay arrays to pointers for type checking.
-            // Needed for passing string literals, but also improves robustness in general.
             using DecayedT = std::decay_t<T>;
 
             if constexpr (std::is_same_v<DecayedT, std::string>)
@@ -80,27 +79,10 @@ namespace vkShade
             return std::unexpected(ConfigError::ParseError);
         }
 
-        template<typename T>
-        std::expected<T, ConfigError> parse_float(const std::string& str) const
+        std::expected<float, ConfigError> parse_float(const std::string& str) const
         {
             try {
-                if constexpr (std::is_same_v<T, float>)
-                    return std::stof(str);
-                else
-                    return std::stod(str);
-            } catch (...) {
-                return std::unexpected(ConfigError::ParseError);
-            }
-        }
-
-        template<typename T>
-        std::expected<T, ConfigError> parse_integral(const std::string& str) const
-        {
-            try {
-                if constexpr (std::is_signed_v<T>)
-                    return static_cast<T>(std::stoll(str));
-                else
-                    return static_cast<T>(std::stoull(str));
+                return std::stof(str);
             } catch (...) {
                 return std::unexpected(ConfigError::ParseError);
             }
@@ -112,8 +94,8 @@ namespace vkShade
             if (components.size() != 2)
                 return std::unexpected(ConfigError::ParseError);
 
-            auto x = parse_float<float>(components[0]);
-            auto y = parse_float<float>(components[1]);
+            auto x = parse_float(components[0]);
+            auto y = parse_float(components[1]);
 
             if (!x || !y)
                 return std::unexpected(ConfigError::ParseError);
@@ -127,9 +109,9 @@ namespace vkShade
             if (components.size() != 3)
                 return std::unexpected(ConfigError::ParseError);
 
-            auto x = parse_float<float>(components[0]);
-            auto y = parse_float<float>(components[1]);
-            auto z = parse_float<float>(components[2]);
+            auto x = parse_float(components[0]);
+            auto y = parse_float(components[1]);
+            auto z = parse_float(components[2]);
 
             if (!x || !y || !z)
                 return std::unexpected(ConfigError::ParseError);
@@ -143,10 +125,10 @@ namespace vkShade
             if (components.size() != 4)
                 return std::unexpected(ConfigError::ParseError);
 
-            auto x = parse_float<float>(components[0]);
-            auto y = parse_float<float>(components[1]);
-            auto z = parse_float<float>(components[2]);
-            auto w = parse_float<float>(components[3]);
+            auto x = parse_float(components[0]);
+            auto y = parse_float(components[1]);
+            auto z = parse_float(components[2]);
+            auto w = parse_float(components[3]);
 
             if (!x || !y || !z || !w)
                 return std::unexpected(ConfigError::ParseError);
@@ -156,31 +138,23 @@ namespace vkShade
 
         std::vector<std::string> split_list(const std::string& str) const
         {
-            std::vector<std::string> items;
-            size_t start = 0;                // Start of current item
-            size_t end = str.find(',');      // Find first comma
-
-            // Loop through all commas except the last item
-            while (end != std::string::npos)
+            auto trim = [](std::string s)
             {
-                std::string item = str.substr(start, end - start);  // Extract item
-                item.erase(0, item.find_first_not_of(" \t"));       // Trim leading whitespace
-                item.erase(item.find_last_not_of(" \t") + 1);       // Trim trailing whitespace
+                s.erase(0, s.find_first_not_of(" \t"));
+                s.erase(s.find_last_not_of(" \t") + 1);
+                return s;
+            };
 
+            std::vector<std::string> items;
+            std::stringstream ss(str);
+            std::string item;
+
+            while (std::getline(ss, item, ','))
+            {
+                item = trim(item);
                 if (!item.empty())
                     items.push_back(item);
-
-                start = end + 1;              // Move past the comma
-                end = str.find(',', start);   // Find next comma
             }
-
-            // Manually handle the last item (no comma after it)
-            std::string item = str.substr(start);
-            item.erase(0, item.find_first_not_of(" \t"));
-            item.erase(item.find_last_not_of(" \t") + 1);
-
-            if (!item.empty())
-                items.push_back(item);
 
             return items;
         }
