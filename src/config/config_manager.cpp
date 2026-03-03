@@ -18,6 +18,7 @@ static int config_ini_handler(void* user, const char* section, const char* name,
 }
 
 vkShade::ConfigManager::ConfigManager()
+    : m_parser(ConfigParser())
 {
     // FIXME: Load from standard paths instead of hardcoded test path
     const std::filesystem::path path = "./config/preset.ini";
