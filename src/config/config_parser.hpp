@@ -26,8 +26,16 @@ namespace vkShade
             // Needed for passing string literals, but also improves robustness in general.
             using DecayedT = std::decay_t<T>;
 
+            // Note: We cannot safely parse to pointer types (e.g., char*) because
+            // we would return a pointer to a temporary string's buffer, creating
+            // a dangling pointer. Callers must normalize pointer types to value
+            // types (e.g., char* -> std::string) before calling parse().
+            static_assert(!std::is_pointer_v<DecayedT>, "Cannot parse to pointer types");
+
             if constexpr (std::is_same_v<DecayedT, std::string>)
                 return str;
+            else if constexpr (std::is_same_v<DecayedT, std::vector<std::string>>)
+                return split_list(str);
             else if constexpr (std::is_same_v<DecayedT, bool>)
                 return parse_bool<DecayedT>(str);
             else if constexpr (std::is_same_v<DecayedT, float>)
@@ -52,6 +60,8 @@ namespace vkShade
                 return value;
             else if constexpr (std::is_same_v<DecayedT, const char*> || std::is_same_v<DecayedT, char*>)
                 return std::string(value);
+            else if constexpr (std::is_same_v<DecayedT, std::vector<std::string>>)
+                return join_list(value);
             else if constexpr (std::is_same_v<DecayedT, bool>)
                 return value ? "true" : "false";
             else if constexpr (std::is_same_v<DecayedT, glm::vec2>)
@@ -66,6 +76,19 @@ namespace vkShade
         }
 
     private:
+        std::string join_list(const std::vector<std::string>& items) const
+        {
+            if (items.empty()) return "";
+
+            std::string result = items[0];
+            for (size_t i = 1; i < items.size(); i++)
+            {
+                result += "," + items[i];
+            }
+
+            return result;
+        }
+
         std::expected<bool, ConfigError> parse_bool(const std::string& str) const
         {
             std::string lower = str;
