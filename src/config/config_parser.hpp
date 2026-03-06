@@ -40,6 +40,8 @@ namespace vkShade
                 return parse_bool(str);
             else if constexpr (std::is_same_v<DecayedT, float>)
                 return parse_float(str);
+            else if constexpr (std::is_integral_v<DecayedT>)
+                return parse_integer<DecayedT>(str);
             else if constexpr (std::is_same_v<DecayedT, glm::vec2>)
                 return parse_vec2(str);
             else if constexpr (std::is_same_v<DecayedT, glm::vec3>)
@@ -106,6 +108,31 @@ namespace vkShade
         {
             try {
                 return std::stof(str);
+            } catch (...) {
+                return std::unexpected(ConfigError::ParseError);
+            }
+        }
+
+        template<typename T>
+        std::expected<T, ConfigError> parse_integer(const std::string& str) const
+        {
+            static_assert(std::is_integral_v<T>);
+
+            try {
+                if constexpr (std::is_signed_v<T>)
+                {
+                    int64_t value = std::stoll(str);
+                    if (value < std::numeric_limits<T>::min() || value > std::numeric_limits<T>::max())
+                        return std::unexpected(ConfigError::ParseError);
+                    return static_cast<T>(value);
+                }
+                else
+                {
+                    uint64_t value = std::stoull(str);
+                    if (value > std::numeric_limits<T>::max())
+                        return std::unexpected(ConfigError::ParseError);
+                    return static_cast<T>(value);
+                }
             } catch (...) {
                 return std::unexpected(ConfigError::ParseError);
             }

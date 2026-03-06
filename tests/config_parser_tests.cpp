@@ -70,6 +70,76 @@ TEST_CASE("ConfigParser: Parse float - invalid value", "[config][parser]")
     REQUIRE(result.error() == ConfigError::ParseError);
 }
 
+TEST_CASE("ConfigParser: Parse int32_t", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result1 = parser.parse<int32_t>("42");
+    auto result2 = parser.parse<int32_t>("-100");
+    auto result3 = parser.parse<int32_t>("2147483647");
+    auto result4 = parser.parse<int32_t>("-2147483648");
+
+    REQUIRE(result1.has_value());
+    REQUIRE(*result1 == 42);
+    REQUIRE(*result2 == -100);
+    REQUIRE(*result3 == 2147483647);
+    REQUIRE(*result4 == -2147483648);
+}
+
+TEST_CASE("ConfigParser: Parse int32_t - out of range", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result1 = parser.parse<int32_t>("2147483648");
+    auto result2 = parser.parse<int32_t>("-2147483649");
+
+    REQUIRE(!result1.has_value());
+    REQUIRE(result1.error() == ConfigError::ParseError);
+    REQUIRE(!result2.has_value());
+    REQUIRE(result2.error() == ConfigError::ParseError);
+}
+
+TEST_CASE("ConfigParser: Parse int32_t - invalid value", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result = parser.parse<int32_t>("not a number");
+    REQUIRE(!result.has_value());
+    REQUIRE(result.error() == ConfigError::ParseError);
+}
+
+TEST_CASE("ConfigParser: Parse uint32_t", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result1 = parser.parse<uint32_t>("0");
+    auto result2 = parser.parse<uint32_t>("42");
+    auto result3 = parser.parse<uint32_t>("4294967295");
+
+    REQUIRE(result1.has_value());
+    REQUIRE(*result1 == 0);
+    REQUIRE(*result2 == 42);
+    REQUIRE(*result3 == 4294967295);
+}
+
+TEST_CASE("ConfigParser: Parse uint32_t - out of range", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result = parser.parse<uint32_t>("4294967296");
+    REQUIRE(!result.has_value());
+    REQUIRE(result.error() == ConfigError::ParseError);
+}
+
+TEST_CASE("ConfigParser: Parse uint32_t - negative value", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result = parser.parse<uint32_t>("-1");
+    REQUIRE(!result.has_value());
+    REQUIRE(result.error() == ConfigError::ParseError);
+}
+
 TEST_CASE("ConfigParser: Parse vec2", "[config][parser]")
 {
     ConfigParser parser;
