@@ -9,6 +9,15 @@ config_parser_tests = executable('config_parser_tests',
   include_directories : include_directories('../src')
 )
 
+config_observer_tests = executable('config_observer_tests',
+  'config_observer_tests.cpp',
+  dependencies : [
+    catch2,
+    glm,
+  ],
+  include_directories : include_directories('../src')
+)
+
 event_bus_tests = executable('event_bus_tests',
   'event_bus_tests.cpp',
   dependencies : [
@@ -18,4 +27,5 @@ event_bus_tests = executable('event_bus_tests',
 )
 
 test('ConfigParser', config_parser_tests)
+test('ConfigObserver', config_observer_tests)
 test('EventBus', event_bus_tests)
