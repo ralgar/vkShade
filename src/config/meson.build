@@ -6,6 +6,7 @@ libconfig_library = static_library(
   'config',
   libconfig_source,
   dependencies : [
+    glm,
     inih,
     spdlog,
   ],
