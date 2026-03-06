@@ -222,6 +222,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     else
         spdlog::warn("{}: No value or error parsing", testKey);
 
+    config.set("", "SomeKey", 1.50000f);
+
+    config.save("./config/output.ini");
+
     // Initialize resource caches
     vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();
 

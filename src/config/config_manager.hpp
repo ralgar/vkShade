@@ -16,6 +16,9 @@ namespace vkShade
     public:
         ConfigManager();
 
+        void load(const std::filesystem::path& filePath);
+        void save(const std::filesystem::path& filePath) const;
+
         // Typed getter
         template<typename T>
         std::expected<T, ConfigError> get(const std::string& section, const std::string& key) const
@@ -71,7 +74,5 @@ namespace vkShade
         ConfigObserver m_observer;
 
         std::unordered_map<std::string, std::string> m_config;
-
-        void load_config_file(const std::filesystem::path& filePath);
     };
 } // namespace vkShade

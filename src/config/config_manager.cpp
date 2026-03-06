@@ -1,5 +1,8 @@
 #include "config_manager.hpp"
 
+#include <fstream>
+#include <map>
+
 #include <ini.h>
 #include <spdlog/spdlog.h>
 
@@ -23,10 +26,10 @@ vkShade::ConfigManager::ConfigManager()
     // FIXME: Load from standard paths instead of hardcoded test path
     const std::filesystem::path path = "./config/preset.ini";
 
-    load_config_file(path);
+    load(path);
 }
 
-void vkShade::ConfigManager::load_config_file(const std::filesystem::path& filePath)
+void vkShade::ConfigManager::load(const std::filesystem::path& filePath)
 {
     if (!std::filesystem::exists(filePath))
         return; // Silently skip non-existent files
@@ -35,4 +38,63 @@ void vkShade::ConfigManager::load_config_file(const std::filesystem::path& fileP
     int result = ini_parse(filePath.string().c_str(), config_ini_handler, &m_config);
     if (result != 0)
         spdlog::error("Failed to load or parse config file: {}", filePath.c_str());
+}
+
+void vkShade::ConfigManager::save(const std::filesystem::path& filePath) const
+{
+    std::ofstream file(filePath);
+    if (!file.is_open())
+    {
+        spdlog::error("Failed to open config file for writing: {}", filePath.string());
+        return;
+    }
+
+    // Group by section
+    std::map<std::string, std::vector<std::pair<std::string, std::string>>> sections;
+
+    for (const auto& [key, value] : m_config)
+    {
+        // Split "Section::Key" back into parts
+        size_t pos = key.find("::");
+        if (pos == std::string::npos)
+            continue;
+
+        std::string section = key.substr(0, pos);
+        std::string name = key.substr(pos + 2);
+
+        sections[section].emplace_back(name, value);
+    }
+
+    // Write in specific order: unnamed section, vkShade, then alphabetical
+    auto write_section = [&](const std::string& section_name)
+    {
+        auto it = sections.find(section_name);
+        if (it != sections.end())
+        {
+            if (!section_name.empty())
+                file << "[" << section_name << "]\n";
+
+            for (const auto& [name, value] : it->second)
+                file << name << " = " << value << "\n";
+
+            file << "\n";
+            sections.erase(it);
+        }
+    };
+
+    write_section("");        // Unnamed/global section first
+    write_section("vkShade"); // App settings second
+
+    // Write remaining sections alphabetically
+    for (auto it = sections.begin(); it != sections.end(); it++)
+    {
+        file << "[" << it->first << "]\n";
+        for (const auto& [name, value] : it->second)
+            file << name << " = " << value << "\n";
+
+        if (std::next(it) != sections.end())
+            file << "\n";
+    }
+
+    spdlog::trace("Saved configuration to: {}", filePath.string());
 }

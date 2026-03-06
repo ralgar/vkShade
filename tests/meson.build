@@ -1,7 +1,17 @@
 catch2 = dependency('catch2-with-main', version : '>=3.0.0')
 
-config_parser_tests = executable('config_parser_tests',
-  'config_parser_tests.cpp',
+config_manager_tests = executable('config_manager_tests',
+  'config_manager_tests.cpp',
+  dependencies : [
+    catch2,
+    glm,
+    libconfig,
+  ],
+  include_directories : include_directories('../src')
+)
+
+config_observer_tests = executable('config_observer_tests',
+  'config_observer_tests.cpp',
   dependencies : [
     catch2,
     glm,
@@ -9,8 +19,8 @@ config_parser_tests = executable('config_parser_tests',
   include_directories : include_directories('../src')
 )
 
-config_observer_tests = executable('config_observer_tests',
-  'config_observer_tests.cpp',
+config_parser_tests = executable('config_parser_tests',
+  'config_parser_tests.cpp',
   dependencies : [
     catch2,
     glm,
@@ -26,6 +36,7 @@ event_bus_tests = executable('event_bus_tests',
   include_directories : include_directories('../src/core')
 )
 
-test('ConfigParser', config_parser_tests)
+test('ConfigManager', config_manager_tests)
 test('ConfigObserver', config_observer_tests)
+test('ConfigParser', config_parser_tests)
 test('EventBus', event_bus_tests)
