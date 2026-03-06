@@ -37,9 +37,9 @@ namespace vkShade
             else if constexpr (std::is_same_v<DecayedT, std::vector<std::string>>)
                 return split_list(str);
             else if constexpr (std::is_same_v<DecayedT, bool>)
-                return parse_bool<DecayedT>(str);
+                return parse_bool(str);
             else if constexpr (std::is_same_v<DecayedT, float>)
-                return parse_float<DecayedT>(str);
+                return parse_float(str);
             else if constexpr (std::is_same_v<DecayedT, glm::vec2>)
                 return parse_vec2(str);
             else if constexpr (std::is_same_v<DecayedT, glm::vec3>)
