@@ -1,5 +1,5 @@
 libconfig_source = [
-  'config_manager.cpp',
+  'config_store.cpp',
 ]
 
 libconfig_library = static_library(

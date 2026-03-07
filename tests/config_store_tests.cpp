@@ -1,4 +1,4 @@
-#include "config/config_manager.hpp"
+#include "config/config_store.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -44,9 +44,9 @@ private:
     std::filesystem::path m_path;
 };
 
-TEST_CASE("ConfigManager: Set and get string", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get string", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("app", "name", std::string("MyApp"));
     auto result = config.get<std::string>("app", "name");
@@ -55,9 +55,9 @@ TEST_CASE("ConfigManager: Set and get string", "[config][manager]")
     REQUIRE(*result == "MyApp");
 }
 
-TEST_CASE("ConfigManager: Set and get with string literal", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get with string literal", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("app", "title", "Hello World");
     auto result = config.get<std::string>("app", "title");
@@ -66,9 +66,9 @@ TEST_CASE("ConfigManager: Set and get with string literal", "[config][manager]")
     REQUIRE(*result == "Hello World");
 }
 
-TEST_CASE("ConfigManager: Set and get float", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get float", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("audio", "volume", 0.75f);
     auto result = config.get<float>("audio", "volume");
@@ -77,9 +77,9 @@ TEST_CASE("ConfigManager: Set and get float", "[config][manager]")
     REQUIRE_THAT(*result, Catch::Matchers::WithinRel(0.75f, 0.0001f));
 }
 
-TEST_CASE("ConfigManager: Set and get bool", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get bool", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("graphics", "vsync", true);
     auto result = config.get<bool>("graphics", "vsync");
@@ -88,9 +88,9 @@ TEST_CASE("ConfigManager: Set and get bool", "[config][manager]")
     REQUIRE(*result == true);
 }
 
-TEST_CASE("ConfigManager: Set and get int32_t", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get int32_t", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("graphics", "width", 1920);
     auto result = config.get<int32_t>("graphics", "width");
@@ -99,9 +99,9 @@ TEST_CASE("ConfigManager: Set and get int32_t", "[config][manager]")
     REQUIRE(*result == 1920);
 }
 
-TEST_CASE("ConfigManager: Set and get uint32_t", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get uint32_t", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("graphics", "samples", 4u);
     auto result = config.get<uint32_t>("graphics", "samples");
@@ -110,9 +110,9 @@ TEST_CASE("ConfigManager: Set and get uint32_t", "[config][manager]")
     REQUIRE(*result == 4);
 }
 
-TEST_CASE("ConfigManager: Set and get vec3", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get vec3", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     glm::vec3 color{0.5f, 0.75f, 1.0f};
     config.set("graphics", "skyColor", color);
@@ -124,9 +124,9 @@ TEST_CASE("ConfigManager: Set and get vec3", "[config][manager]")
     REQUIRE_THAT(result->z, Catch::Matchers::WithinRel(1.0f, 0.0001f));
 }
 
-TEST_CASE("ConfigManager: Set and get string list", "[config][manager]")
+TEST_CASE("ConfigStore: Set and get string list", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     std::vector<std::string> maps = {"map1", "map2", "map3"};
     config.set("game", "maps", maps);
@@ -139,9 +139,9 @@ TEST_CASE("ConfigManager: Set and get string list", "[config][manager]")
     REQUIRE((*result)[2] == "map3");
 }
 
-TEST_CASE("ConfigManager: Get non-existent key", "[config][manager]")
+TEST_CASE("ConfigStore: Get non-existent key", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     auto result = config.get<std::string>("nonexistent", "key");
 
@@ -149,9 +149,9 @@ TEST_CASE("ConfigManager: Get non-existent key", "[config][manager]")
     REQUIRE(result.error() == ConfigError::KeyNotFound);
 }
 
-TEST_CASE("ConfigManager: Get with wrong type", "[config][manager]")
+TEST_CASE("ConfigStore: Get with wrong type", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("test", "value", std::string("not a number"));
     auto result = config.get<float>("test", "value");
@@ -160,9 +160,9 @@ TEST_CASE("ConfigManager: Get with wrong type", "[config][manager]")
     REQUIRE(result.error() == ConfigError::ParseError);
 }
 
-TEST_CASE("ConfigManager: Update existing value", "[config][manager]")
+TEST_CASE("ConfigStore: Update existing value", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config;
 
     config.set("test", "counter", 1);
     config.set("test", "counter", 2);
@@ -173,16 +173,16 @@ TEST_CASE("ConfigManager: Update existing value", "[config][manager]")
     REQUIRE(*result == 3);
 }
 
-TEST_CASE("ConfigManager: Save to file", "[config][manager]")
+TEST_CASE("ConfigStore: Save to file", "[config][manager]")
 {
     TempConfigFile tempFile("test_save.ini");
-    ConfigManager config;
+    ConfigStore config({tempFile.path()});
 
     config.set("graphics", "width", 1920);
     config.set("graphics", "height", 1080);
     config.set("audio", "volume", 0.8f);
 
-    config.save(tempFile.path());
+    config.save();
 
     std::string content = tempFile.read();
     REQUIRE(content.find("[graphics]") != std::string::npos);
@@ -192,7 +192,7 @@ TEST_CASE("ConfigManager: Save to file", "[config][manager]")
     REQUIRE(content.find("volume = ") != std::string::npos);
 }
 
-TEST_CASE("ConfigManager: Load from file", "[config][manager]")
+TEST_CASE("ConfigStore: Load from file", "[config][manager]")
 {
     TempConfigFile tempFile("test_load.ini");
     tempFile.write(
@@ -205,8 +205,8 @@ TEST_CASE("ConfigManager: Load from file", "[config][manager]")
         "volume = 0.75\n"
     );
 
-    ConfigManager config;
-    config.load(tempFile.path());
+    ConfigStore config({tempFile.path()});
+    config.load();
 
     auto width = config.get<int32_t>("graphics", "width");
     auto height = config.get<int32_t>("graphics", "height");
@@ -223,36 +223,36 @@ TEST_CASE("ConfigManager: Load from file", "[config][manager]")
     REQUIRE_THAT(*volume, Catch::Matchers::WithinRel(0.75f, 0.01f));
 }
 
-TEST_CASE("ConfigManager: Load non-existent file does nothing", "[config][manager]")
+TEST_CASE("ConfigStore: Load non-existent file does nothing", "[config][manager]")
 {
-    ConfigManager config;
+    ConfigStore config({"/nonexistent/path/config.ini"});
     config.set("test", "value", std::string("original"));
 
-    config.load("/nonexistent/path/config.ini");
+    config.load();
 
     auto result = config.get<std::string>("test", "value");
     REQUIRE(result.has_value());
     REQUIRE(*result == "original");
 }
 
-TEST_CASE("ConfigManager: Save and load round-trip", "[config][manager]")
+TEST_CASE("ConfigStore: Save and load round-trip", "[config][manager]")
 {
     TempConfigFile tempFile("test_roundtrip.ini");
 
     {
-        ConfigManager config;
+        ConfigStore config({tempFile.path()});
         config.set("graphics", "width", 2560);
         config.set("graphics", "height", 1440);
         config.set("graphics", "vsync", false);
         config.set("audio", "volume", 0.9f);
         config.set("game", "difficulty", std::string("hard"));
 
-        config.save(tempFile.path());
+        config.save();
     }
 
     {
-        ConfigManager config;
-        config.load(tempFile.path());
+        ConfigStore config({tempFile.path()});
+        config.load();
 
         REQUIRE(*config.get<int32_t>("graphics", "width") == 2560);
         REQUIRE(*config.get<int32_t>("graphics", "height") == 1440);
@@ -263,16 +263,16 @@ TEST_CASE("ConfigManager: Save and load round-trip", "[config][manager]")
     }
 }
 
-TEST_CASE("ConfigManager: Section ordering - vkShade first, then alphabetical", "[config][manager]")
+TEST_CASE("ConfigStore: Section ordering - vkShade first, then alphabetical", "[config][manager]")
 {
     TempConfigFile tempFile("test_ordering.ini");
-    ConfigManager config;
+    ConfigStore config({tempFile.path()});
 
     config.set("zebra", "last", std::string("z"));
     config.set("vkShade", "app", std::string("setting"));
     config.set("apple", "first", std::string("a"));
 
-    config.save(tempFile.path());
+    config.save();
 
     std::string content = tempFile.read();
     size_t vkshade_pos = content.find("[vkShade]");
@@ -286,15 +286,15 @@ TEST_CASE("ConfigManager: Section ordering - vkShade first, then alphabetical", 
     REQUIRE(apple_pos < zebra_pos);
 }
 
-TEST_CASE("ConfigManager: No trailing newline after last section", "[config][manager]")
+TEST_CASE("ConfigStore: No trailing newline after last section", "[config][manager]")
 {
     TempConfigFile tempFile("test_no_trailing.ini");
-    ConfigManager config;
+    ConfigStore config({tempFile.path()});
 
     config.set("section1", "key", std::string("value"));
     config.set("section2", "key", std::string("value"));
 
-    config.save(tempFile.path());
+    config.save();
 
     std::string content = tempFile.read();
     REQUIRE(!content.empty());
@@ -310,16 +310,16 @@ TEST_CASE("ConfigManager: No trailing newline after last section", "[config][man
     REQUIRE(double_newlines == 1);  // Only one separator between two sections
 }
 
-TEST_CASE("ConfigManager: Unnamed section appears first", "[config][manager]")
+TEST_CASE("ConfigStore: Unnamed section appears first", "[config][manager]")
 {
     TempConfigFile tempFile("test_unnamed.ini");
-    ConfigManager config;
+    ConfigStore config({tempFile.path()});
 
     config.set("", "global_key", std::string("global_value"));
     config.set("vkShade", "app_key", std::string("app_value"));
     config.set("other", "other_key", std::string("other_value"));
 
-    config.save(tempFile.path());
+    config.save();
 
     std::string content = tempFile.read();
     size_t global_pos = content.find("global_key");
@@ -331,7 +331,7 @@ TEST_CASE("ConfigManager: Unnamed section appears first", "[config][manager]")
     REQUIRE(vkshade_pos < other_pos);
 }
 
-TEST_CASE("ConfigManager: Load with vec3", "[config][manager]")
+TEST_CASE("ConfigStore: Load with vec3", "[config][manager]")
 {
     TempConfigFile tempFile("test_vec3.ini");
     tempFile.write(
@@ -339,8 +339,8 @@ TEST_CASE("ConfigManager: Load with vec3", "[config][manager]")
         "color = 1.0, 0.5, 0.25\n"
     );
 
-    ConfigManager config;
-    config.load(tempFile.path());
+    ConfigStore config({tempFile.path()});
+    config.load();
 
     auto color = config.get<glm::vec3>("graphics", "color");
     REQUIRE(color.has_value());
@@ -349,7 +349,7 @@ TEST_CASE("ConfigManager: Load with vec3", "[config][manager]")
     REQUIRE_THAT(color->z, Catch::Matchers::WithinRel(0.25f, 0.0001f));
 }
 
-TEST_CASE("ConfigManager: Load with string list", "[config][manager]")
+TEST_CASE("ConfigStore: Load with string list", "[config][manager]")
 {
     TempConfigFile tempFile("test_list.ini");
     tempFile.write(
@@ -357,8 +357,8 @@ TEST_CASE("ConfigManager: Load with string list", "[config][manager]")
         "maps = map1, map2, map3\n"
     );
 
-    ConfigManager config;
-    config.load(tempFile.path());
+    ConfigStore config({tempFile.path()});
+    config.load();
 
     auto maps = config.get<std::vector<std::string>>("game", "maps");
     REQUIRE(maps.has_value());

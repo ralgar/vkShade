@@ -203,7 +203,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 
     // Initialize ConfigManager
     // FIXME: Clean this up
-    auto& config = vkShade::Locator<vkShade::ConfigManager>::emplace();
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::emplace().app();
     std::string testKey = "ConfigKey";
     auto optFoo = config.get<std::string>("vkShade", testKey);
     if (optFoo.has_value())
@@ -223,8 +223,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         spdlog::warn("{}: No value or error parsing", testKey);
 
     config.set("", "SomeKey", 1.50000f);
-
-    config.save("./config/output.ini");
 
     // Initialize resource caches
     vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();

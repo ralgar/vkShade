@@ -70,7 +70,7 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
 
     VK_CHECK(m_device.dispatch.AllocateCommandBuffers(m_device.handle, &allocInfo, &m_commandBuffer));
 
-    auto& config = vkShade::Locator<vkShade::ConfigManager>::get();
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
 
     // Subscribe to config changes
     config.on_changed("vkShade", "Effects").connect<&VulkanSwapchain::on_effects_changed>(this);
