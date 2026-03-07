@@ -201,29 +201,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         g_vulkanDevices.emplace(dispatch_key_from_handle(*pDevice), thisDevice);
     }
 
-    // Initialize ConfigManager
-    // FIXME: Clean this up
-    auto& config = vkShade::Locator<vkShade::ConfigManager>::emplace().app();
-    std::string testKey = "ConfigKey";
-    auto optFoo = config.get<std::string>("vkShade", testKey);
-    if (optFoo.has_value())
-        spdlog::debug("{}: {}", testKey, optFoo.value());
-    else
-        spdlog::warn("{}: No value", testKey);
-
-    glm::vec3 bar = glm::vec3(1.5f, 0.9f, -2.0f);
-    config.set("SomeEffect", "Uniform1", bar);
-    auto optBar = config.get<glm::vec3>("SomeEffect", "Uniform1");
-    if (optBar.has_value())
-    {
-        glm::vec3 value = optBar.value();
-        spdlog::debug("{}: {}, {}, {}", "Uniform1", value.x, value.y, value.z);
-    }
-    else
-        spdlog::warn("{}: No value or error parsing", testKey);
-
-    config.set("", "SomeKey", 1.50000f);
-
     // Initialize resource caches
     vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();
 
