@@ -14,13 +14,8 @@ namespace vkShade
     class ConfigStore
     {
     public:
-        ConfigStore() = default;  // In-memory only
-
-        // Last path is the save target, all paths loaded in order
-        ConfigStore(std::vector<std::filesystem::path> filePaths);
-
-        void load();
-        void save() const;
+        bool load(std::filesystem::path filePath);
+        bool save(std::filesystem::path filePath) const;
 
         // Typed getter
         template<typename T>
@@ -76,7 +71,6 @@ namespace vkShade
         ConfigParser   m_parser;
         ConfigObserver m_observer;
 
-        std::vector<std::filesystem::path> m_filePaths;
         std::unordered_map<std::string, std::string> m_config;
     };
 } // namespace vkShade

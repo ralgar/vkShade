@@ -176,13 +176,13 @@ TEST_CASE("ConfigStore: Update existing value", "[config][manager]")
 TEST_CASE("ConfigStore: Save to file", "[config][manager]")
 {
     TempConfigFile tempFile("test_save.ini");
-    ConfigStore config({tempFile.path()});
+    ConfigStore config;
 
     config.set("graphics", "width", 1920);
     config.set("graphics", "height", 1080);
     config.set("audio", "volume", 0.8f);
 
-    config.save();
+    config.save(tempFile.path());
 
     std::string content = tempFile.read();
     REQUIRE(content.find("[graphics]") != std::string::npos);
@@ -205,8 +205,8 @@ TEST_CASE("ConfigStore: Load from file", "[config][manager]")
         "volume = 0.75\n"
     );
 
-    ConfigStore config({tempFile.path()});
-    config.load();
+    ConfigStore config;
+    config.load(tempFile.path());
 
     auto width = config.get<int32_t>("graphics", "width");
     auto height = config.get<int32_t>("graphics", "height");
@@ -225,10 +225,10 @@ TEST_CASE("ConfigStore: Load from file", "[config][manager]")
 
 TEST_CASE("ConfigStore: Load non-existent file does nothing", "[config][manager]")
 {
-    ConfigStore config({"/nonexistent/path/config.ini"});
+    ConfigStore config;
     config.set("test", "value", std::string("original"));
 
-    config.load();
+    config.load("/nonexistent/path/config.ini");
 
     auto result = config.get<std::string>("test", "value");
     REQUIRE(result.has_value());
@@ -240,19 +240,19 @@ TEST_CASE("ConfigStore: Save and load round-trip", "[config][manager]")
     TempConfigFile tempFile("test_roundtrip.ini");
 
     {
-        ConfigStore config({tempFile.path()});
+        ConfigStore config;
         config.set("graphics", "width", 2560);
         config.set("graphics", "height", 1440);
         config.set("graphics", "vsync", false);
         config.set("audio", "volume", 0.9f);
         config.set("game", "difficulty", std::string("hard"));
 
-        config.save();
+        config.save(tempFile.path());
     }
 
     {
-        ConfigStore config({tempFile.path()});
-        config.load();
+        ConfigStore config;
+        config.load(tempFile.path());
 
         REQUIRE(*config.get<int32_t>("graphics", "width") == 2560);
         REQUIRE(*config.get<int32_t>("graphics", "height") == 1440);
@@ -263,25 +263,29 @@ TEST_CASE("ConfigStore: Save and load round-trip", "[config][manager]")
     }
 }
 
-TEST_CASE("ConfigStore: Section ordering - vkShade first, then alphabetical", "[config][manager]")
+TEST_CASE("ConfigStore: Section ordering - unnamed first, vkShade second, then alphabetical", "[config][manager]")
 {
     TempConfigFile tempFile("test_ordering.ini");
-    ConfigStore config({tempFile.path()});
+    ConfigStore config;
 
+    config.set("", "global", std::string("value"));
     config.set("zebra", "last", std::string("z"));
     config.set("vkShade", "app", std::string("setting"));
     config.set("apple", "first", std::string("a"));
 
-    config.save();
+    config.save(tempFile.path());
 
     std::string content = tempFile.read();
+    size_t global_pos = content.find("global =");
     size_t vkshade_pos = content.find("[vkShade]");
     size_t apple_pos = content.find("[apple]");
     size_t zebra_pos = content.find("[zebra]");
 
+    REQUIRE(global_pos != std::string::npos);
     REQUIRE(vkshade_pos != std::string::npos);
     REQUIRE(apple_pos != std::string::npos);
     REQUIRE(zebra_pos != std::string::npos);
+    REQUIRE(global_pos < vkshade_pos);
     REQUIRE(vkshade_pos < apple_pos);
     REQUIRE(apple_pos < zebra_pos);
 }
@@ -289,12 +293,12 @@ TEST_CASE("ConfigStore: Section ordering - vkShade first, then alphabetical", "[
 TEST_CASE("ConfigStore: No trailing newline after last section", "[config][manager]")
 {
     TempConfigFile tempFile("test_no_trailing.ini");
-    ConfigStore config({tempFile.path()});
+    ConfigStore config;
 
     config.set("section1", "key", std::string("value"));
     config.set("section2", "key", std::string("value"));
 
-    config.save();
+    config.save(tempFile.path());
 
     std::string content = tempFile.read();
     REQUIRE(!content.empty());
@@ -313,13 +317,13 @@ TEST_CASE("ConfigStore: No trailing newline after last section", "[config][manag
 TEST_CASE("ConfigStore: Unnamed section appears first", "[config][manager]")
 {
     TempConfigFile tempFile("test_unnamed.ini");
-    ConfigStore config({tempFile.path()});
+    ConfigStore config;
 
     config.set("", "global_key", std::string("global_value"));
     config.set("vkShade", "app_key", std::string("app_value"));
     config.set("other", "other_key", std::string("other_value"));
 
-    config.save();
+    config.save(tempFile.path());
 
     std::string content = tempFile.read();
     size_t global_pos = content.find("global_key");
@@ -339,8 +343,8 @@ TEST_CASE("ConfigStore: Load with vec3", "[config][manager]")
         "color = 1.0, 0.5, 0.25\n"
     );
 
-    ConfigStore config({tempFile.path()});
-    config.load();
+    ConfigStore config;
+    config.load(tempFile.path());
 
     auto color = config.get<glm::vec3>("graphics", "color");
     REQUIRE(color.has_value());
@@ -357,8 +361,8 @@ TEST_CASE("ConfigStore: Load with string list", "[config][manager]")
         "maps = map1, map2, map3\n"
     );
 
-    ConfigStore config({tempFile.path()});
-    config.load();
+    ConfigStore config;
+    config.load(tempFile.path());
 
     auto maps = config.get<std::vector<std::string>>("game", "maps");
     REQUIRE(maps.has_value());

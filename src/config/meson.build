@@ -1,4 +1,11 @@
+config_globals_hpp = configure_file(
+  output: 'config_globals.hpp',
+  configuration: conf_paths
+)
+
 libconfig_source = [
+  config_globals_hpp,
+  'config_manager.cpp',
   'config_store.cpp',
 ]
 

@@ -20,34 +20,36 @@ static int config_ini_handler(void* user, const char* section, const char* name,
     return 1;  // Success
 }
 
-vkShade::ConfigStore::ConfigStore(std::vector<std::filesystem::path> filePaths)
-    : m_parser(ConfigParser()),
-      m_filePaths(filePaths)
+bool vkShade::ConfigStore::load(std::filesystem::path filePath)
 {
-    load();
-}
+    if (!std::filesystem::exists(filePath))
+        return false;
 
-void vkShade::ConfigStore::load()
-{
-    for (const auto& file : m_filePaths)
+    if (!std::filesystem::is_regular_file(filePath))
+        return false;
+
+    auto perms = std::filesystem::status(filePath).permissions();
+    if ((perms & std::filesystem::perms::owner_read) == std::filesystem::perms::none)
+        return false;
+
+    // Parse the INI file
+    int result = ini_parse(filePath.string().c_str(), config_ini_handler, &m_config);
+    if (result != 0)
     {
-        if (!std::filesystem::exists(file))
-            return; // Silently skip non-existent files
-
-        // Parse the INI file
-        int result = ini_parse(file.string().c_str(), config_ini_handler, &m_config);
-        if (result != 0)
-            spdlog::error("Failed to load or parse config file: {}", file.c_str());
+        spdlog::error("Failed to load or parse config file: {}", filePath.c_str());
+        return false;
     }
+
+    return true;
 }
 
-void vkShade::ConfigStore::save() const
+bool vkShade::ConfigStore::save(std::filesystem::path filePath) const
 {
-    std::ofstream file(m_filePaths.back());
+    std::ofstream file(filePath);
     if (!file.is_open())
     {
-        spdlog::error("Failed to open config file for writing: {}", m_filePaths.back().string());
-        return;
+        spdlog::error("Failed to open config file for writing: {}", filePath.string());
+        return false;
     }
 
     // Group by section
@@ -97,5 +99,6 @@ void vkShade::ConfigStore::save() const
             file << "\n";
     }
 
-    spdlog::trace("Saved configuration to: {}", m_filePaths.back().string());
+    spdlog::trace("Saved configuration to: {}", filePath.string());
+    return true;
 }
