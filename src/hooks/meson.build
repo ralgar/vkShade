@@ -11,6 +11,7 @@ vkshade = shared_library(
   hooks_source,
   include_directories : vkShade_include_path,
   dependencies : [
+    libconfig,
     libgui,
     libinput,
     libvk,

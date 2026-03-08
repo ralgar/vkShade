@@ -22,6 +22,8 @@ namespace vkShade
         VulkanImage& image(size_t index) const;
         uint32_t image_count() const { return m_images.size(); }
 
+        void on_effects_changed(std::vector<std::string> effects);
+
         // Render layer on top of swapchain
         void render(uint32_t imageIndex);
 

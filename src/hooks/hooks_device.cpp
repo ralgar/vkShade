@@ -9,6 +9,7 @@
 
 #include <vulkan/vk_layer.h>
 
+#include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 #include "core/resource_cache.hpp"
 #include "gui/gui_manager.hpp"

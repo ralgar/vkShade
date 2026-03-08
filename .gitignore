@@ -9,3 +9,6 @@ imgui.ini
 
 # Log files
 *.log
+
+# INI files
+*.ini

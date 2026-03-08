@@ -11,6 +11,7 @@ libinput_library = static_library(
   libinput_source,
   dependencies : [
     glm,
+    magic_enum,
     spdlog,
     xcb,
     x11,

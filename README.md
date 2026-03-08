@@ -45,6 +45,7 @@ This project is still in the **ALPHA** phase of development - meaning
 - [x] Cross-platform input (Wayland, Xlib, XCB)
 - [x] Modern C++ RAII wrappers around the Vulkan C API
 - [x] Demo shader effects (greyscale and grid overlay)
+- [x] Configuration system
 
 <p align="center">
   <a href="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.1-demo.png">
@@ -59,18 +60,17 @@ This project is still in the **ALPHA** phase of development - meaning
 #### Near-term (v0.1.x)
 
 - [x] Ping-pong rendering for multiple effects
-- [ ] Configuration system (global options and per-game presets)
-- [ ] Browse and apply shaders in the in-game GUI
-- [ ] Hot-reload configuration
-- [ ] Shader reflection (for UI/config options)
+- [x] Configuration system (global options and per-game presets)
+- [ ] Basic GUI integration (browse/apply shaders and save/load config)
+- [ ] ReShade FX compiler integration
+- [ ] Shader reflection (set uniforms in the GUI and config files)
 
 #### Mid-term (v0.2.x+)
 
-- [ ] ReShade FX compilation and configuration support
-- [ ] GLSL/HLSL compilation (libshaderc)
 - [ ] Hot-reloadable shaders
 - [ ] Multi-pass effect support
 - [ ] Depth buffer access
+- [ ] GLSL compilation (libshaderc)
 
 #### Long-term
 
@@ -166,15 +166,45 @@ With Steam, edit your game's launch options and add:
 ENABLE_VKSHADE=1 %command%
 ```
 
-### Controls
+## Configuration
 
-**NOTE:** Keybinds are currently hardcoded.
+The configuration file is searched for in the following locations (in order):
 
-- Press `F2` to toggle the GUI overlay
-- Click to interact with GUI windows when visible
-- Press `HOME` to toggle the effects
+- A file set with the environment variable
+  `VKSHADE_CONFIG_FILE=/path/to/vkShade.ini`
+- A file named `vkShade.ini` in the working directory of the game
+- `$XDG_CONFIG_HOME/vkShade/vkShade.ini` or `~/.config/vkShade/vkShade.ini`
+- `$XDG_DATA_HOME/vkShade/vkShade.ini` or `~/.local/share/vkShade/vkShade.ini`
+- `/etc/vkShade.ini`
+- `/etc/vkShade/vkShade.ini`
+- `/usr/share/vkShade/vkShade.ini`
 
-Customizable keybinds will be added in a future release.
+> [!TIP]
+> The default/example configuration file can be found in this repo at
+> `config/vkShade.ini` and will be installed at either
+> `$XDG_DATA_HOME/vkShade/vkShade.ini` for a user-level installation or at
+> `/usr/share/vkShade/vkShade.ini` for a system-wide installation.
+
+### Input
+
+Keybinds are now configurable under the `[Input]` section in `vkShade.ini`
+ (single keys only for now). You can set custom keybinds by using the
+ action name and the enum name of the key (`src/input/key_codes.hpp`):
+
+```ini
+[Input]
+ToggleEffects = KEY_F12
+ToggleGui = KEY_BACKQUOTE
+```
+
+> [!TIP]
+> If you don't set any keybinds, vkShade will use the defaults:
+>
+> - `HOME` to toggle the effects
+> - `F2` to toggle the in-game GUI overlay
+
+> [!NOTE]
+> When interacting with the in-game GUI, only the mouse is supported currently.
 
 ### Log Output
 

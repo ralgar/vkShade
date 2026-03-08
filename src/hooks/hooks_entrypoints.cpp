@@ -5,6 +5,9 @@
 #include <mutex>
 #include <vulkan/vulkan_core.h>
 
+#include "config/config_manager.hpp"
+#include "core/service_locator.hpp"
+
 // Layer book-keeping information
 // These are only modified during create/destroy
 // NOTE: These are declared in `vulkan_hooks.hpp`
@@ -47,6 +50,8 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
 
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInstance instance, const char* pName)
 {
+    vkShade::Locator<vkShade::ConfigManager>::emplace().app();
+
     // Self-intercept here as well to stay consistent with 'vkShade_GetDeviceProcAddr' implementation
     GETPROCADDR(GetInstanceProcAddr);
 

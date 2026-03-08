@@ -10,3 +10,8 @@ configure_file(
     install : true,
     install_dir : vulkan_layer_dir,
 )
+
+install_data(
+    'vkShade.ini',
+    install_dir: get_option('datadir') / 'vkShade'
+)

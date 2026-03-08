@@ -5,6 +5,7 @@
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
 
+#include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_manager.hpp"
@@ -69,9 +70,20 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
 
     VK_CHECK(m_device.dispatch.AllocateCommandBuffers(m_device.handle, &allocInfo, &m_commandBuffer));
 
-    // Add the effects
-    m_effects.push_back(std::make_shared<Effect>(m_device, m_format, "greyscale.frag.spv"));
-    m_effects.push_back(std::make_shared<Effect>(m_device, m_format, "simple_grid.frag.spv"));
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+
+    // Subscribe to config changes
+    config.on_changed("vkShade", "Effects").connect<&VulkanSwapchain::on_effects_changed>(this);
+
+    // Load the current effects list
+    auto effects = config.get<std::vector<std::string>>("vkShade", "Effects");
+    if (effects)
+    {
+        for (const auto& effect : effects.value())
+        {
+            m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
+        }
+    }
 }
 
 vkShade::VulkanSwapchain::~VulkanSwapchain()
@@ -82,6 +94,15 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
     // Clean up
     m_device.dispatch.DestroyCommandPool(m_device.handle, m_commandPool, nullptr);
     m_device.dispatch.DestroyFence(m_device.handle, m_fence, nullptr);
+}
+
+void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effects)
+{
+    m_effects.clear();
+    for (const auto& effect : effects)
+    {
+        m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
+    }
 }
 
 void vkShade::VulkanSwapchain::render(uint32_t imageIndex)

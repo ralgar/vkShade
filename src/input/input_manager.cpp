@@ -1,8 +1,12 @@
 #include "input_manager.hpp"
 #include "input/key_codes.hpp"
 
+#include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
 #include <xkbcommon/xkbcommon.h>
+
+#include "config/config_manager.hpp"
+#include "core/service_locator.hpp"
 
 vkShade::InputManager::InputManager()
 {
@@ -43,10 +47,26 @@ vkShade::InputManager::InputManager()
         return;
     }
 
-    // Hardcoded keybinds
-    // TODO: Add proper configuration for this
-    bind_action("ToggleEffects", vkShade::KeyCode::KEY_HOME);
-    bind_action("ToggleGui", vkShade::KeyCode::KEY_F2);
+    // Set keybinds
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+
+    auto toggleEffects = config.get<std::string>("Input", "ToggleEffects");
+    if (toggleEffects)
+    {
+        vkShade::KeyCode keyEnum;
+        std::string keyString = toggleEffects.value();
+        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_HOME);
+        bind_action("ToggleEffects", keyEnum);
+    }
+
+    auto toggleGui = config.get<std::string>("Input", "ToggleGui");
+    if (toggleGui)
+    {
+        vkShade::KeyCode keyEnum;
+        std::string keyString = toggleGui.value();
+        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_F2);
+        bind_action("ToggleGui", keyEnum);
+    }
 }
 
 vkShade::InputManager::~InputManager()
@@ -72,6 +92,7 @@ vkShade::InputManager::~InputManager()
 void vkShade::InputManager::bind_action(const std::string& actionName, vkShade::KeyCode keyCode)
 {
     m_actionBindings[actionName] = ActionBinding {keyCode};
+    spdlog::debug("Bound action '{}' to '{}'", actionName, magic_enum::enum_name(keyCode));
 }
 
 void vkShade::InputManager::handle_keyboard_event(const xkb_keysym_t& keysym, bool pressed)
