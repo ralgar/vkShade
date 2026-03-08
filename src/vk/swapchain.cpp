@@ -77,9 +77,12 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
 
     // Load the current effects list
     auto effects = config.get<std::vector<std::string>>("vkShade", "Effects");
-    for (const auto& effect : effects.value())
+    if (effects)
     {
-        m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
+        for (const auto& effect : effects.value())
+        {
+            m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
+        }
     }
 }
 
