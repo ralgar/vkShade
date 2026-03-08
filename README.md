@@ -27,9 +27,10 @@ vkShade is a Vulkan post-processing layer for improving the visuals of games.
  It is being written from the ground up, with the goal of being a powerful,
  modern, and maintainable post-processing layer for Linux gaming.
 
-**DISCLAIMER:** As with any software that hooks into the graphics pipeline,
- this project may trigger bans from anti-cheat software. Use it with
- multiplayer games at your own risk.
+> [!CAUTION]
+> As with any software that hooks into the graphics pipeline, this project
+> may trigger bans from anti-cheat software. Use it with multiplayer games
+> at your own risk.
 
 ## Project Status
 
