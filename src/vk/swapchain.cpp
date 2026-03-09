@@ -94,6 +94,10 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
     // Clean up
     m_device.dispatch.DestroyCommandPool(m_device.handle, m_commandPool, nullptr);
     m_device.dispatch.DestroyFence(m_device.handle, m_fence, nullptr);
+
+    // Unsubscribe from config changes
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    config.on_changed("vkShade", "Effects").disconnect<&VulkanSwapchain::on_effects_changed>(this);
 }
 
 void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effects)

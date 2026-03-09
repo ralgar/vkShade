@@ -223,3 +223,107 @@ TEST_CASE("ConfigObserver: Multiple notifications trigger handler each time", "[
     REQUIRE(listener.get_call_count() == 3);
     REQUIRE(listener.get_last_int() == 3);
 }
+
+TEST_CASE("ConfigObserver: Disconnect free function", "[config][observer]")
+{
+    g_callbackLog.clear();
+    ConfigObserver observer;
+
+    observer.on_changed("test", "key").connect<&on_string_changed>();
+    observer.notify("test", "key", std::string("first"));
+
+    observer.on_changed("test", "key").disconnect<&on_string_changed>();
+    observer.notify("test", "key", std::string("second"));
+
+    REQUIRE(g_callbackLog.size() == 1);
+    REQUIRE(g_callbackLog[0] == "string:first");
+}
+
+TEST_CASE("ConfigObserver: Disconnect member function", "[config][observer]")
+{
+    TestListener listener;
+    ConfigObserver observer;
+
+    observer.on_changed("test", "key").connect<&TestListener::on_int_value>(&listener);
+    observer.notify("test", "key", 10);
+
+    observer.on_changed("test", "key").disconnect<&TestListener::on_int_value>(&listener);
+    observer.notify("test", "key", 20);
+
+    REQUIRE(listener.get_call_count() == 1);
+    REQUIRE(listener.get_last_int() == 10);
+}
+
+TEST_CASE("ConfigObserver: Disconnect one of multiple handlers", "[config][observer]")
+{
+    g_callbackLog.clear();
+    TestListener listener;
+    ConfigObserver observer;
+
+    observer.on_changed("test", "value").connect<&on_string_changed>();
+    observer.on_changed("test", "value").connect<&TestListener::on_string_value>(&listener);
+
+    observer.on_changed("test", "value").disconnect<&on_string_changed>();
+    observer.notify("test", "value", std::string("hello"));
+
+    REQUIRE(g_callbackLog.empty());
+    REQUIRE(listener.get_call_count() == 1);
+    REQUIRE(listener.get_last_string() == "hello");
+}
+
+TEST_CASE("ConfigObserver: Disconnect one instance leaves others", "[config][observer]")
+{
+    TestListener listener1;
+    TestListener listener2;
+    ConfigObserver observer;
+
+    observer.on_changed("test", "key").connect<&TestListener::on_int_value>(&listener1);
+    observer.on_changed("test", "key").connect<&TestListener::on_int_value>(&listener2);
+
+    observer.on_changed("test", "key").disconnect<&TestListener::on_int_value>(&listener1);
+    observer.notify("test", "key", 42);
+
+    REQUIRE(listener1.get_call_count() == 0);
+    REQUIRE(listener2.get_call_count() == 1);
+    REQUIRE(listener2.get_last_int() == 42);
+}
+
+TEST_CASE("ConfigObserver: Disconnect non-existent handler does nothing", "[config][observer]")
+{
+    g_callbackLog.clear();
+    ConfigObserver observer;
+
+    observer.on_changed("test", "key").connect<&on_string_changed>();
+    observer.on_changed("test", "key").disconnect<&on_float_changed>();
+    observer.notify("test", "key", std::string("still works"));
+
+    REQUIRE(g_callbackLog.size() == 1);
+    REQUIRE(g_callbackLog[0] == "string:still works");
+}
+
+TEST_CASE("ConfigObserver: Disconnect from non-existent key does nothing", "[config][observer]")
+{
+    ConfigObserver observer;
+
+    // Should not crash
+    observer.on_changed("nonexistent", "key").disconnect<&on_string_changed>();
+}
+
+TEST_CASE("ConfigObserver: Reconnect after disconnect", "[config][observer]")
+{
+    g_callbackLog.clear();
+    ConfigObserver observer;
+
+    observer.on_changed("test", "key").connect<&on_string_changed>();
+    observer.notify("test", "key", std::string("first"));
+
+    observer.on_changed("test", "key").disconnect<&on_string_changed>();
+    observer.notify("test", "key", std::string("second"));
+
+    observer.on_changed("test", "key").connect<&on_string_changed>();
+    observer.notify("test", "key", std::string("third"));
+
+    REQUIRE(g_callbackLog.size() == 2);
+    REQUIRE(g_callbackLog[0] == "string:first");
+    REQUIRE(g_callbackLog[1] == "string:third");
+}
