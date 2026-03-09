@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -23,6 +24,14 @@ namespace vkShade
             // Connect a member function (method)
             template<auto Method, typename Class>
             void connect(Class* instance) { m_observer.connect_impl<Method>(m_section, m_key, instance); }
+
+            // Disconnect a free function
+            template<auto Func>
+            void disconnect() { m_observer.disconnect_impl<Func>(m_section, m_key); }
+
+            // Disconnect a member function (method)
+            template<auto Method, typename Class>
+            void disconnect(Class* instance) { m_observer.disconnect_impl<Method>(m_section, m_key, instance); }
 
         private:
             ConfigObserver& m_observer;
@@ -127,6 +136,66 @@ namespace vkShade
                 Class* obj = static_cast<Class*>(pInstance);
                 (obj->*Method)(*static_cast<const ArgType*>(pValue));
             });
+        }
+
+        // Disconnect free function
+        template<auto Func>
+        void disconnect_impl(const std::string& section, const std::string& key)
+        {
+            std::string mapKey = section + "::" + key;
+            void* pFunction = reinterpret_cast<void*>(Func);
+
+            auto it = m_subscribers.find(mapKey);
+            if (it != m_subscribers.end())
+            {
+                auto& handlers = it->second;
+                handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
+                    [pFunction](const auto& tuple)
+                    {
+                        return std::get<0>(tuple) == pFunction && std::get<1>(tuple) == nullptr;
+                    }),
+                    handlers.end()
+                );
+
+                // Clean up empty entries
+                if (handlers.empty())
+                {
+                    m_subscribers.erase(it);
+                }
+            }
+        }
+
+        // Disconnect member function
+        template<auto Method, typename Class>
+        void disconnect_impl(const std::string& section, const std::string& key, Class* instance)
+        {
+            std::string mapKey = section + "::" + key;
+
+            union {
+                decltype(Method) method;
+                void* ptr;
+            } converter;
+            converter.method = Method;
+            void* pMethod = converter.ptr;
+
+            auto it = m_subscribers.find(mapKey);
+            if (it != m_subscribers.end())
+            {
+                auto& handlers = it->second;
+                handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
+                    [pMethod, instance](const auto& tuple)
+                    {
+                        return std::get<0>(tuple) == pMethod && std::get<1>(tuple) == instance;
+                    }),
+                    handlers.end()
+                );
+
+                // Clean up empty entries
+                if (handlers.empty())
+                {
+                    m_subscribers.erase(it);
+                }
+            }
         }
     };
 } // namespace vkShade
