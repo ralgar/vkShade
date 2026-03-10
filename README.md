@@ -28,13 +28,12 @@ vkShade is a Vulkan post-processing layer for improving the visuals of games.
  modern, and maintainable post-processing layer for Linux gaming.
 
 > [!CAUTION]
-> As with any software that hooks into the graphics pipeline, this project
-> may trigger bans from anti-cheat software. Use it with multiplayer games
-> at your own risk.
+> This software may trigger bans from anti-cheat. Use it with multiplayer
+> games at your own risk.
 
 ## Project Status
 
-This project is still in the **ALPHA** phase of development - meaning
+This project is still in the **PRE-ALPHA** phase of development - meaning
  it works, but it's really just a proof-of-concept right now. Over time, I
  intend to bring it up to speed as the de facto post-processing layer for
  Vulkan applications on Linux.
@@ -97,7 +96,7 @@ vkShade provides a full-featured and easy to use build system, which will
 
 Before building, you will need:
 
-- GCC >= 9
+- GCC >= 12
 - X11 development files (`libx11`, `libxcb`)
 - Wayland development files (`wayland-client`)
 - xkbcommon development files (`libxkbcommon`)
