@@ -83,7 +83,8 @@ void vkShade::ShaderManagerUI::render_shader_lists()
 {
     // Get active shaders from config
     std::vector<std::string> activeShaders;
-    activeShaders = m_config.get<std::vector<std::string>>("vkShade", "Effects").value_or({});
+    auto activeShadersOpt = m_config.get<std::vector<std::string>>("vkShade", "Effects");
+    activeShaders = activeShadersOpt.value_or(std::vector<std::string>{});
 
     // Scan directory for all shaders
     std::string effectsPath = std::string(DATADIR) + "/vkShade";
