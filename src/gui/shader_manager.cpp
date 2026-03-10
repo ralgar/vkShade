@@ -3,6 +3,7 @@
 #include "config/config_globals.hpp"
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
+#include "gui_helpers.hpp"
 #include "gui_style.hpp"
 
 vkShade::ShaderManagerUI::ShaderManagerUI()
@@ -126,53 +127,52 @@ void vkShade::ShaderManagerUI::render_shader_lists()
 
     float listWidth = (availableWidth - UIStyle::ITEM_SPACING_X * 2 - 80.0f) * 0.5f;
 
+    float moveButtonsHeight = UIStyle::BUTTON_HEIGHT + ImGui::GetStyle().ItemSpacing.y * 2;
+
     ImGui::BeginGroup();
 
     // Available Shaders column
-    ImGui::BeginChild("AvailableColumn", ImVec2(listWidth, listHeight), false);
-    ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Available Shaders");
-    ImGui::Spacing();
-
-    float moveButtonsHeight = UIStyle::BUTTON_HEIGHT + ImGui::GetStyle().ItemSpacing.y * 2;
-
-    // Content section (scrollable)
     {
-        float headerHeight = ImGui::GetCursorPosY();
-        ImGui::BeginChild("AvailableScrollRegion",
-                          ImVec2(0, listHeight - headerHeight - moveButtonsHeight),
-                          false,
-                          ImGuiWindowFlags_None);
+        ImGui::BeginChild("AvailableColumn", ImVec2(listWidth, listHeight), false);
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Available Shaders");
+        ImGui::Spacing();
 
-        if (render_shader_listbox("##AvailableShaders", availableShaders, m_selectedAvailable, ImVec2(-FLT_MIN, -FLT_MIN)))
-            m_selectedActive = -1;  // When we select in this listbox, deselect in the other.
+        // Content section (scrollable)
+        {
+            float headerHeight = ImGui::GetCursorPosY();
+            ImGui::BeginChild("AvailableScrollRegion",
+                              ImVec2(0, listHeight - headerHeight - moveButtonsHeight),
+                              false,
+                              ImGuiWindowFlags_None);
+
+            if (render_shader_listbox("##AvailableShaders", availableShaders, m_selectedAvailable, ImVec2(-FLT_MIN, -FLT_MIN)))
+                m_selectedActive = -1;  // When we select in this listbox, deselect in the other.
+
+            ImGui::EndChild();
+        }
 
         ImGui::EndChild();
     }
 
-    ImGui::EndChild();
-
     ImGui::SameLine();
 
     // Center buttons column
-    ImGui::BeginChild("ButtonsColumn", ImVec2(80.0f, listHeight), false);
-
-    // Add vertical centering
-    float buttonRegionHeight = UIStyle::BUTTON_HEIGHT * 2 + UIStyle::ITEM_SPACING_Y;
-    float verticalOffset = (listHeight - moveButtonsHeight - buttonRegionHeight) * 0.5f;
-    if (verticalOffset > 0) {
-        ImGui::Dummy(ImVec2(0, verticalOffset));
-    }
-
-    bool canActivate = m_selectedAvailable >= 0 &&
-                       m_selectedAvailable < (int)availableShaders.size();
-
-    if (!canActivate) {
-        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-    }
-
-    if (ImGui::Button(">>##Activate", ImVec2(-FLT_MIN, UIStyle::BUTTON_HEIGHT)))
     {
-        if (canActivate)
+        ImGui::BeginChild("ButtonsColumn", ImVec2(80.0f, listHeight), false);
+
+        // Add vertical centering
+        float buttonRegionHeight = UIStyle::BUTTON_HEIGHT * 2 + UIStyle::ITEM_SPACING_Y;
+        float verticalOffset = (listHeight - moveButtonsHeight - buttonRegionHeight) * 0.5f;
+        if (verticalOffset > 0) {
+            ImGui::Dummy(ImVec2(0, verticalOffset));
+        }
+
+        bool canActivate = m_selectedAvailable >= 0 &&
+                           m_selectedAvailable < (int)availableShaders.size();
+
+        ImVec2 btnSize(-FLT_MIN, UIStyle::BUTTON_HEIGHT);
+
+        if (UI::Button(">>##Activate", btnSize, canActivate, "Activate selected shader"))
         {
             std::string shader = availableShaders[m_selectedAvailable];
             // Add to active list
@@ -180,93 +180,72 @@ void vkShade::ShaderManagerUI::render_shader_lists()
             m_config.set("vkShade", "Effects", activeShaders);
             m_selectedAvailable = -1;
         }
-    }
 
-    if (!canActivate) {
-        ImGui::PopStyleVar();
-    }
+        bool canDeactivate = m_selectedActive >= 0 &&
+                             m_selectedActive < (int)activeShaders.size();
 
-    if (ImGui::IsItemHovered() && canActivate) {
-        ImGui::SetTooltip("Activate selected shader");
-    }
-
-    bool canDeactivate = m_selectedActive >= 0 &&
-                         m_selectedActive < (int)activeShaders.size();
-
-    if (!canDeactivate) {
-        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-    }
-
-    if (ImGui::Button("<<##Deactivate", ImVec2(-FLT_MIN, UIStyle::BUTTON_HEIGHT))) {
-        if (canDeactivate) {
+        if (UI::Button("<<##Deactivate", btnSize, canDeactivate, "Deactivate selected shader"))
+        {
             // Remove from active list
             activeShaders.erase(activeShaders.begin() + m_selectedActive);
             m_config.set("vkShade", "Effects", activeShaders);
             m_selectedActive = -1;
         }
-    }
-
-    if (!canDeactivate) {
-        ImGui::PopStyleVar();
-    }
-
-    if (ImGui::IsItemHovered() && canDeactivate) {
-        ImGui::SetTooltip("Deactivate selected shader");
-    }
-
-    ImGui::EndChild();
-
-    ImGui::SameLine();
-
-    // Active Shaders column
-    ImGui::BeginChild("ActiveColumn", ImVec2(listWidth, listHeight), false);
-    ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Active Shaders (Ordered)");
-    ImGui::Spacing();
-
-    // Content section (scrollable)
-    {
-        float headerHeight = ImGui::GetCursorPosY();
-        ImGui::BeginChild("ActiveScrollRegion",
-                          ImVec2(0, listHeight - headerHeight - moveButtonsHeight),
-                          false,
-                          ImGuiWindowFlags_None);
-
-        if (render_shader_listbox("##ActiveShaders", activeShaders, m_selectedActive, ImVec2(-FLT_MIN, -FLT_MIN)))
-            m_selectedAvailable = -1;   // When we select in this listbox, deselect in the other.
 
         ImGui::EndChild();
     }
 
-     // Move Up/Down buttons, centered under the active list
-     ImGui::Spacing();
-     bool canMoveUp   = m_selectedActive > 0;
-     bool canMoveDown = m_selectedActive >= 0 &&
-                        m_selectedActive < (int)activeShaders.size() - 1;
+    ImGui::SameLine();
 
-     float btnWidth   = 80.0f;
-     float totalWidth = btnWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
-     float indent     = (listWidth - totalWidth) * 0.5f;
-     if (indent > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+    // Active Shaders column
+    {
+        ImGui::BeginChild("ActiveColumn", ImVec2(listWidth, listHeight), false);
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Active Shaders (Ordered)");
+        ImGui::Spacing();
 
-     if (!canMoveUp) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-     if (ImGui::Button("Move Up", ImVec2(btnWidth, 0)) && canMoveUp) {
-         std::swap(activeShaders[m_selectedActive], activeShaders[m_selectedActive - 1]);
-         m_config.set("vkShade", "Effects", activeShaders);
-         m_selectedActive--;
-     }
-     if (!canMoveUp) ImGui::PopStyleVar();
+        // Content section (scrollable)
+        {
+            float headerHeight = ImGui::GetCursorPosY();
+            ImGui::BeginChild("ActiveScrollRegion",
+                              ImVec2(0, listHeight - headerHeight - moveButtonsHeight),
+                              false,
+                              ImGuiWindowFlags_None);
 
-     ImGui::SameLine();
+            if (render_shader_listbox("##ActiveShaders", activeShaders, m_selectedActive, ImVec2(-FLT_MIN, -FLT_MIN)))
+                m_selectedAvailable = -1;   // When we select in this listbox, deselect in the other.
 
-     if (!canMoveDown) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-     if (ImGui::Button("Move Down", ImVec2(btnWidth, 0)) && canMoveDown) {
-         std::swap(activeShaders[m_selectedActive], activeShaders[m_selectedActive + 1]);
-         m_config.set("vkShade", "Effects", activeShaders);
-         m_selectedActive++;
-     }
-     if (!canMoveDown) ImGui::PopStyleVar();
+            ImGui::EndChild();
+        }
 
-    ImGui::EndChild();
+        // Move Up/Down buttons, centered under the active list
+        ImGui::Spacing();
+        bool canMoveUp   = m_selectedActive > 0;
+        bool canMoveDown = m_selectedActive >= 0 &&
+                           m_selectedActive < (int)activeShaders.size() - 1;
+
+        float btnWidth   = 80.0f;
+        float totalWidth = btnWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
+        float indent     = (listWidth - totalWidth) * 0.5f;
+        if (indent > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+
+        if (UI::Button("Move Up", ImVec2(btnWidth, 0), canMoveUp))
+        {
+            std::swap(activeShaders[m_selectedActive], activeShaders[m_selectedActive - 1]);
+            m_config.set("vkShade", "Effects", activeShaders);
+            m_selectedActive--;
+        }
+
+        ImGui::SameLine();
+
+        if (UI::Button("Move Down", ImVec2(btnWidth, 0), canMoveDown))
+        {
+            std::swap(activeShaders[m_selectedActive], activeShaders[m_selectedActive + 1]);
+            m_config.set("vkShade", "Effects", activeShaders);
+            m_selectedActive++;
+        }
+
+        ImGui::EndChild();
+    }
 
     ImGui::EndGroup();
 }
