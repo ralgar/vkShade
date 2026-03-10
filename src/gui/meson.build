@@ -1,5 +1,6 @@
 libgui_source = [
   'gui_manager.cpp',
+  'shader_manager.cpp',
 ]
 
 libgui_library = static_library(

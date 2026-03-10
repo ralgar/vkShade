@@ -1,11 +1,15 @@
 #pragma once
 
+#include <memory>
+
 #include <vulkan/vulkan_core.h>
 
 #include "hooks/hooks.hpp"
 
 namespace vkShade
 {
+    class ShaderManagerUI;
+
     class GuiManager
     {
     public:
@@ -22,5 +26,7 @@ namespace vkShade
         VkDescriptorPool m_descriptorPool;
 
         bool m_visible {false};
+
+        std::unique_ptr<ShaderManagerUI> m_shaderManager;
     };
 } // namespace vkShade

@@ -7,7 +7,9 @@
 #include "core/service_locator.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_manager.hpp"
+#include "shader_manager.hpp"
 #include "vk/macros.hpp"
+#include "gui_style.hpp"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
 {
@@ -92,6 +94,11 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
 	ImGui_ImplVulkan_Init(&init_info);
 	ImGui_ImplVulkan_CreateFontsTexture();
+
+    // Apply custom style
+    UIStyle::ApplyStyle();
+
+    m_shaderManager = std::make_unique<vkShade::ShaderManagerUI>();
 }
 
 vkShade::GuiManager::~GuiManager()
@@ -122,18 +129,14 @@ void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
     // Test window
     if (m_visible)
     {
-        // Draw a black cursor with white outline and red center dot
+        m_shaderManager->render();
+
+        // Last: Draw a black cursor with white outline and red center dot
         ImDrawList* draw_list = ImGui::GetForegroundDrawList();
         ImVec2 pos(mousePos.x, mousePos.y);
         draw_list->AddCircleFilled(pos, 4.0f, IM_COL32(0, 0, 0, 255));
         draw_list->AddCircle(pos, 5.0f, IM_COL32(255, 255, 255, 255), 0, 1.0f);
         draw_list->AddCircleFilled(pos, 1.5f, IM_COL32(255, 0, 0, 255));
-
-        ImGui::Begin("vkShade");
-        ImGui::Text("FPS: %.1f", io.Framerate);
-        ImGui::Text("Mouse Position: (%.1f, %.1f)", mousePos.x, mousePos.y);
-        ImGui::End();
-        ImGui::ShowDemoWindow();
     }
 
     ImGui::Render();

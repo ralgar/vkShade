@@ -26,6 +26,13 @@ config-lib32:
 	ASFLAGS=--32 CFLAGS=-m32 CXXFLAGS=-m32 PKG_CONFIG_PATH=/usr/$(LIB32_DIR)/pkgconfig \
 		meson setup --prefix "$(HOME)/.local" --buildtype=release libdir=$(LIB32_DIR) $(BUILD32_DIR)
 
+.PHONY: debug
+debug:
+	meson setup --prefix "$(HOME)/.local" --buildtype=debug $(BUILD_DIR)
+	ninja -C $(BUILD_DIR)
+	meson install -C "$(BUILD_DIR)" --skip-subprojects
+	ENABLE_VKSHADE=1 gdb vkcube
+
 .PHONY: install
 install: build
 	meson install -C "$(BUILD_DIR)" --skip-subprojects
