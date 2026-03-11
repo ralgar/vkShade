@@ -35,6 +35,9 @@ void vkShade::ShaderManagerUI::render()
 
 void vkShade::ShaderManagerUI::render_menu_bar()
 {
+    // Override custom padding and use the default (much less) for menus
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
+
     if (ImGui::BeginMenuBar())
     {
         if (ImGui::BeginMenu("File"))
@@ -78,6 +81,8 @@ void vkShade::ShaderManagerUI::render_menu_bar()
 
         ImGui::EndMenuBar();
     }
+
+    ImGui::PopStyleVar();  // WindowPadding
 }
 
 void vkShade::ShaderManagerUI::render_shader_lists()
