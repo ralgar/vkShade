@@ -40,10 +40,11 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
         return false;
     }
 
+    m_currentFile = filePath;
     return true;
 }
 
-bool vkShade::ConfigStore::save(std::filesystem::path filePath) const
+bool vkShade::ConfigStore::save(std::filesystem::path filePath)
 {
     std::ofstream file(filePath);
     if (!file.is_open())
@@ -99,6 +100,15 @@ bool vkShade::ConfigStore::save(std::filesystem::path filePath) const
             file << "\n";
     }
 
+    m_currentFile = filePath;
     spdlog::trace("Saved configuration to: {}", filePath.string());
     return true;
+}
+
+bool vkShade::ConfigStore::save()
+{
+    if (!m_currentFile.empty())
+        return this->save(m_currentFile);
+
+    return false;
 }
