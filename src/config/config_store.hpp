@@ -14,9 +14,12 @@ namespace vkShade
     class ConfigStore
     {
     public:
+        void clear();
         bool load(std::filesystem::path filePath);
         bool save(std::filesystem::path filePath);  // Save As
         bool save();  // Save currently open file
+
+        bool has_file() const { return !m_currentFile.empty(); }
 
         // Typed getter
         template<typename T>
