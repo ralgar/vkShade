@@ -20,6 +20,12 @@ static int config_ini_handler(void* user, const char* section, const char* name,
     return 1;  // Success
 }
 
+void vkShade::ConfigStore::clear()
+{
+    m_currentFile = std::filesystem::path{};
+    m_config.clear();
+}
+
 bool vkShade::ConfigStore::load(std::filesystem::path filePath)
 {
     if (!std::filesystem::exists(filePath))

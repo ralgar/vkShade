@@ -414,3 +414,53 @@ TEST_CASE("ConfigStore: explicit save() path sets current file", "[config][manag
     config2.load(tempFile.path());
     REQUIRE(*config2.get<std::string>("test", "key") == "updated");
 }
+
+TEST_CASE("ConfigStore: has_file() returns false by default", "[config][manager]")
+{
+    ConfigStore config;
+    REQUIRE(config.has_file() == false);
+}
+
+TEST_CASE("ConfigStore: has_file() returns true after load", "[config][manager]")
+{
+    TempConfigFile tempFile("test_haspath_load.ini");
+    tempFile.write("[test]\nkey = value\n");
+
+    ConfigStore config;
+    config.load(tempFile.path());
+    REQUIRE(config.has_file() == true);
+}
+
+TEST_CASE("ConfigStore: has_file() returns true after save with path", "[config][manager]")
+{
+    TempConfigFile tempFile("test_haspath_save.ini");
+    ConfigStore config;
+    config.set("test", "key", std::string("value"));
+    config.save(tempFile.path());
+    REQUIRE(config.has_file() == true);
+}
+
+TEST_CASE("ConfigStore: clear() resets config and current file", "[config][manager]")
+{
+    TempConfigFile tempFile("test_clear.ini");
+    tempFile.write("[test]\nkey = value\n");
+
+    ConfigStore config;
+    config.load(tempFile.path());
+    config.clear();
+
+    REQUIRE(config.has_file() == false);
+    REQUIRE(!config.get<std::string>("test", "key").has_value());
+}
+
+TEST_CASE("ConfigStore: save() returns false after clear()", "[config][manager]")
+{
+    TempConfigFile tempFile("test_clear_save.ini");
+    tempFile.write("[test]\nkey = value\n");
+
+    ConfigStore config;
+    config.load(tempFile.path());
+    config.clear();
+
+    REQUIRE(config.save() == false);
+}
