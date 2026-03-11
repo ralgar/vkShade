@@ -371,3 +371,46 @@ TEST_CASE("ConfigStore: Load with string list", "[config][manager]")
     REQUIRE((*maps)[1] == "map2");
     REQUIRE((*maps)[2] == "map3");
 }
+
+TEST_CASE("ConfigStore: save() with no current file returns false", "[config][manager]")
+{
+    ConfigStore config;
+    config.set("test", "key", std::string("value"));
+
+    REQUIRE(config.save() == false);
+}
+
+TEST_CASE("ConfigStore: load sets current file for subsequent save()", "[config][manager]")
+{
+    TempConfigFile tempFile("test_currentfile.ini");
+    tempFile.write(
+        "[graphics]\n"
+        "width = 1920\n"
+    );
+
+    ConfigStore config;
+    REQUIRE(config.load(tempFile.path()) == true);
+
+    config.set("graphics", "width", 2560);
+    REQUIRE(config.save() == true);
+
+    ConfigStore config2;
+    config2.load(tempFile.path());
+    REQUIRE(*config2.get<int32_t>("graphics", "width") == 2560);
+}
+
+TEST_CASE("ConfigStore: explicit save() path sets current file", "[config][manager]")
+{
+    TempConfigFile tempFile("test_setcurrentfile.ini");
+    ConfigStore config;
+    config.set("test", "key", std::string("value"));
+
+    REQUIRE(config.save(tempFile.path()) == true);
+
+    config.set("test", "key", std::string("updated"));
+    REQUIRE(config.save() == true);
+
+    ConfigStore config2;
+    config2.load(tempFile.path());
+    REQUIRE(*config2.get<std::string>("test", "key") == "updated");
+}

@@ -15,7 +15,8 @@ namespace vkShade
     {
     public:
         bool load(std::filesystem::path filePath);
-        bool save(std::filesystem::path filePath) const;
+        bool save(std::filesystem::path filePath);  // Save As
+        bool save();  // Save currently open file
 
         // Typed getter
         template<typename T>
@@ -71,6 +72,7 @@ namespace vkShade
         ConfigParser   m_parser;
         ConfigObserver m_observer;
 
+        std::filesystem::path m_currentFile;
         std::unordered_map<std::string, std::string> m_config;
     };
 } // namespace vkShade
