@@ -33,6 +33,23 @@ void vkShade::ShaderManagerUI::render()
     ImGui::End();
 }
 
+void vkShade::ShaderManagerUI::render_about_dialog()
+{
+    if (!m_showAbout)
+        return;
+
+    ImGui::SetNextWindowSize(ImVec2(300, 120), ImGuiCond_Always);
+    if (ImGui::Begin("About vkShade", &m_showAbout, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
+    {
+        ImGui::Text("vkShade");
+        ImGui::Spacing();
+        ImGui::TextDisabled("A Vulkan post-processing shader manager");
+        ImGui::Spacing();
+        ImGui::TextDisabled("Version 0.1.0");
+    }
+    ImGui::End();
+}
+
 void vkShade::ShaderManagerUI::render_menu_bar()
 {
     // Override custom padding and use the default (much less) for menus
@@ -42,26 +59,27 @@ void vkShade::ShaderManagerUI::render_menu_bar()
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("New", "Ctrl+N"))
+            if (ImGui::MenuItem("New"))
             {
-                // TODO: Clear ConfigStore and close file
+                m_config.clear();
             }
 
-            if (ImGui::MenuItem("Open", "Ctrl+O"))
+            if (ImGui::MenuItem("Open"))
             {
-                // TODO: Open file browser and load preset from file
-            }
-
-            ImGui::Separator();
-
-            if (ImGui::MenuItem("Save", "Ctrl+S"))
-            {
-                // TODO: Save contents of ConfigStore to file
+                // TODO: Open file browser and select file
+                m_config.load("vkShade.ini");  // From CWD
             }
 
             ImGui::Separator();
 
-            if (ImGui::MenuItem("Close", "Ctrl+Q"))
+            if (ImGui::MenuItem("Save", nullptr, nullptr, m_config.has_file()))
+            {
+                m_config.save();
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Close"))
             {
                 m_showWindow = false;
             }
