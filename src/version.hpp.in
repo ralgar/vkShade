@@ -1,0 +1,2 @@
+#pragma once
+#define VKSHADE_VERSION "@VCS_TAG@"

@@ -3,6 +3,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "hooks/hooks.hpp"
+#include "windows/main_window.hpp"
 
 namespace vkShade
 {
@@ -12,8 +13,9 @@ namespace vkShade
         GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat);
         ~GuiManager();
 
-        bool visible() { return m_visible; }
-        void visible(bool value) { m_visible = value; }
+        // FIXME: These are useless indirection
+        bool visible() { return m_mainWindow.visible(); }
+        void visible(bool value) { m_mainWindow.visible(value); }
 
         void update(float deltaTime, VkExtent2D swapchainExtent);
 
@@ -21,6 +23,6 @@ namespace vkShade
         VkDevice m_device;
         VkDescriptorPool m_descriptorPool;
 
-        bool m_visible {false};
+        MainWindow m_mainWindow;
     };
 } // namespace vkShade
