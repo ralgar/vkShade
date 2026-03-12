@@ -1,5 +1,6 @@
 #include "shader_manager.hpp"
 
+#include "../version.hpp"
 #include "config/config_globals.hpp"
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
@@ -30,6 +31,9 @@ void vkShade::ShaderManagerUI::render()
         render_uniform_controls();
     }
 
+    if (m_showAbout)
+        render_about_dialog();
+
     ImGui::End();
 }
 
@@ -38,14 +42,31 @@ void vkShade::ShaderManagerUI::render_about_dialog()
     if (!m_showAbout)
         return;
 
-    ImGui::SetNextWindowSize(ImVec2(300, 120), ImGuiCond_Always);
-    if (ImGui::Begin("About vkShade", &m_showAbout, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
+    ImGui::SetNextWindowSize(ImVec2(300, 160), ImGuiCond_Always);
+    if (ImGui::Begin("About", &m_showAbout, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
     {
+        // Center the title
+        float windowWidth = ImGui::GetContentRegionAvail().x;
+        float textWidth = ImGui::CalcTextSize("vkShade").x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (windowWidth - textWidth) * 0.5f);
         ImGui::Text("vkShade");
+
         ImGui::Spacing();
-        ImGui::TextDisabled("A Vulkan post-processing shader manager");
+        ImGui::Separator();
         ImGui::Spacing();
-        ImGui::TextDisabled("Version 0.1.0");
+
+        ImGui::TextDisabled("A Vulkan post-processing layer.");
+
+        ImGui::Spacing();
+
+        ImGui::TextDisabled(VKSHADE_VERSION);
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Copyright at the bottom
+        ImGui::TextDisabled("Copyright (c) 2026 Ryan Algar");
     }
     ImGui::End();
 }
@@ -91,7 +112,7 @@ void vkShade::ShaderManagerUI::render_menu_bar()
         {
             if (ImGui::MenuItem("About"))
             {
-                // TODO: Open a simple about dialog
+                m_showAbout = true;
             }
 
             ImGui::EndMenu();

@@ -21,9 +21,11 @@ namespace vkShade
         int m_selectedAvailable = -1;
         int m_selectedActive = -1;
         bool m_showWindow = true;
+        bool m_showAbout = false;
         ImVec2 m_windowPos = ImVec2(100, 100);
         ImVec2 m_windowSize = ImVec2(600, 450);
 
+        void render_about_dialog();
         void render_menu_bar();
 
         void render_shader_lists();
