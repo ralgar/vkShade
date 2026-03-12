@@ -18,8 +18,8 @@ namespace vkShade
         ConfigStore& m_config;
 
         // UI-only state (widget selections, window position)
-        int m_selectedAvailable = -1;
-        int m_selectedActive = -1;
+        int32_t m_selectedAvailable = -1;
+        int32_t m_selectedActive = -1;
         bool m_showWindow = true;
         bool m_showAbout = false;
         ImVec2 m_windowPos = ImVec2(100, 100);
@@ -34,7 +34,7 @@ namespace vkShade
         // List rendering helper
         bool render_shader_listbox(const char* label,
                                    const std::vector<std::string>& shaders,
-                                   int& selected,
+                                   int32_t& selected,
                                    const ImVec2& size);
     };
 } // namespace vkShade

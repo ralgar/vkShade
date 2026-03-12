@@ -212,7 +212,7 @@ void vkShade::ShaderManagerUI::render_shader_lists()
         }
 
         bool canActivate = m_selectedAvailable >= 0 &&
-                           m_selectedAvailable < (int)availableShaders.size();
+                           m_selectedAvailable < (int32_t)availableShaders.size();
 
         ImVec2 btnSize(-FLT_MIN, UIStyle::BUTTON_HEIGHT);
 
@@ -226,7 +226,7 @@ void vkShade::ShaderManagerUI::render_shader_lists()
         }
 
         bool canDeactivate = m_selectedActive >= 0 &&
-                             m_selectedActive < (int)activeShaders.size();
+                             m_selectedActive < (int32_t)activeShaders.size();
 
         if (UI::Button("<<##Deactivate", btnSize, canDeactivate, "Deactivate selected shader"))
         {
@@ -265,7 +265,7 @@ void vkShade::ShaderManagerUI::render_shader_lists()
         ImGui::Spacing();
         bool canMoveUp   = m_selectedActive > 0;
         bool canMoveDown = m_selectedActive >= 0 &&
-                           m_selectedActive < (int)activeShaders.size() - 1;
+                           m_selectedActive < (int32_t)activeShaders.size() - 1;
 
         float btnWidth   = 80.0f;
         float totalWidth = btnWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
@@ -313,14 +313,14 @@ void vkShade::ShaderManagerUI::render_uniform_controls()
 
 bool vkShade::ShaderManagerUI::render_shader_listbox(const char* label,
                                                      const std::vector<std::string>& shaders,
-                                                     int& selected,
+                                                     int32_t& selected,
                                                      const ImVec2& size)
 {
     bool changed = false;
 
     if (ImGui::BeginListBox(label, size))
     {
-        for (int i = 0; i < (int)shaders.size(); i++)
+        for (int32_t i = 0; i < (int32_t)shaders.size(); i++)
         {
             const bool isSelected = (selected == i);
 
