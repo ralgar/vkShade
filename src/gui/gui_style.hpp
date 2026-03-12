@@ -52,9 +52,9 @@ namespace vkShade
             colors[ImGuiCol_Button] = ACCENT_COLOR;
             colors[ImGuiCol_ButtonHovered] = ACCENT_HOVER;
             colors[ImGuiCol_ButtonActive] = ACCENT_ACTIVE;
-            colors[ImGuiCol_Header] = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
-            colors[ImGuiCol_HeaderHovered] = ImVec4(0.27f, 0.27f, 0.29f, 1.0f);
-            colors[ImGuiCol_HeaderActive] = ImVec4(0.32f, 0.32f, 0.34f, 1.0f);
+            colors[ImGuiCol_Header]        = ImVec4(0.26f, 0.59f, 0.98f, 0.4f);
+            colors[ImGuiCol_HeaderHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.6f);
+            colors[ImGuiCol_HeaderActive]  = ImVec4(0.26f, 0.59f, 0.98f, 0.8f);
         }
     } // namespace UIStyle
 } // namespace vkShade
