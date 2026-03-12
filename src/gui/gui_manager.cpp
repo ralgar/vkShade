@@ -7,7 +7,7 @@
 #include "core/service_locator.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_manager.hpp"
-#include "shader_manager.hpp"
+#include "windows/main_window.hpp"
 #include "vk/macros.hpp"
 #include "gui_style.hpp"
 
@@ -97,8 +97,6 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
     // Apply custom style
     UIStyle::ApplyStyle();
-
-    m_shaderManager = std::make_unique<vkShade::ShaderManagerUI>();
 }
 
 vkShade::GuiManager::~GuiManager()
@@ -127,9 +125,9 @@ void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
     ImGui::NewFrame();
 
     // Test window
-    if (m_visible)
+    if (m_mainWindow.visible())
     {
-        m_shaderManager->render();
+        m_mainWindow.render();
 
         // Last: Draw a black cursor with white outline and red center dot
         ImDrawList* draw_list = ImGui::GetForegroundDrawList();

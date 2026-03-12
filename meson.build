@@ -1,12 +1,5 @@
 project('vkShade', ['c', 'cpp'], version: files('VERSION'), default_options: ['c_std=c11', 'cpp_std=c++23'])
 
-vcs_tag(
-    command: ['git', 'describe', '--tags', '--dirty=+dev'],
-    input:  'src/version.hpp.in',
-    output: 'version.hpp',
-    fallback: meson.project_version()
-)
-
 cpp = meson.get_compiler('cpp')
 
 vkShade_include_path = include_directories(['./src'])

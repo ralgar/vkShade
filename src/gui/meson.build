@@ -1,6 +1,7 @@
 libgui_source = [
+  'windows/about_window.cpp',
+  'windows/main_window.cpp',
   'gui_manager.cpp',
-  'shader_manager.cpp',
 ]
 
 libgui_library = static_library(
@@ -11,6 +12,7 @@ libgui_library = static_library(
     imgui,
     magic_enum,
     spdlog,
+    version_hpp,
     vma,
   ],
   include_directories : vkShade_include_path

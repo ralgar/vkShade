@@ -3,25 +3,28 @@
 #include <imgui.h>
 
 #include "config/config_store.hpp"
+#include "../window.hpp"
+#include "about_window.hpp"
 
 namespace vkShade
 {
-    // Main shader manager UI
-    class ShaderManagerUI
+    // Main GUI window
+    class MainWindow : public GuiWindow
     {
     public:
-        ShaderManagerUI();
+        MainWindow();
 
         void render();
 
     private:
         ConfigStore& m_config;
 
+        // Sub-windows
+        AboutWindow m_aboutWindow;
+
         // UI-only state (widget selections, window position)
         int32_t m_selectedAvailable = -1;
         int32_t m_selectedActive = -1;
-        bool m_showWindow = true;
-        bool m_showAbout = false;
         ImVec2 m_windowPos = ImVec2(100, 100);
         ImVec2 m_windowSize = ImVec2(600, 450);
 

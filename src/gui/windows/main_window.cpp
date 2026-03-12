@@ -1,22 +1,18 @@
-#include "shader_manager.hpp"
+#include "main_window.hpp"
 
-#include "../version.hpp"
 #include "config/config_globals.hpp"
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
-#include "gui_helpers.hpp"
-#include "gui_style.hpp"
+#include "../gui_helpers.hpp"
+#include "../gui_style.hpp"
 
-vkShade::ShaderManagerUI::ShaderManagerUI()
+vkShade::MainWindow::MainWindow()
     : m_config(vkShade::Locator<ConfigManager>::get().app())
 {}
 
-void vkShade::ShaderManagerUI::render()
+void vkShade::MainWindow::render()
 {
-    if (!m_showWindow)
-        return;
-
-    if (ImGui::Begin("vkShade: Shader Manager", &m_showWindow, ImGuiWindowFlags_MenuBar))
+    if (ImGui::Begin("vkShade", &m_visible, ImGuiWindowFlags_MenuBar))
     {
         render_menu_bar();
 
@@ -31,47 +27,13 @@ void vkShade::ShaderManagerUI::render()
         render_uniform_controls();
     }
 
-    if (m_showAbout)
-        render_about_dialog();
+    if (m_aboutWindow.visible())
+        m_aboutWindow.render();
 
     ImGui::End();
 }
 
-void vkShade::ShaderManagerUI::render_about_dialog()
-{
-    if (!m_showAbout)
-        return;
-
-    ImGui::SetNextWindowSize(ImVec2(300, 160), ImGuiCond_Always);
-    if (ImGui::Begin("About", &m_showAbout, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
-    {
-        // Center the title
-        float windowWidth = ImGui::GetContentRegionAvail().x;
-        float textWidth = ImGui::CalcTextSize("vkShade").x;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (windowWidth - textWidth) * 0.5f);
-        ImGui::Text("vkShade");
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::TextDisabled("A Vulkan post-processing layer.");
-
-        ImGui::Spacing();
-
-        ImGui::TextDisabled(VKSHADE_VERSION);
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        // Copyright at the bottom
-        ImGui::TextDisabled("Copyright (c) 2026 Ryan Algar");
-    }
-    ImGui::End();
-}
-
-void vkShade::ShaderManagerUI::render_menu_bar()
+void vkShade::MainWindow::render_menu_bar()
 {
     // Override custom padding and use the default (much less) for menus
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
@@ -102,7 +64,7 @@ void vkShade::ShaderManagerUI::render_menu_bar()
 
             if (ImGui::MenuItem("Close"))
             {
-                m_showWindow = false;
+                m_visible = false;
             }
 
             ImGui::EndMenu();
@@ -112,7 +74,7 @@ void vkShade::ShaderManagerUI::render_menu_bar()
         {
             if (ImGui::MenuItem("About"))
             {
-                m_showAbout = true;
+                m_aboutWindow.visible(true);
             }
 
             ImGui::EndMenu();
@@ -124,7 +86,7 @@ void vkShade::ShaderManagerUI::render_menu_bar()
     ImGui::PopStyleVar();  // WindowPadding
 }
 
-void vkShade::ShaderManagerUI::render_shader_lists()
+void vkShade::MainWindow::render_shader_lists()
 {
     // Get active shaders from config
     std::vector<std::string> activeShaders;
@@ -294,7 +256,7 @@ void vkShade::ShaderManagerUI::render_shader_lists()
     ImGui::EndGroup();
 }
 
-void vkShade::ShaderManagerUI::render_uniform_controls()
+void vkShade::MainWindow::render_uniform_controls()
 {
     ImGui::Separator();
     ImGui::Spacing();
@@ -311,10 +273,10 @@ void vkShade::ShaderManagerUI::render_uniform_controls()
     ImGui::TextDisabled("%s", text);
 }
 
-bool vkShade::ShaderManagerUI::render_shader_listbox(const char* label,
-                                                     const std::vector<std::string>& shaders,
-                                                     int32_t& selected,
-                                                     const ImVec2& size)
+bool vkShade::MainWindow::render_shader_listbox(const char* label,
+                                                const std::vector<std::string>& shaders,
+                                                int32_t& selected,
+                                                const ImVec2& size)
 {
     bool changed = false;
 

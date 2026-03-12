@@ -1,3 +1,12 @@
+version_hpp = declare_dependency(
+  sources: vcs_tag(
+    command: ['git', 'describe', '--tags', '--dirty=+dev'],
+    input:  'version.hpp.in',
+    output: 'version.hpp',
+    fallback: meson.project_version()
+  )
+)
+
 glm = dependency('glm', fallback: ['glm', 'glm_dep'])
 imgui = dependency('imgui', fallback: ['imgui', 'imgui_dep'], static: true)
 inih = dependency('inih', fallback: ['inih', 'inih_dep'])
