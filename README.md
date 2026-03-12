@@ -41,15 +41,15 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
 ### Current Features
 
 - [x] Post-processing pipeline (single-pass effects)
-- [x] Interactive ImGui overlay with mouse support
+- [x] Interactive GUI overlay with mouse support
 - [x] Cross-platform input (Wayland, Xlib, XCB)
 - [x] Modern C++ RAII wrappers around the Vulkan C API
 - [x] Demo shader effects (greyscale and grid overlay)
 - [x] Configuration system
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.1-demo.png">
-    <img src="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.1-demo.png" width="800" alt="vkShade in action">
+  <a href="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.4-demo.png">
+    <img src="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.4-demo.png" width="800" alt="vkShade in action">
   </a>
   <br>
   <em>vkShade overlay running in-game (click to enlarge)</em>
@@ -61,7 +61,7 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
 
 - [x] Ping-pong rendering for multiple effects
 - [x] Configuration system (global options and per-game presets)
-- [ ] Basic GUI integration (browse/apply shaders and save/load config)
+- [x] Basic GUI integration (browse/apply shaders and save/load config)
 - [ ] ReShade FX compiler integration
 - [ ] Shader reflection (set uniforms in the GUI and config files)
 
