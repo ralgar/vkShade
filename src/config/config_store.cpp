@@ -22,6 +22,7 @@ static int config_ini_handler(void* user, const char* section, const char* name,
 
 void vkShade::ConfigStore::clear()
 {
+    m_observer.notify_all_defaults();
     m_currentFile = std::filesystem::path{};
     m_config.clear();
 }

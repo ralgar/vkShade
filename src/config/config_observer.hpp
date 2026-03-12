@@ -51,18 +51,27 @@ namespace vkShade
             auto it = m_subscribers.find(mapKey);
             if (it != m_subscribers.end())
             {
-                for (const auto& [ptr, pInstance, callback] : it->second)
+                for (const auto& [ptr, pInstance, callback, reset] : it->second)
                 {
                     callback(&value, pInstance);
                 }
             }
         }
 
+        // Reset each callback with a default value. Called when clearing ConfigStore.
+        void notify_all_defaults()
+        {
+            for (const auto& [key, handlers] : m_subscribers)
+                for (const auto& [ptr, pInstance, callback, reset] : handlers)
+                    reset();
+        }
+
     private:
         using Callback = std::function<void(const void*, void*)>;
+        using ResetCallback = std::function<void()>;
 
-        // Map: "Section::Key" -> [(function pointer, instance pointer, callback)]
-        std::unordered_map<std::string, std::vector<std::tuple<void*, void*, Callback>>> m_subscribers;
+        // Map: "Section::Key" -> [(function pointer, instance pointer, callback, reset callback)]
+        std::unordered_map<std::string, std::vector<std::tuple<void*, void*, Callback, ResetCallback>>> m_subscribers;
 
         // Helper traits
         template<typename T>
@@ -95,7 +104,7 @@ namespace vkShade
 
             // Check if already connected
             auto& handlers = m_subscribers[mapKey];
-            for (const auto& [ptr, pInstance, callback] : handlers)
+            for (const auto& [ptr, pInstance, callback, reset] : handlers)
             {
                 if (ptr == pFunction && pInstance == nullptr)
                     return;  // Already connected
@@ -104,6 +113,11 @@ namespace vkShade
             handlers.emplace_back(pFunction, nullptr, [](const void* pValue, void*)
             {
                 Func(*static_cast<const ArgType*>(pValue));
+            },
+            []()  // Reset callback - notifies with default value for the type
+            {
+                ArgType defaultValue{};
+                Func(defaultValue);
             });
         }
 
@@ -125,7 +139,7 @@ namespace vkShade
 
             // Check if already connected
             auto& handlers = m_subscribers[mapKey];
-            for (const auto& [ptr, pInstance, callback] : handlers)
+            for (const auto& [ptr, pInstance, callback, reset] : handlers)
             {
                 if (ptr == pMethod && pInstance == instance)
                     return;  // Already connected
@@ -135,6 +149,12 @@ namespace vkShade
             {
                 Class* obj = static_cast<Class*>(pInstance);
                 (obj->*Method)(*static_cast<const ArgType*>(pValue));
+            },
+            [instance]()  // Reset callback - notifies with default value for the type
+            {
+                ArgType defaultValue{};
+                Class* obj = static_cast<Class*>(instance);
+                (obj->*Method)(defaultValue);
             });
         }
 
