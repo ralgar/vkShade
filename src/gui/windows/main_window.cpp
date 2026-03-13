@@ -94,7 +94,7 @@ void vkShade::MainWindow::render_shader_lists()
     activeShaders = activeShadersOpt.value_or(std::vector<std::string>{});
 
     // Scan directory for all shaders
-    std::string effectsPath = std::string(DATADIR) + "/vkShade";
+    std::string effectsPath = std::string(DATADIR) + "/vkShade/shaders";
     std::vector<std::string> allShaders;
 
     namespace fs = std::filesystem;
