@@ -193,8 +193,8 @@ Keybinds are now configurable under the `[Input]` section in `vkShade.ini`
 
 ```ini
 [Input]
-ToggleEffects = KEY_F12
-ToggleGui = KEY_BACKQUOTE
+ToggleEffects = KEY_HOME
+ToggleGui = KEY_F2
 ```
 
 > [!TIP]
