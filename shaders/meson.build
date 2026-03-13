@@ -2,6 +2,7 @@
 glslc = find_program('glslc')
 
 shaders = [
+  'cas.frag',
   'fullscreen.vert',
   'greyscale.frag',
   'simple_grid.frag',
