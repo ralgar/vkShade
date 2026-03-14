@@ -17,6 +17,6 @@ foreach shader : shaders
     input : shader,
     output : '@PLAINNAME@.spv',
     install : true,
-    install_dir : datadir
+    install_dir : datadir / 'shaders'
   )
 endforeach

@@ -18,13 +18,13 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
     std::filesystem::path dataDir = std::filesystem::path(homeDir) / ".local/share/vkShade";
 
     // Load the vertex shader module
-    std::filesystem::path vertShaderPath = dataDir / "fullscreen.vert.spv";
+    std::filesystem::path vertShaderPath = dataDir / "shaders" / "fullscreen.vert.spv";
     m_vertShader = shaderCache.load(vertShaderPath, m_device, vertShaderPath);
 	if (m_vertShader == nullptr)
         spdlog::error("Vertex shader not found");
 
     // Load the fragment shader module
-    std::filesystem::path fragShaderPath = dataDir / fileName;
+    std::filesystem::path fragShaderPath = dataDir / "shaders" / fileName;
     m_fragShader = shaderCache.load(fragShaderPath, m_device, fragShaderPath);
 	if (m_fragShader == nullptr)
         spdlog::error("Fragment shader not found");
