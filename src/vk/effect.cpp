@@ -4,6 +4,7 @@
 
 #include <magic_enum/magic_enum.hpp>
 
+#include "config/config_globals.hpp"
 #include "core/resource_cache.hpp"
 #include "core/service_locator.hpp"
 
@@ -12,10 +13,8 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
 {
     auto& shaderCache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
 
-    const char* homeDir = std::getenv("HOME");
-    if (!homeDir)
-        spdlog::critical("HOME environment variable not set!");
-    std::filesystem::path dataDir = std::filesystem::path(homeDir) / ".local/share/vkShade";
+    std::filesystem::path dataDir = DATADIR;
+    dataDir = dataDir / "vkShade";
 
     // Load the vertex shader module
     std::filesystem::path vertShaderPath = dataDir / "shaders" / "fullscreen.vert.spv";
