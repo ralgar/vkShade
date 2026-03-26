@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 
 #include <vulkan/vulkan_core.h>
@@ -30,7 +31,9 @@ namespace vkShade
         std::shared_ptr<vkShade::ShaderModule> m_vertShader;
         std::shared_ptr<vkShade::ShaderModule> m_fragShader;
 
-        void create_descriptor_pool();
         void allocate_descriptor_set();
+        void create_descriptor_pool();
+
+        bool compile_reshadefx(std::filesystem::path filePath);
     };
 } // namespace vkShade

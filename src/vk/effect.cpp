@@ -1,32 +1,25 @@
 #include "effect.hpp"
 
 #include <filesystem>
+#include <spdlog/spdlog.h>
 
+#include <effect_parser.hpp>
+#include <effect_codegen.hpp>
+#include <effect_preprocessor.hpp>
 #include <magic_enum/magic_enum.hpp>
 
 #include "config/config_globals.hpp"
-#include "core/resource_cache.hpp"
-#include "core/service_locator.hpp"
 
 vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName)
     : VulkanObject(device)
 {
-    auto& shaderCache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
 
     std::filesystem::path dataDir = DATADIR;
     dataDir = dataDir / "vkShade";
 
     // Load the vertex shader module
-    std::filesystem::path vertShaderPath = dataDir / "shaders" / "fullscreen.vert.spv";
-    m_vertShader = shaderCache.load(vertShaderPath, m_device, vertShaderPath);
-	if (m_vertShader == nullptr)
-        spdlog::error("Vertex shader not found");
-
-    // Load the fragment shader module
-    std::filesystem::path fragShaderPath = dataDir / "shaders" / fileName;
-    m_fragShader = shaderCache.load(fragShaderPath, m_device, fragShaderPath);
-	if (m_fragShader == nullptr)
-        spdlog::error("Fragment shader not found");
+    std::filesystem::path effectPath = dataDir / "shaders" /fileName;
+    this->compile_reshadefx(effectPath);
 
     // Create sampler for input texture
     VkSamplerCreateInfo samplerInfo = {
@@ -62,10 +55,11 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
     allocate_descriptor_set();
 
     // Create pipeline layout
+    VkDescriptorSetLayout layouts[] = { m_descriptorSetLayout, m_descriptorSetLayout };
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &m_descriptorSetLayout,
+        .setLayoutCount = 2,
+        .pSetLayouts = layouts,
     };
 
     m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
@@ -76,13 +70,13 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
             .module = m_vertShader->module(),
-            .pName = "main",
+            .pName = "E__PostProcessVS",
         },
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
             .module = m_fragShader->module(),
-            .pName = "main",
+            .pName = "E__PS_Main",
         }
     };
 
@@ -215,7 +209,7 @@ void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
 
     // Bind descriptor set
     m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
+        m_pipelineLayout, 1, 1, &m_descriptorSet, 0, nullptr);
 
     // Draw fullscreen triangle (3 vertices, no vertex buffer)
     m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
@@ -240,6 +234,89 @@ void vkShade::Effect::bind_input(VkImageView inputView)
     };
 
     m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
+}
+
+bool vkShade::Effect::compile_reshadefx(std::filesystem::path filePath)
+{
+    // TODO: Set buffer size from swapchain
+	const char* buffer_width = "800";
+	const char* buffer_height = "600";
+    const bool useDebugInfo = false;
+    const bool useSpecConstants = false;
+    const bool enable16BitTypes = false;
+    const bool invertYAxis = true;
+
+    reshadefx::preprocessor pp;
+    pp.add_macro_definition("__RESHADE__", std::to_string(60703));
+    pp.add_macro_definition("__RESHADE_PERFORMANCE_MODE__", "0");
+
+	pp.add_macro_definition("BUFFER_WIDTH", buffer_width);
+	pp.add_macro_definition("BUFFER_HEIGHT", buffer_height);
+	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
+	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
+
+    // TODO: Set from config
+    pp.add_include_path("/opt/reshade/shaders");
+
+	if (!pp.append_file(filePath))
+	{
+        // TODO: Improve this
+        spdlog::error("ReShade FX compilation failed (append): {}", filePath.string());
+        return false;
+	}
+
+    std::unique_ptr<reshadefx::codegen> backend;
+    backend.reset(reshadefx::create_codegen_spirv(true, useDebugInfo, useSpecConstants, enable16BitTypes, invertYAxis));
+
+	reshadefx::parser parser;
+	if (!parser.parse(pp.output(), backend.get()))
+	{
+        // TODO: Improve this
+        spdlog::error("ReShade FX compilation failed (parse): {}", pp.errors());
+        spdlog::error("ReShade FX compilation failed (parse): {}", parser.errors());
+		return false;
+	}
+
+    auto& mod = backend->module();
+    if (mod.techniques.empty() || mod.techniques[0].passes.empty())
+    {
+        spdlog::error("ReShade FX: no techniques found in {}", filePath.string());
+        return false;
+    }
+
+    std::string vsEntryPoint = mod.techniques[0].passes[0].vs_entry_point;
+    std::string psEntryPoint = mod.techniques[0].passes[0].ps_entry_point;
+
+    std::string vs_binary, vs_asm, ps_binary, ps_asm, errors;
+
+    if (!backend->assemble_code_for_entry_point(vsEntryPoint, vs_binary, vs_asm, errors))
+    {
+        spdlog::error("ReShade FX VS assembly failed: {}", errors);
+        return false;
+    }
+
+    if (!backend->assemble_code_for_entry_point(psEntryPoint, ps_binary, ps_asm, errors))
+    {
+        spdlog::error("ReShade FX PS assembly failed: {}", errors);
+        return false;
+    }
+
+    auto to_spirv = [](const std::string& binary)
+    {
+        std::vector<uint32_t> spirv(binary.size() / sizeof(uint32_t));
+        std::memcpy(spirv.data(), binary.data(), binary.size());
+        return spirv;
+    };
+
+    std::vector<uint32_t> vsBytecode = to_spirv(vs_binary);
+    std::vector<uint32_t> psBytecode = to_spirv(ps_binary);
+
+    spdlog::trace("VertexShader size (words): {}", vsBytecode.size());
+    spdlog::trace("PixelShader size (words): {}", psBytecode.size());
+
+    m_vertShader = std::make_shared<vkShade::ShaderModule>(m_device, vsBytecode);
+    m_fragShader = std::make_shared<vkShade::ShaderModule>(m_device, psBytecode);
+    return true;
 }
 
 void vkShade::Effect::create_descriptor_pool()

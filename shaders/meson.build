@@ -20,3 +20,6 @@ foreach shader : shaders
     install_dir : datadir / 'shaders'
   )
 endforeach
+
+# TODO: Remove this
+install_data('reshade-test.fx', install_dir : datadir / 'shaders')

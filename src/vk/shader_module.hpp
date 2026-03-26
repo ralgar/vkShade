@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <string>
 
 #include "core/resource.hpp"
@@ -11,6 +12,7 @@ namespace vkShade
     {
     public:
         ShaderModule(VulkanDevice& device, const std::string& filePath);
+        ShaderModule(VulkanDevice& device, std::span<const uint32_t> bytecode);
         ~ShaderModule() override;
 
         bool load() override;

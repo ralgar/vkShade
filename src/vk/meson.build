@@ -14,6 +14,7 @@ libvk_library = static_library(
     glm,
     imgui,
     magic_enum,
+    reshadefx,
     spdlog,
     stb,
     vma,
