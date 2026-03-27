@@ -1,13 +1,14 @@
 #include "effect.hpp"
 
+#include <cstring>
 #include <filesystem>
-#include <spdlog/spdlog.h>
+#include <stdexcept>
 
 #include <effect_parser.hpp>
 #include <effect_codegen.hpp>
 #include <effect_preprocessor.hpp>
 #include <magic_enum/magic_enum.hpp>
-#include <stdexcept>
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
 #include "config/config_globals.hpp"
