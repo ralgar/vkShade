@@ -23,7 +23,7 @@ namespace vkShade
     class Effect : public VulkanObject
     {
     public:
-        Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName);
+        Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, const std::string& fileName);
         ~Effect() override;
 
         enum class Error
@@ -105,7 +105,7 @@ namespace vkShade
         void create_descriptor_sets();
         void create_pipeline(VkFormat outputFormat);
 
-        bool compile(std::filesystem::path filePath);
+        bool compile(VkExtent2D extent, std::filesystem::path filePath);
 
         Uniform* find_uniform(const std::string& name)
         {

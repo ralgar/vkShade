@@ -81,7 +81,7 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     {
         for (const auto& effect : effects.value())
         {
-            m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
+            m_effects.push_back(std::make_shared<Effect>(m_device, m_extent, m_format, effect));
         }
     }
 }
@@ -105,7 +105,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
     m_effects.clear();
     for (const auto& effect : effects)
     {
-        m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
+        m_effects.push_back(std::make_shared<Effect>(m_device, m_extent, m_format, effect));
     }
 }
 

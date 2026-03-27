@@ -14,7 +14,7 @@
 #include "effect_module.hpp"
 #include "vk/macros.hpp"
 
-vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName)
+vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, const std::string& fileName)
     : VulkanObject(device)
 {
     // Create sampler for input texture
@@ -38,11 +38,11 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
 
     // Compile the ReShade effect from source
     reshadefx::effect_module module;
-    if (!this->compile(effectPath))
+    if (!this->compile(extent, effectPath))
         throw std::runtime_error("Failed to compile ReShade effect");
 
     this->create_descriptor_sets();
-    this->create_pipeline(outputFormat);
+    this->create_pipeline(format);
     this->reflect_uniforms();
 
     auto ret = this->set_uniform("iGridColor", glm::vec3{1.0f, 0.0f, 0.0f});
@@ -110,11 +110,8 @@ void vkShade::Effect::bind_input(VkImageView inputView)
     m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
 }
 
-bool vkShade::Effect::compile(std::filesystem::path filePath)
+bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 {
-    // TODO: Set buffer size from swapchain
-	const char* buffer_width = "800";
-	const char* buffer_height = "600";
     const bool useDebugInfo = false;
     const bool useSpecConstants = false;
     const bool enable16BitTypes = false;
@@ -124,8 +121,8 @@ bool vkShade::Effect::compile(std::filesystem::path filePath)
     pp.add_macro_definition("__RESHADE__", std::to_string(60703));
     pp.add_macro_definition("__RESHADE_PERFORMANCE_MODE__", "0");
 
-	pp.add_macro_definition("BUFFER_WIDTH", buffer_width);
-	pp.add_macro_definition("BUFFER_HEIGHT", buffer_height);
+	pp.add_macro_definition("BUFFER_WIDTH", std::to_string(extent.width));
+	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(extent.height));
 	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
 	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
 
