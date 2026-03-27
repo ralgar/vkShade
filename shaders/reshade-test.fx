@@ -1,5 +1,7 @@
 #include "ReShade.fxh"
 
+uniform float3 iGridColor < source = "gridColor"; > = float3(0.0, 1.0, 1.0);
+
 float4 PS_Main(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 {
     float3 color = tex2D(ReShade::BackBuffer, uv).rgb;
@@ -13,10 +15,7 @@ float4 PS_Main(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
     float line = step(modPixel.x, lineWidth) + step(modPixel.y, lineWidth);
     line = clamp(line, 0.0, 1.0);
 
-    // Cyan instead of magenta to distinguish from GLSL version
-    float3 gridColor = float3(0.0, 1.0, 1.0);
-
-    color = lerp(color, gridColor, line);
+    color = lerp(color, iGridColor, line);
 
     return float4(color, 1.0);
 }

@@ -43,6 +43,11 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
 
     this->create_descriptor_sets();
     this->create_pipeline(outputFormat);
+    this->reflect_uniforms();
+
+    auto ret = this->set_uniform("iGridColor", glm::vec3{1.0f, 0.0f, 0.0f});
+    if (ret != Error::None)
+        spdlog::error("WRITE FAILED: {}", magic_enum::enum_name(ret));
 }
 
 vkShade::Effect::~Effect()
@@ -414,4 +419,39 @@ void vkShade::Effect::create_pipeline(VkFormat outputFormat)
 
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
     spdlog::debug("Effect pipeline created");
+}
+
+void vkShade::Effect::reflect_uniforms()
+{
+    auto reflect_type = [](const reshadefx::type type) -> vkShade::Uniform::Type
+    {
+        if (type.base == reshadefx::type::t_float && type.rows == 1 && type.cols == 1)
+            return Uniform::Type::Float;
+        if (type.base == reshadefx::type::t_float && type.rows == 2 && type.cols == 1)
+            return Uniform::Type::Vec2;
+        if (type.base == reshadefx::type::t_float && type.rows == 3 && type.cols == 1)
+            return Uniform::Type::Vec3;
+        if (type.base == reshadefx::type::t_float && type.rows == 4 && type.cols == 1)
+            return Uniform::Type::Vec4;
+
+        return Uniform::Type::Unknown;
+    };
+
+    // Convert the ReShade uniform to our own reflected type
+    for (const auto& uniform : m_module->uniforms)
+    {
+        m_uniformsByName[uniform.name] = {
+            .name = uniform.name,
+            .size = uniform.size,
+            .offset = uniform.offset,
+            .type = reflect_type(uniform.type)
+        };
+
+        // Set the default value if there is one
+        if (uniform.has_initializer_value)
+        {
+            // NOTE: The initializer value is a union, so we just cast it to a pointer.
+            m_uniformBuffer->write(&uniform.initializer_value.as_uint[0], uniform.size, uniform.offset);
+        }
+    }
 }
