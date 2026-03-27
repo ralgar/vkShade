@@ -39,7 +39,7 @@ namespace vkShade
         void bind_input(VkImageView inputView);
 
         template <class T>
-        inline std::expected<T, Error> get_uniform(const std::string& name)
+        std::expected<T, Error> get_uniform(const std::string& name)
         {
             // Search for a binding with the name passed into the func
             const Uniform* binding = this->find_uniform(name);
@@ -62,7 +62,7 @@ namespace vkShade
         }
 
         template <typename T>
-        inline Error set_uniform(const std::string& name, T value)
+        Error set_uniform(const std::string& name, T value)
         {
             // Search for the uniform by name
             const Uniform* uniform = this->find_uniform(name);
@@ -121,7 +121,7 @@ namespace vkShade
         }
 
         template<typename T>
-        inline bool matches_type(const Uniform::Type& type)
+        bool matches_type(const Uniform::Type& type)
         {
             // Float types
             if constexpr (std::is_same_v<T, float>)        return type == Uniform::Type::Float;
