@@ -45,10 +45,6 @@ vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format
     this->create_descriptor_sets();
     this->create_pipeline(format);
     this->reflect_uniforms();
-
-    auto ret = this->set_uniform("iGridColor", glm::vec3{1.0f, 0.0f, 0.0f});
-    if (ret != Error::None)
-        spdlog::error("WRITE FAILED: {}", magic_enum::enum_name(ret));
 }
 
 vkShade::Effect::~Effect()
