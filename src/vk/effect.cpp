@@ -18,6 +18,8 @@
 vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, const std::string& fileName)
     : VulkanObject(device)
 {
+    spdlog::trace("Creating effect: {}", fileName);
+
     // Create sampler for input texture
     VkSamplerCreateInfo samplerInfo = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -45,6 +47,8 @@ vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format
     this->create_descriptor_sets();
     this->create_pipeline(format);
     this->reflect_uniforms();
+
+    spdlog::debug("Created effect: {}", fileName);
 }
 
 vkShade::Effect::~Effect()
@@ -128,8 +132,7 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 
 	if (!pp.append_file(filePath))
 	{
-        // TODO: Improve this
-        spdlog::error("ReShade FX compilation failed (append): {}", filePath.string());
+        spdlog::error("Failed to open effect file: {}", filePath.string());
         return false;
 	}
 
@@ -139,16 +142,14 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 	reshadefx::parser parser;
 	if (!parser.parse(pp.output(), backend.get()))
 	{
-        // TODO: Improve this
-        spdlog::error("ReShade FX compilation failed (parse): {}", pp.errors());
-        spdlog::error("ReShade FX compilation failed (parse): {}", parser.errors());
+        spdlog::error(parser.errors());
         return false;
 	}
 
     m_module = std::make_unique<reshadefx::effect_module>(backend->module());
     if (m_module->techniques.empty() || m_module->techniques[0].passes.empty())
     {
-        spdlog::error("ReShade FX: no techniques found in {}", filePath.string());
+        spdlog::error("No techniques found: {}", filePath.string());
         return false;
     }
 
@@ -159,13 +160,13 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 
     if (!backend->assemble_code_for_entry_point(vsEntryPoint, vs_binary, vs_asm, errors))
     {
-        spdlog::error("ReShade FX VS assembly failed: {}", errors);
+        spdlog::error("Failed to assemble vertex shader: {}", errors);
         return false;
     }
 
     if (!backend->assemble_code_for_entry_point(psEntryPoint, ps_binary, ps_asm, errors))
     {
-        spdlog::error("ReShade FX PS assembly failed: {}", errors);
+        spdlog::error("Failed to assemble pixel shader: {}", errors);
         return false;
     }
 
@@ -178,9 +179,6 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 
     std::vector<uint32_t> vsBytecode = to_spirv(vs_binary);
     std::vector<uint32_t> psBytecode = to_spirv(ps_binary);
-
-    spdlog::trace("VertexShader size (words): {}", vsBytecode.size());
-    spdlog::trace("PixelShader size (words): {}", psBytecode.size());
 
     m_vertShader = std::make_shared<vkShade::ShaderModule>(m_device, vsBytecode);
     m_fragShader = std::make_shared<vkShade::ShaderModule>(m_device, psBytecode);
@@ -213,7 +211,6 @@ void vkShade::Effect::create_descriptor_sets()
     VK_CHECK(m_device.dispatch.CreateDescriptorPool(m_device.handle, &poolInfo, nullptr, &m_descriptorPool));
 
     // Set 0: Uniform Buffer
-    spdlog::trace("Uniform buffer size (bytes): {}", m_module->total_uniform_size);
     if (m_module->total_uniform_size > 0)
     {
         VkDescriptorSetLayoutBinding uboBinding = {
@@ -412,7 +409,6 @@ void vkShade::Effect::create_pipeline(VkFormat outputFormat)
     };
 
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
-    spdlog::debug("Effect pipeline created");
 }
 
 void vkShade::Effect::reflect_uniforms()
