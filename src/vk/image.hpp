@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
@@ -10,6 +12,9 @@ namespace vkShade
     class VulkanImage : public VulkanObject
     {
     public:
+        // Owning constructor: loads image from file + creates view
+        VulkanImage(VulkanDevice& device, const std::string& filePath, VkImageUsageFlags usageFlags);
+
         // Owning constructor: creates image + view
         VulkanImage(VulkanDevice& device, VkExtent2D size, VkFormat format, VkImageUsageFlags usageFlags);
 
@@ -46,5 +51,7 @@ namespace vkShade
 
         void create_image();
         void create_image_view();
+
+        void upload(void* data, size_t size);
     };
 } // namespace vkShade
