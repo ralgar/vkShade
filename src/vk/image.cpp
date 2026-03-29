@@ -1,6 +1,40 @@
 #include "image.hpp"
-#include "macros.hpp"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 #include <vulkan/vulkan_core.h>
+
+#include "buffer.hpp"
+#include "initializers.hpp"
+#include "macros.hpp"
+
+vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const std::string& filePath, VkImageUsageFlags usageFlags)
+    : VulkanObject(device)
+{
+    spdlog::trace("Creating image from file: {}", filePath);
+
+    int32_t texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    size_t imageSize = texWidth * texHeight * 4;
+
+    m_extent.width  = texWidth;
+    m_extent.height = texHeight;
+    m_format = VK_FORMAT_R8G8B8A8_UNORM;
+    m_usageFlags = usageFlags;
+
+    if (!pixels)
+    {
+        spdlog::error("Failed to load image: {}", filePath);
+        throw std::runtime_error("Failed to load image");
+    }
+
+    this->create_image();
+    this->create_image_view();
+
+    this->upload(pixels, imageSize);
+
+    stbi_image_free(pixels);
+}
 
 vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkExtent2D size, VkFormat format, VkImageUsageFlags usageFlags)
     : VulkanObject(device)
@@ -170,4 +204,50 @@ void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout 
     m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
 
     m_currentLayout = newLayout;  // Update tracked layout
+}
+
+void vkShade::VulkanImage::upload(void* data, size_t size)
+{
+    // Create staging buffer
+    VulkanBuffer staging(m_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    staging.write(data, size);
+
+    // Record and submit a one-time command buffer
+    VkCommandBufferAllocateInfo cmdBufAllocInfo = vkinit::command_buffer_allocate_info(m_device.commandPool);
+
+    VkCommandBuffer cmd;
+    m_device.dispatch.AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd);
+
+    VkCommandBufferBeginInfo beginInfo;
+    m_device.dispatch.BeginCommandBuffer(cmd, &beginInfo);
+
+    VkBufferImageCopy copyRegion = {
+        .imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
+        .imageExtent = {
+            .width = m_extent.width,
+            .height = m_extent.height,
+            .depth = 1
+        }
+    };
+
+    m_device.dispatch.CmdCopyBufferToImage(cmd, staging.buffer(), m_image,
+                                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+    m_device.dispatch.EndCommandBuffer(cmd);
+
+    VkSubmitInfo submitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &cmd,
+    };
+
+    m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, VK_NULL_HANDLE);
+    m_device.dispatch.QueueWaitIdle(m_device.queue);
+
+    m_device.dispatch.FreeCommandBuffers(m_device.handle, m_device.commandPool, 1, &cmd);
 }
