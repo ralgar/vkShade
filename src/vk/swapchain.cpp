@@ -76,13 +76,9 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     config.on_changed("vkShade", "Effects").connect<&VulkanSwapchain::on_effects_changed>(this);
 
     // Load the current effects list
-    auto effects = config.get<std::vector<std::string>>("vkShade", "Effects");
-    if (effects)
+    if (auto effects = config.get<std::vector<std::string>>("vkShade", "Effects"))
     {
-        for (const auto& effect : effects.value())
-        {
-            m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
-        }
+        this->on_effects_changed(effects.value());
     }
 }
 
@@ -102,10 +98,30 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
 
 void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effects)
 {
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    auto shadersPath = config.get<std::string>("ReShade", "ShadersPath");
+    if (!shadersPath)
+    {
+        spdlog::warn("ReShade shaders path is unset");
+        return;  // Return early since we can't search without a path
+    }
+
     m_effects.clear();
     for (const auto& effect : effects)
     {
-        m_effects.push_back(std::make_shared<Effect>(m_device, m_format, effect));
+        bool found = false;
+        for (const auto& entry : std::filesystem::directory_iterator(shadersPath.value()))
+        {
+            if (entry.path().filename() == effect)
+            {
+                m_effects.push_back(std::make_shared<Effect>(m_device, m_extent, m_format, entry.path()));
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            spdlog::warn("Unable to find effect: {}", effect);
     }
 }
 

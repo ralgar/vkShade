@@ -1,32 +1,25 @@
 #include "effect.hpp"
 
+#include <cstring>
 #include <filesystem>
+#include <stdexcept>
 
+#include <effect_parser.hpp>
+#include <effect_codegen.hpp>
+#include <effect_preprocessor.hpp>
 #include <magic_enum/magic_enum.hpp>
+#include <spdlog/spdlog.h>
+#include <vulkan/vulkan_core.h>
 
-#include "config/config_globals.hpp"
-#include "core/resource_cache.hpp"
 #include "core/service_locator.hpp"
+#include "config/config_manager.hpp"
+#include "effect_module.hpp"
+#include "vk/macros.hpp"
 
-vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::string& fileName)
+vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device)
 {
-    auto& shaderCache = vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::get();
-
-    std::filesystem::path dataDir = DATADIR;
-    dataDir = dataDir / "vkShade";
-
-    // Load the vertex shader module
-    std::filesystem::path vertShaderPath = dataDir / "shaders" / "fullscreen.vert.spv";
-    m_vertShader = shaderCache.load(vertShaderPath, m_device, vertShaderPath);
-	if (m_vertShader == nullptr)
-        spdlog::error("Vertex shader not found");
-
-    // Load the fragment shader module
-    std::filesystem::path fragShaderPath = dataDir / "shaders" / fileName;
-    m_fragShader = shaderCache.load(fragShaderPath, m_device, fragShaderPath);
-	if (m_fragShader == nullptr)
-        spdlog::error("Fragment shader not found");
+    spdlog::trace("Creating effect: {}", effectPath.filename().string());
 
     // Create sampler for input texture
     VkSamplerCreateInfo samplerInfo = {
@@ -40,35 +33,312 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
         .minLod = 0.0f,
         .maxLod = 0.0f,
     };
-    m_device.dispatch.CreateSampler(m_device.handle, &samplerInfo, nullptr, &m_sampler);
+    VK_CHECK(m_device.dispatch.CreateSampler(m_device.handle, &samplerInfo, nullptr, &m_sampler));
 
-    // Create descriptor set layout (for sampling input texture)
-    VkDescriptorSetLayoutBinding binding = {
-        .binding = 0,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    // Compile the ReShade effect from source
+    reshadefx::effect_module module;
+    if (!this->compile(extent, effectPath))
+        throw std::runtime_error("Failed to compile ReShade effect");
+
+    this->create_descriptor_sets();
+    this->create_pipeline(format);
+    this->reflect_uniforms();
+
+    spdlog::debug("Created effect: {}", effectPath.filename().string());
+}
+
+vkShade::Effect::~Effect()
+{
+    m_device.dispatch.DestroyPipeline(m_device.handle, m_pipeline, nullptr);
+    m_device.dispatch.DestroyPipelineLayout(m_device.handle, m_pipelineLayout, nullptr);
+    m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_uniformSetLayout, nullptr);
+    m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_imageSetLayout, nullptr);
+}
+
+void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
+{
+    // Bind pipeline
+    m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+    // Set viewport and scissor
+    VkViewport viewport = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (float)extent.width,
+        .height = (float)extent.height,
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+    m_device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {
+        .offset = {0, 0},
+        .extent = extent,
+    };
+    m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
+
+    // Bind descriptor sets
+    std::array<VkDescriptorSet, 2> sets = { m_uniformSet, m_imageSet };
+    m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_pipelineLayout, 0, sets.size(), sets.data(), 0, nullptr);
+
+    // Draw fullscreen triangle (3 vertices, no vertex buffer)
+    m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
+}
+
+void vkShade::Effect::bind_input(VkImageView inputView)
+{
+    VkDescriptorImageInfo imageInfo = {
+        .sampler = m_sampler,
+        .imageView = inputView,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+
+    VkWriteDescriptorSet descriptorWrite = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = m_imageSet,
+        .dstBinding = 0,
+        .dstArrayElement = 0,
         .descriptorCount = 1,
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .pImageInfo = &imageInfo,
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindings = &binding,
+    m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
+}
+
+bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
+{
+    const bool useDebugInfo = false;
+    const bool useSpecConstants = false;
+    const bool enable16BitTypes = false;
+    const bool invertYAxis = true;
+
+    reshadefx::preprocessor pp;
+    pp.add_macro_definition("__RESHADE__", std::to_string(60703));
+    pp.add_macro_definition("__RESHADE_PERFORMANCE_MODE__", "0");
+    pp.add_macro_definition("__RENDERER__", "0x21300");
+
+	pp.add_macro_definition("BUFFER_WIDTH", std::to_string(extent.width));
+	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(extent.height));
+	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
+	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
+
+    // Get the ReShade shaders directory
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    auto shadersPath = config.get<std::string>("ReShade", "ShadersPath");
+    if (!shadersPath)
+    {
+        spdlog::error("ReShade shaders path is unset");
+        return false;
+    }
+
+    // Add include paths
+    pp.add_include_path(filePath.parent_path());
+    pp.add_include_path(shadersPath.value());
+
+    // Add some conversion macros for compatibility with older versions of ReShade
+    pp.append_string(
+        "#define tex2Doffset(s, coords, offset) tex2D(s, coords, offset)\n"
+        "#define tex2Dlodoffset(s, coords, offset) tex2Dlod(s, coords, offset)\n"
+        "#define tex2Dgather(s, t, c) tex2Dgather##c(s, t)\n"
+        "#define tex2Dgatheroffset(s, t, o, c) tex2Dgather##c(s, t, o)\n"
+        "#define tex2Dgather0 tex2DgatherR\n"
+        "#define tex2Dgather1 tex2DgatherG\n"
+        "#define tex2Dgather2 tex2DgatherB\n"
+        "#define tex2Dgather3 tex2DgatherA\n");
+
+    if (!pp.append_file(filePath))
+	{
+        spdlog::error(pp.errors());
+        return false;
+	}
+
+    std::unique_ptr<reshadefx::codegen> backend;
+    backend.reset(reshadefx::create_codegen_spirv(true, useDebugInfo, useSpecConstants, enable16BitTypes, invertYAxis));
+
+	reshadefx::parser parser;
+	if (!parser.parse(pp.output(), backend.get()))
+	{
+        spdlog::error(parser.errors());
+        return false;
+	}
+
+    m_module = std::make_unique<reshadefx::effect_module>(backend->module());
+    if (m_module->techniques.empty() || m_module->techniques[0].passes.empty())
+    {
+        spdlog::error("No techniques found: {}", filePath.string());
+        return false;
+    }
+
+    std::string vsEntryPoint = m_module->techniques[0].passes[0].vs_entry_point;
+    std::string psEntryPoint = m_module->techniques[0].passes[0].ps_entry_point;
+
+    std::string vs_binary, vs_asm, ps_binary, ps_asm, errors;
+
+    if (!backend->assemble_code_for_entry_point(vsEntryPoint, vs_binary, vs_asm, errors))
+    {
+        spdlog::error("Failed to assemble vertex shader: {}", errors);
+        return false;
+    }
+
+    if (!backend->assemble_code_for_entry_point(psEntryPoint, ps_binary, ps_asm, errors))
+    {
+        spdlog::error("Failed to assemble pixel shader: {}", errors);
+        return false;
+    }
+
+    auto to_spirv = [](const std::string& binary)
+    {
+        std::vector<uint32_t> spirv(binary.size() / sizeof(uint32_t));
+        std::memcpy(spirv.data(), binary.data(), binary.size());
+        return spirv;
     };
 
-    m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &layoutInfo, nullptr, &m_descriptorSetLayout);
+    std::vector<uint32_t> vsBytecode = to_spirv(vs_binary);
+    std::vector<uint32_t> psBytecode = to_spirv(ps_binary);
 
-    create_descriptor_pool();
-    allocate_descriptor_set();
+    m_vertShader = std::make_shared<vkShade::ShaderModule>(m_device, vsBytecode);
+    m_fragShader = std::make_shared<vkShade::ShaderModule>(m_device, psBytecode);
+
+    return true;
+}
+
+void vkShade::Effect::create_descriptor_sets()
+{
+    auto& pass = m_module->techniques[0].passes[0];
+
+    // Create Descriptor Pool
+    std::vector<VkDescriptorPoolSize> poolSizes;
+    if (m_module->total_uniform_size > 0)
+        poolSizes.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 });
+    if (!pass.texture_bindings.empty())
+        poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                              (uint32_t)pass.texture_bindings.size() });
+
+    // Always at least 1 for the empty UBO set
+    uint32_t maxSets = 1 + (!pass.texture_bindings.empty() ? 1 : 0);
+
+    VkDescriptorPoolCreateInfo poolInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = maxSets,
+        .poolSizeCount = (uint32_t)poolSizes.size(),
+        .pPoolSizes = poolSizes.data(),
+    };
+
+    VK_CHECK(m_device.dispatch.CreateDescriptorPool(m_device.handle, &poolInfo, nullptr, &m_descriptorPool));
+
+    // Set 0: Uniform Buffer
+    if (m_module->total_uniform_size > 0)
+    {
+        VkDescriptorSetLayoutBinding uboBinding = {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        };
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindings = &uboBinding,
+        };
+
+        VK_CHECK(m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &layoutInfo, nullptr, &m_uniformSetLayout));
+
+        // Create the buffer
+        m_uniformBuffer = std::make_unique<VulkanBuffer>(m_device, m_module->total_uniform_size,
+                                                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                                         VMA_MEMORY_USAGE_CPU_TO_GPU);
+    }
+    else
+    {
+        VkDescriptorSetLayoutCreateInfo emptyLayoutInfo = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 0,
+            .pBindings = nullptr,
+        };
+
+        VK_CHECK(m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &emptyLayoutInfo, nullptr, &m_uniformSetLayout));
+    }
+
+    // Allocate set 0
+    VkDescriptorSetAllocateInfo uniformAllocInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = m_descriptorPool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &m_uniformSetLayout,
+    };
+
+    VK_CHECK(m_device.dispatch.AllocateDescriptorSets(m_device.handle, &uniformAllocInfo, &m_uniformSet));
+
+    // Write set 0 if we have a buffer
+    if (m_uniformBuffer)
+    {
+        VkDescriptorBufferInfo bufferInfo = {
+            .buffer = m_uniformBuffer->buffer(),
+            .offset = 0,
+            .range = m_module->total_uniform_size,
+        };
+
+        VkWriteDescriptorSet uboWrite = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = m_uniformSet,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &bufferInfo,
+        };
+
+        m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &uboWrite, 0, nullptr);
+    }
+
+    // Set 1: Texture Bindings
+    if (!pass.texture_bindings.empty())
+    {
+        std::vector<VkDescriptorSetLayoutBinding> imageBindings;
+        for (auto& tb : pass.texture_bindings)
+        {
+            imageBindings.push_back({
+                .binding = tb.entry_point_binding,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            });
+        }
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = (uint32_t)imageBindings.size(),
+            .pBindings = imageBindings.data(),
+        };
+
+        VK_CHECK(m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &layoutInfo, nullptr, &m_imageSetLayout));
+
+        VkDescriptorSetAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = m_descriptorPool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &m_imageSetLayout,
+        };
+
+        VK_CHECK(m_device.dispatch.AllocateDescriptorSets(m_device.handle, &allocInfo, &m_imageSet));
+    }
+}
+
+void vkShade::Effect::create_pipeline(VkFormat outputFormat)
+{
+    auto& pass = m_module->techniques[0].passes[0];
 
     // Create pipeline layout
+    std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, m_imageSetLayout };
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &m_descriptorSetLayout,
+        .setLayoutCount = layouts.size(),
+        .pSetLayouts = layouts.data(),
     };
 
-    m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+    VK_CHECK(m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
     // Create graphics pipeline
     VkPipelineShaderStageCreateInfo shaderStages[] = {
@@ -76,13 +346,13 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
             .module = m_vertShader->module(),
-            .pName = "main",
+            .pName = pass.vs_entry_point.c_str(),
         },
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
             .module = m_fragShader->module(),
-            .pName = "main",
+            .pName = pass.ps_entry_point.c_str(),
         }
     };
 
@@ -156,105 +426,40 @@ vkShade::Effect::Effect(VulkanDevice& device, VkFormat outputFormat, const std::
         .layout = m_pipelineLayout,
     };
 
-    VkResult result = m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+    VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
+}
 
-    if (result != VK_SUCCESS)
+void vkShade::Effect::reflect_uniforms()
+{
+    auto reflect_type = [](const reshadefx::type type) -> vkShade::Uniform::Type
     {
-        spdlog::error("Failed to create pipeline: {}", magic_enum::enum_name(result));
-    }
+        if (type.base == reshadefx::type::t_float && type.rows == 1 && type.cols == 1)
+            return Uniform::Type::Float;
+        if (type.base == reshadefx::type::t_float && type.rows == 2 && type.cols == 1)
+            return Uniform::Type::Vec2;
+        if (type.base == reshadefx::type::t_float && type.rows == 3 && type.cols == 1)
+            return Uniform::Type::Vec3;
+        if (type.base == reshadefx::type::t_float && type.rows == 4 && type.cols == 1)
+            return Uniform::Type::Vec4;
 
-    // In Effect constructor after CreateGraphicsPipelines:
-    if (m_pipeline == VK_NULL_HANDLE)
+        return Uniform::Type::Unknown;
+    };
+
+    // Convert the ReShade uniform to our own reflected type
+    for (const auto& uniform : m_module->uniforms)
     {
-        spdlog::error("Failed to create pipeline!");
+        m_uniformsByName[uniform.name] = {
+            .name = uniform.name,
+            .size = uniform.size,
+            .offset = uniform.offset,
+            .type = reflect_type(uniform.type)
+        };
+
+        // Set the default value if there is one
+        if (uniform.has_initializer_value)
+        {
+            // NOTE: The initializer value is a union, so we just cast it to a pointer.
+            m_uniformBuffer->write(&uniform.initializer_value.as_uint[0], uniform.size, uniform.offset);
+        }
     }
-
-    spdlog::debug("Effect pipeline created");
-}
-
-vkShade::Effect::~Effect()
-{
-    m_device.dispatch.DestroyPipeline(m_device.handle, m_pipeline, nullptr);
-    m_device.dispatch.DestroyPipelineLayout(m_device.handle, m_pipelineLayout, nullptr);
-    m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_descriptorSetLayout, nullptr);
-}
-
-void vkShade::Effect::allocate_descriptor_set()
-{
-    VkDescriptorSetAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = m_descriptorPool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &m_descriptorSetLayout,
-    };
-
-    m_device.dispatch.AllocateDescriptorSets(m_device.handle, &allocInfo, &m_descriptorSet);
-}
-
-void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
-{
-    // Bind pipeline
-    m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-
-    // Set viewport and scissor
-    VkViewport viewport = {
-        .x = 0.0f,
-        .y = 0.0f,
-        .width = (float)extent.width,
-        .height = (float)extent.height,
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    };
-    m_device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {
-        .offset = {0, 0},
-        .extent = extent,
-    };
-    m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
-
-    // Bind descriptor set
-    m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
-
-    // Draw fullscreen triangle (3 vertices, no vertex buffer)
-    m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
-}
-
-void vkShade::Effect::bind_input(VkImageView inputView)
-{
-    VkDescriptorImageInfo imageInfo = {
-        .sampler = m_sampler,
-        .imageView = inputView,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    };
-
-    VkWriteDescriptorSet descriptorWrite = {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = m_descriptorSet,
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .pImageInfo = &imageInfo,
-    };
-
-    m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
-}
-
-void vkShade::Effect::create_descriptor_pool()
-{
-    VkDescriptorPoolSize poolSize = {
-        .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .descriptorCount = 1,
-    };
-
-    VkDescriptorPoolCreateInfo poolInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = 1,
-        .poolSizeCount = 1,
-        .pPoolSizes = &poolSize,
-    };
-
-    m_device.dispatch.CreateDescriptorPool(m_device.handle, &poolInfo, nullptr, &m_descriptorPool);
 }

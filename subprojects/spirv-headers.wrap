@@ -1,0 +1,8 @@
+[wrap-git]
+url = https://github.com/KhronosGroup/SPIRV-Headers.git
+revision = vulkan-sdk-1.4.341.0
+depth = 1
+patch_directory = spirv-headers
+
+[provide]
+dependency_names = SPIRV-Headers

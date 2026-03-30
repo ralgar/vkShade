@@ -8,24 +8,11 @@
   <img src="https://img.shields.io/github/stars/ralgar/vkShade?style=flat&logo=github&color=gold&label=Stars">
 </p>
 
-<p align="center">
-<b>VKSHADE IS BACK!</b>
-</p>
-
-**What happened to the original vkShade project?**
-
-When I first started the project, I quickly realized that I was in over my
- head trying to learn C++ and Vulkan at the same time. I also came to the
- conclusion that it would be easier to start from scratch rather than attempt
- to refactor the vkBasalt codebase. Over the past 2 years I've grown much more
- comfortable with both C++ and Vulkan, enough that I'm able to revive this
- project and deliver on my original vision!
-
 ## Overview
 
-vkShade is a Vulkan post-processing layer for improving the visuals of games.
- It is being written from the ground up, with the goal of being a powerful,
- modern, and maintainable post-processing layer for Linux gaming.
+vkShade is a ReShade-compatible Vulkan post-processing layer, written from the
+ ground up to be a powerful, modern, and maintainable solution for improving
+ visuals in games and other Vulkan applications on Linux.
 
 > [!CAUTION]
 > This software may trigger bans from anti-cheat. Use it with multiplayer
@@ -40,11 +27,10 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
 
 ### Current Features
 
-- [x] Post-processing pipeline (single-pass effects)
+- [x] ReShade FX integration (see [Limitations](#limitations))
 - [x] Interactive GUI overlay with mouse support
 - [x] Cross-platform input (Wayland, Xlib, XCB)
 - [x] Modern C++ RAII wrappers around the Vulkan C API
-- [x] Demo shader effects (greyscale and grid overlay)
 - [x] Configuration system
 
 <p align="center">
@@ -55,22 +41,35 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
   <em>vkShade overlay running in-game (click to enlarge)</em>
 </p>
 
+### Limitations
+
+Many ReShade effects do not work yet. For example:
+
+- Effects relying on additional images and samplers
+- Effects with multiple techniques or passes
+- Effects relying on the depth buffer
+- Probably more...
+
 ### Roadmap
 
 #### Near-term (v0.1.x)
 
 - [x] Ping-pong rendering for multiple effects
-- [x] Configuration system (global options and per-game presets)
-- [x] Basic GUI integration (browse/apply shaders and save/load config)
-- [ ] ReShade FX compiler integration
-- [ ] Shader reflection (set uniforms in the GUI and config files)
+- [x] Configuration system
+    - [x] Application-level (global) options
+    - [ ] Per-game presets using ReShade format
+- [x] Basic GUI overlay (browse/apply shaders and save/load config)
+- [x] ReShade FX integration
+    - [x] Basic ReShade FX support
+    - [ ] Image and sampler reflection
+    - [ ] Uniform reflection in the GUI and config system
+- [ ] Various fixes and improvements
 
 #### Mid-term (v0.2.x+)
 
-- [ ] Hot-reloadable shaders
 - [ ] Multi-pass effect support
+- [ ] Hot-reloadable effects
 - [ ] Depth buffer access
-- [ ] GLSL compilation (libshaderc)
 
 #### Long-term
 
@@ -100,7 +99,6 @@ Before building, you will need:
 - X11 development files (`libx11`, `libxcb`)
 - Wayland development files (`wayland-client`)
 - xkbcommon development files (`libxkbcommon`)
-- glslc
 - SPIR-V Headers
 - Vulkan Headers
 - Vulkan Utility Libraries
@@ -184,6 +182,15 @@ The configuration file is searched for in the following locations (in order):
 > `config/vkShade.ini` and will be installed at either
 > `$XDG_DATA_HOME/vkShade/vkShade.ini` for a user-level installation or at
 > `/usr/share/vkShade/vkShade.ini` for a system-wide installation.
+
+### ReShade FX
+
+To use ReShade FX effects, you need to configure the search path.
+
+```ini
+[ReShade]
+ShadersPath = /opt/reshade/shaders
+```
 
 ### Input
 

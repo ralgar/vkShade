@@ -19,6 +19,26 @@ vkShade::ShaderModule::ShaderModule(VulkanDevice& device, const std::string& fil
     }
 }
 
+vkShade::ShaderModule::ShaderModule(VulkanDevice& device, std::span<const uint32_t> bytecode)
+    : VulkanObject(device)
+{
+    // Create shader module
+    VkShaderModuleCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = bytecode.size_bytes();
+    createInfo.pCode = bytecode.data();
+
+    VkResult result = m_device.dispatch.CreateShaderModule(m_device.handle, &createInfo, nullptr, &m_module);
+
+    if (result != VK_SUCCESS)
+    {
+        spdlog::error("Failed to create shader module: {}", m_filePath);
+    }
+
+    this->set_ready(true);
+    spdlog::trace("Created VkShaderModule from bytecode");
+}
+
 bool vkShade::ShaderModule::load()
 {
     // Read file into temporary buffer

@@ -1,2 +1,1 @@
-option('shaders', type: 'boolean', value: true, description: 'Build shaders')
 option('tests', type: 'boolean', value: false, description: 'Build tests')
