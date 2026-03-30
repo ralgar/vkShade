@@ -110,7 +110,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
     for (const auto& effect : effects)
     {
         bool found = false;
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(shadersPath.value()))
+        for (const auto& entry : std::filesystem::directory_iterator(shadersPath.value()))
         {
             if (entry.path().filename() == effect)
             {
