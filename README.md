@@ -58,7 +58,7 @@ Many ReShade effects do not work yet. For example:
 - [x] Configuration system
     - [x] Application-level (global) options
     - [ ] Per-game presets using ReShade format
-- [x] Basic GUI overlay (browse/apply shaders and save/load config)
+- [x] Basic GUI overlay (browse/apply effects and save/load config)
 - [x] ReShade FX integration
     - [x] Basic ReShade FX support
     - [ ] Image and sampler reflection
@@ -189,7 +189,7 @@ To use ReShade FX effects, you need to configure the search path.
 
 ```ini
 [ReShade]
-ShadersPath = /opt/reshade/shaders
+EffectsPath = /opt/reshade/shaders
 ```
 
 ### Input
