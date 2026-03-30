@@ -50,21 +50,19 @@ vkShade::InputManager::InputManager()
     // Set keybinds
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
 
-    auto toggleEffects = config.get<std::string>("Input", "ToggleEffects");
-    if (toggleEffects)
     {
+        auto toggleEffects = config.get<std::string>("Input", "ToggleEffects");
         vkShade::KeyCode keyEnum;
-        std::string keyString = toggleEffects.value();
-        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_HOME);
+        std::string keyString = toggleEffects.value_or("");
+        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_INSERT);
         bind_action("ToggleEffects", keyEnum);
     }
 
-    auto toggleGui = config.get<std::string>("Input", "ToggleGui");
-    if (toggleGui)
     {
+        auto toggleGui = config.get<std::string>("Input", "ToggleGui");
         vkShade::KeyCode keyEnum;
-        std::string keyString = toggleGui.value();
-        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_F2);
+        std::string keyString = toggleGui.value_or("");
+        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_HOME);
         bind_action("ToggleGui", keyEnum);
     }
 }
