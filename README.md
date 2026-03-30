@@ -34,8 +34,8 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
 - [x] Configuration system
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.4-demo.png">
-    <img src="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.4-demo.png" width="800" alt="vkShade in action">
+  <a href="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.6-demo.png">
+    <img src="https://raw.githubusercontent.com/ralgar/vkShade/assets/screenshots/v0.0.6-demo.png" width="800" alt="vkShade in action">
   </a>
   <br>
   <em>vkShade overlay running in-game (click to enlarge)</em>
