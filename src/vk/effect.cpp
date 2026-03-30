@@ -11,14 +11,15 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan_core.h>
 
-#include "config/config_globals.hpp"
+#include "core/service_locator.hpp"
+#include "config/config_manager.hpp"
 #include "effect_module.hpp"
 #include "vk/macros.hpp"
 
-vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, const std::string& fileName)
+vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device)
 {
-    spdlog::trace("Creating effect: {}", fileName);
+    spdlog::trace("Creating effect: {}", effectPath.filename().string());
 
     // Create sampler for input texture
     VkSamplerCreateInfo samplerInfo = {
@@ -34,11 +35,6 @@ vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format
     };
     VK_CHECK(m_device.dispatch.CreateSampler(m_device.handle, &samplerInfo, nullptr, &m_sampler));
 
-    // Get the ReShade shaders directory
-    std::filesystem::path dataDir = DATADIR;
-    dataDir = dataDir / "vkShade";
-    std::filesystem::path effectPath = dataDir / "shaders" / fileName;
-
     // Compile the ReShade effect from source
     reshadefx::effect_module module;
     if (!this->compile(extent, effectPath))
@@ -48,7 +44,7 @@ vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format
     this->create_pipeline(format);
     this->reflect_uniforms();
 
-    spdlog::debug("Created effect: {}", fileName);
+    spdlog::debug("Created effect: {}", effectPath.filename().string());
 }
 
 vkShade::Effect::~Effect()
@@ -127,12 +123,22 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
 	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
 
-    // TODO: Set from config
-    pp.add_include_path("/opt/reshade/shaders");
+    // Get the ReShade shaders directory
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    auto shadersPath = config.get<std::string>("ReShade", "ShadersPath");
+    if (!shadersPath)
+    {
+        spdlog::error("ReShade shaders path is unset");
+        return false;
+    }
 
-	if (!pp.append_file(filePath))
+    // Add include paths
+    pp.add_include_path(filePath.parent_path());
+    pp.add_include_path(shadersPath.value());
+
+    if (!pp.append_file(filePath))
 	{
-        spdlog::error("Failed to open effect file: {}", filePath.string());
+        spdlog::error(pp.errors());
         return false;
 	}
 

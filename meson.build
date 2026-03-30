@@ -17,10 +17,6 @@ conf_paths.set_quoted('DATADIR', join_paths(get_option('prefix'), get_option('da
 subdir('config')
 subdir('src')
 
-if get_option('shaders')
-  subdir('shaders')
-endif
-
 if get_option('tests')
   subdir('tests')
 endif

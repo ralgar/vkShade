@@ -1,6 +1,5 @@
 #include "main_window.hpp"
 
-#include "config/config_globals.hpp"
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 #include "../gui_helpers.hpp"
@@ -94,7 +93,7 @@ void vkShade::MainWindow::render_shader_lists()
     activeShaders = activeShadersOpt.value_or(std::vector<std::string>{});
 
     // Scan directory for all shaders
-    std::string effectsPath = std::string(DATADIR) + "/vkShade/shaders";
+    std::string effectsPath = m_config.get<std::string>("ReShade", "ShadersPath").value_or("");
     std::vector<std::string> allShaders;
 
     namespace fs = std::filesystem;
@@ -102,7 +101,7 @@ void vkShade::MainWindow::render_shader_lists()
     {
         for (const auto& entry : fs::directory_iterator(effectsPath))
         {
-            if (entry.is_regular_file() && entry.path().filename().string().ends_with(".frag.spv"))
+            if (entry.is_regular_file() && entry.path().filename().string().ends_with(".fx"))
             {
                 allShaders.push_back(entry.path().filename().string());
             }
