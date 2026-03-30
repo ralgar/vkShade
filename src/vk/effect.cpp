@@ -117,6 +117,7 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
     reshadefx::preprocessor pp;
     pp.add_macro_definition("__RESHADE__", std::to_string(60703));
     pp.add_macro_definition("__RESHADE_PERFORMANCE_MODE__", "0");
+    pp.add_macro_definition("__RENDERER__", "0x21300");
 
 	pp.add_macro_definition("BUFFER_WIDTH", std::to_string(extent.width));
 	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(extent.height));
@@ -135,6 +136,17 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
     // Add include paths
     pp.add_include_path(filePath.parent_path());
     pp.add_include_path(shadersPath.value());
+
+    // Add some conversion macros for compatibility with older versions of ReShade
+    pp.append_string(
+        "#define tex2Doffset(s, coords, offset) tex2D(s, coords, offset)\n"
+        "#define tex2Dlodoffset(s, coords, offset) tex2Dlod(s, coords, offset)\n"
+        "#define tex2Dgather(s, t, c) tex2Dgather##c(s, t)\n"
+        "#define tex2Dgatheroffset(s, t, o, c) tex2Dgather##c(s, t, o)\n"
+        "#define tex2Dgather0 tex2DgatherR\n"
+        "#define tex2Dgather1 tex2DgatherG\n"
+        "#define tex2Dgather2 tex2DgatherB\n"
+        "#define tex2Dgather3 tex2DgatherA\n");
 
     if (!pp.append_file(filePath))
 	{
