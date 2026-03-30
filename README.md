@@ -200,15 +200,15 @@ Keybinds are now configurable under the `[Input]` section in `vkShade.ini`
 
 ```ini
 [Input]
-ToggleEffects = KEY_HOME
-ToggleGui = KEY_F2
+ToggleEffects = KEY_INSERT
+ToggleGui = KEY_HOME
 ```
 
 > [!TIP]
 > If you don't set any keybinds, vkShade will use the defaults:
 >
-> - `HOME` to toggle the effects
-> - `F2` to toggle the in-game GUI overlay
+> - `INSERT` to toggle the effects
+> - `HOME` to toggle the in-game GUI overlay
 
 > [!NOTE]
 > When interacting with the in-game GUI, only the mouse is supported currently.
