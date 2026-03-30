@@ -19,7 +19,7 @@ void vkShade::MainWindow::render()
         ImGui::Separator();
         ImGui::Spacing();
 
-        render_shader_lists();
+        render_effect_lists();
 
         ImGui::Spacing();
 
@@ -85,16 +85,16 @@ void vkShade::MainWindow::render_menu_bar()
     ImGui::PopStyleVar();  // WindowPadding
 }
 
-void vkShade::MainWindow::render_shader_lists()
+void vkShade::MainWindow::render_effect_lists()
 {
-    // Get active shaders from config
-    std::vector<std::string> activeShaders;
-    auto activeShadersOpt = m_config.get<std::vector<std::string>>("vkShade", "Effects");
-    activeShaders = activeShadersOpt.value_or(std::vector<std::string>{});
+    // Get active effects from config
+    std::vector<std::string> activeEffects;
+    auto activeEffectsOpt = m_config.get<std::vector<std::string>>("vkShade", "Effects");
+    activeEffects = activeEffectsOpt.value_or(std::vector<std::string>{});
 
-    // Scan directory for all shaders
-    std::string effectsPath = m_config.get<std::string>("ReShade", "ShadersPath").value_or("");
-    std::vector<std::string> allShaders;
+    // Scan directory for all effects
+    std::string effectsPath = m_config.get<std::string>("ReShade", "EffectsPath").value_or("");
+    std::vector<std::string> allEffects;
 
     namespace fs = std::filesystem;
     if (fs::exists(effectsPath) && fs::is_directory(effectsPath))
@@ -103,19 +103,19 @@ void vkShade::MainWindow::render_shader_lists()
         {
             if (entry.is_regular_file() && entry.path().filename().string().ends_with(".fx"))
             {
-                allShaders.push_back(entry.path().filename().string());
+                allEffects.push_back(entry.path().filename().string());
             }
         }
     }
-    std::sort(allShaders.begin(), allShaders.end());
+    std::sort(allEffects.begin(), allEffects.end());
 
     // Filter out active ones to get available
-    std::vector<std::string> availableShaders;
-    for (const auto& shader : allShaders)
+    std::vector<std::string> availableEffects;
+    for (const auto& effect : allEffects)
     {
-        if (std::find(activeShaders.begin(), activeShaders.end(), shader) == activeShaders.end())
+        if (std::find(activeEffects.begin(), activeEffects.end(), effect) == activeEffects.end())
         {
-            availableShaders.push_back(shader);
+            availableEffects.push_back(effect);
         }
     }
 
@@ -136,10 +136,10 @@ void vkShade::MainWindow::render_shader_lists()
 
     ImGui::BeginGroup();
 
-    // Available Shaders column
+    // Available Effects column
     {
         ImGui::BeginChild("AvailableColumn", ImVec2(listWidth, listHeight), false);
-        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Available Shaders");
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Available Effects");
         ImGui::Spacing();
 
         // Content section (scrollable)
@@ -150,7 +150,7 @@ void vkShade::MainWindow::render_shader_lists()
                               false,
                               ImGuiWindowFlags_None);
 
-            if (render_shader_listbox("##AvailableShaders", availableShaders, m_selectedAvailable, ImVec2(-FLT_MIN, -FLT_MIN)))
+            if (render_effect_listbox("##AvailableEffects", availableEffects, m_selectedAvailable, ImVec2(-FLT_MIN, -FLT_MIN)))
                 m_selectedActive = -1;  // When we select in this listbox, deselect in the other.
 
             ImGui::EndChild();
@@ -173,27 +173,27 @@ void vkShade::MainWindow::render_shader_lists()
         }
 
         bool canActivate = m_selectedAvailable >= 0 &&
-                           m_selectedAvailable < (int32_t)availableShaders.size();
+                           m_selectedAvailable < (int32_t)availableEffects.size();
 
         ImVec2 btnSize(-FLT_MIN, UIStyle::BUTTON_HEIGHT);
 
-        if (UI::Button(">>##Activate", btnSize, canActivate, "Activate selected shader"))
+        if (UI::Button(">>##Activate", btnSize, canActivate, "Activate selected effect"))
         {
-            std::string shader = availableShaders[m_selectedAvailable];
+            std::string effect = availableEffects[m_selectedAvailable];
             // Add to active list
-            activeShaders.push_back(shader);
-            m_config.set("vkShade", "Effects", activeShaders);
+            activeEffects.push_back(effect);
+            m_config.set("vkShade", "Effects", activeEffects);
             m_selectedAvailable = -1;
         }
 
         bool canDeactivate = m_selectedActive >= 0 &&
-                             m_selectedActive < (int32_t)activeShaders.size();
+                             m_selectedActive < (int32_t)activeEffects.size();
 
-        if (UI::Button("<<##Deactivate", btnSize, canDeactivate, "Deactivate selected shader"))
+        if (UI::Button("<<##Deactivate", btnSize, canDeactivate, "Deactivate selected effect"))
         {
             // Remove from active list
-            activeShaders.erase(activeShaders.begin() + m_selectedActive);
-            m_config.set("vkShade", "Effects", activeShaders);
+            activeEffects.erase(activeEffects.begin() + m_selectedActive);
+            m_config.set("vkShade", "Effects", activeEffects);
             m_selectedActive = -1;
         }
 
@@ -202,10 +202,10 @@ void vkShade::MainWindow::render_shader_lists()
 
     ImGui::SameLine();
 
-    // Active Shaders column
+    // Active Effects column
     {
         ImGui::BeginChild("ActiveColumn", ImVec2(listWidth, listHeight), false);
-        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Active Shaders (Ordered)");
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Active Effects (Ordered)");
         ImGui::Spacing();
 
         // Content section (scrollable)
@@ -216,7 +216,7 @@ void vkShade::MainWindow::render_shader_lists()
                               false,
                               ImGuiWindowFlags_None);
 
-            if (render_shader_listbox("##ActiveShaders", activeShaders, m_selectedActive, ImVec2(-FLT_MIN, -FLT_MIN)))
+            if (render_effect_listbox("##ActiveEffects", activeEffects, m_selectedActive, ImVec2(-FLT_MIN, -FLT_MIN)))
                 m_selectedAvailable = -1;   // When we select in this listbox, deselect in the other.
 
             ImGui::EndChild();
@@ -226,7 +226,7 @@ void vkShade::MainWindow::render_shader_lists()
         ImGui::Spacing();
         bool canMoveUp   = m_selectedActive > 0;
         bool canMoveDown = m_selectedActive >= 0 &&
-                           m_selectedActive < (int32_t)activeShaders.size() - 1;
+                           m_selectedActive < (int32_t)activeEffects.size() - 1;
 
         float btnWidth   = 80.0f;
         float totalWidth = btnWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
@@ -235,8 +235,8 @@ void vkShade::MainWindow::render_shader_lists()
 
         if (UI::Button("Move Up", ImVec2(btnWidth, 0), canMoveUp))
         {
-            std::swap(activeShaders[m_selectedActive], activeShaders[m_selectedActive - 1]);
-            m_config.set("vkShade", "Effects", activeShaders);
+            std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive - 1]);
+            m_config.set("vkShade", "Effects", activeEffects);
             m_selectedActive--;
         }
 
@@ -244,8 +244,8 @@ void vkShade::MainWindow::render_shader_lists()
 
         if (UI::Button("Move Down", ImVec2(btnWidth, 0), canMoveDown))
         {
-            std::swap(activeShaders[m_selectedActive], activeShaders[m_selectedActive + 1]);
-            m_config.set("vkShade", "Effects", activeShaders);
+            std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive + 1]);
+            m_config.set("vkShade", "Effects", activeEffects);
             m_selectedActive++;
         }
 
@@ -260,7 +260,7 @@ void vkShade::MainWindow::render_uniform_controls()
     ImGui::Separator();
     ImGui::Spacing();
 
-    const char* text = "Shader uniforms will be adjustable here";
+    const char* text = "Effect uniforms will be adjustable here";
 
     float availHeight = ImGui::GetContentRegionAvail().y;
     float textHeight = ImGui::CalcTextSize(text).y;
@@ -272,8 +272,8 @@ void vkShade::MainWindow::render_uniform_controls()
     ImGui::TextDisabled("%s", text);
 }
 
-bool vkShade::MainWindow::render_shader_listbox(const char* label,
-                                                const std::vector<std::string>& shaders,
+bool vkShade::MainWindow::render_effect_listbox(const char* label,
+                                                const std::vector<std::string>& effects,
                                                 int32_t& selected,
                                                 const ImVec2& size)
 {
@@ -281,11 +281,11 @@ bool vkShade::MainWindow::render_shader_listbox(const char* label,
 
     if (ImGui::BeginListBox(label, size))
     {
-        for (int32_t i = 0; i < (int32_t)shaders.size(); i++)
+        for (int32_t i = 0; i < (int32_t)effects.size(); i++)
         {
             const bool isSelected = (selected == i);
 
-            if (ImGui::Selectable(shaders[i].c_str(), isSelected))
+            if (ImGui::Selectable(effects[i].c_str(), isSelected))
             {
                 selected = i;
                 changed = true;
