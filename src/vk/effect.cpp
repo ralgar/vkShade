@@ -126,8 +126,8 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 
     // Get the ReShade shaders directory
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-    auto shadersPath = config.get<std::string>("ReShade", "ShadersPath");
-    if (!shadersPath)
+    auto effectsPath = config.get<std::string>("ReShade", "EffectsPath");
+    if (!effectsPath)
     {
         spdlog::error("ReShade shaders path is unset");
         return false;
@@ -135,7 +135,7 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
 
     // Add include paths
     pp.add_include_path(filePath.parent_path());
-    pp.add_include_path(shadersPath.value());
+    pp.add_include_path(effectsPath.value());
 
     // Add some conversion macros for compatibility with older versions of ReShade
     pp.append_string(

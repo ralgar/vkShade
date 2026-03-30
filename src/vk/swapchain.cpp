@@ -99,8 +99,8 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
 void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effects)
 {
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-    auto shadersPath = config.get<std::string>("ReShade", "ShadersPath");
-    if (!shadersPath)
+    auto effectsPath = config.get<std::string>("ReShade", "EffectsPath");
+    if (!effectsPath)
     {
         spdlog::warn("ReShade shaders path is unset");
         return;  // Return early since we can't search without a path
@@ -110,7 +110,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
     for (const auto& effect : effects)
     {
         bool found = false;
-        for (const auto& entry : std::filesystem::directory_iterator(shadersPath.value()))
+        for (const auto& entry : std::filesystem::directory_iterator(effectsPath.value()))
         {
             if (entry.path().filename() == effect)
             {

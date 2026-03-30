@@ -31,12 +31,12 @@ namespace vkShade
         void render_about_dialog();
         void render_menu_bar();
 
-        void render_shader_lists();
+        void render_effect_lists();
         void render_uniform_controls();
 
         // List rendering helper
-        bool render_shader_listbox(const char* label,
-                                   const std::vector<std::string>& shaders,
+        bool render_effect_listbox(const char* label,
+                                   const std::vector<std::string>& effects,
                                    int32_t& selected,
                                    const ImVec2& size);
     };
