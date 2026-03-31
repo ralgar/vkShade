@@ -8,15 +8,19 @@
 
 #include "vk/buffer.hpp"
 
-vkShade::FrameTimeUniform::FrameTimeUniform(reshadefx::uniform uniform)
+static bool uniform_has_source(const reshadefx::uniform& uniform, const std::string& source)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
+    auto it = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
     {
         return a.name == "source";
     });
 
-    if (source->value.string_data != "frametime")
-        throw std::runtime_error("Tried to create a FrameTimeUniform from a non-frametime uniform");
+    return it != uniform.annotations.end() && it->value.string_data == source;
+}
+
+vkShade::FrameTimeUniform::FrameTimeUniform(reshadefx::uniform uniform)
+{
+    assert(uniform_has_source(uniform, "frametime"));
 
     m_lastFrame = std::chrono::steady_clock::now();
     m_offset    = uniform.offset;
@@ -35,13 +39,7 @@ void vkShade::FrameTimeUniform::update(VulkanBuffer& buffer)
 
 vkShade::FrameCountUniform::FrameCountUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "framecount")
-        throw std::runtime_error("Tried to create a FrameCountUniform from a non-framecount uniform");
+    assert(uniform_has_source(uniform, "framecount"));
 
     m_offset = uniform.offset;
     m_size   = uniform.size;
@@ -55,13 +53,7 @@ void vkShade::FrameCountUniform::update(VulkanBuffer& buffer)
 
 vkShade::DateUniform::DateUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "date")
-        throw std::runtime_error("Tried to create a DateUniform from a non-date uniform");
+    assert(uniform_has_source(uniform, "date"));
 
     m_offset = uniform.offset;
     m_size   = uniform.size;
@@ -83,13 +75,7 @@ void vkShade::DateUniform::update(VulkanBuffer& buffer)
 
 vkShade::TimerUniform::TimerUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "timer")
-        throw std::runtime_error("Tried to create a TimerUniform from a non-timer uniform");
+    assert(uniform_has_source(uniform, "timer"));
 
     m_startTime = std::chrono::steady_clock::now();
     m_offset    = uniform.offset;
@@ -107,13 +93,7 @@ void vkShade::TimerUniform::update(VulkanBuffer& buffer)
 
 vkShade::PingPongUniform::PingPongUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "pingpong")
-        throw std::runtime_error("Tried to create a PingPongUniform from a non-pingpong uniform");
+    assert(uniform_has_source(uniform, "pingpong"));
 
     auto to_float = [](const reshadefx::annotation& a, int idx = 0)
     {
@@ -181,13 +161,7 @@ void vkShade::PingPongUniform::update(VulkanBuffer& buffer)
 
 vkShade::RandomUniform::RandomUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "random")
-        throw std::runtime_error("Tried to create a RandomUniform from a non-random uniform");
+    assert(uniform_has_source(uniform, "random"));
 
     auto to_int = [](const reshadefx::annotation& a)
     {
@@ -214,13 +188,7 @@ void vkShade::RandomUniform::update(VulkanBuffer& buffer)
 
 vkShade::KeyUniform::KeyUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "key")
-        throw std::runtime_error("Tried to create a KeyUniform from a non-key uniform");
+    assert(uniform_has_source(uniform, "key"));
 
     m_offset = uniform.offset;
     m_size   = uniform.size;
@@ -235,13 +203,7 @@ void vkShade::KeyUniform::update(VulkanBuffer& buffer)
 
 vkShade::MouseButtonUniform::MouseButtonUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "mousebutton")
-        throw std::runtime_error("Tried to create a MouseButtonUniform from a non-mousebutton uniform");
+    assert(uniform_has_source(uniform, "mousebutton"));
 
     m_offset = uniform.offset;
     m_size   = uniform.size;
@@ -256,13 +218,7 @@ void vkShade::MouseButtonUniform::update(VulkanBuffer& buffer)
 
 vkShade::MousePointUniform::MousePointUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "mousepoint")
-        throw std::runtime_error("Tried to create a MousePointUniform from a non-mousepoint uniform");
+    assert(uniform_has_source(uniform, "mousepoint"));
 
     m_offset = uniform.offset;
     m_size   = uniform.size;
@@ -277,13 +233,7 @@ void vkShade::MousePointUniform::update(VulkanBuffer& buffer)
 
 vkShade::MouseDeltaUniform::MouseDeltaUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "mousedelta")
-        throw std::runtime_error("Tried to create a MouseDeltaUniform from a non-mousedelta uniform");
+    assert(uniform_has_source(uniform, "mousedelta"));
 
     m_offset = uniform.offset;
     m_size   = uniform.size;
@@ -298,13 +248,7 @@ void vkShade::MouseDeltaUniform::update(VulkanBuffer& buffer)
 
 vkShade::DepthUniform::DepthUniform(reshadefx::uniform uniform)
 {
-    auto source = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
-    {
-        return a.name == "source";
-    });
-
-    if (source->value.string_data != "bufready_depth")
-        throw std::runtime_error("Tried to create a MouseDeltaUniform from a non-bufready_depth uniform");
+    assert(uniform_has_source(uniform, "bufready_depth"));
 
     m_offset = uniform.offset;
     m_size   = uniform.size;
