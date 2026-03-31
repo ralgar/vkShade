@@ -133,4 +133,25 @@ namespace vkShade
         DepthUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
+
+    class OverlayOpenUniform : public ReshadeUniform
+    {
+    public:
+        OverlayOpenUniform(reshadefx::uniform uniform);
+        void update(VulkanBuffer& buffer) override;
+    };
+
+    class OverlayActiveUniform : public ReshadeUniform
+    {
+    public:
+        OverlayActiveUniform(reshadefx::uniform uniform);
+        void update(VulkanBuffer& buffer) override;
+    };
+
+    class OverlayHoveredUniform : public ReshadeUniform
+    {
+    public:
+        OverlayHoveredUniform(reshadefx::uniform uniform);
+        void update(VulkanBuffer& buffer) override;
+    };
 } // namespace vkShade

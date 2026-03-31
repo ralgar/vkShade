@@ -482,6 +482,12 @@ void vkShade::ReshadeEffect::reflect_uniforms()
                 m_builtinUniforms.push_back(std::make_unique<vkShade::MouseWheelUniform>(uniform));
             else if (source == "bufready_depth")
                 m_builtinUniforms.push_back(std::make_unique<vkShade::DepthUniform>(uniform));
+            else if (source == "overlay_open")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayOpenUniform>(uniform));
+            else if (source == "overlay_active")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayActiveUniform>(uniform));
+            else if (source == "overlay_hovered")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayHoveredUniform>(uniform));
 
             continue;  // Skip GUI reflection for built-in uniforms
         }

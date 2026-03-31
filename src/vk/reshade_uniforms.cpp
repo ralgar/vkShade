@@ -275,3 +275,48 @@ void vkShade::DepthUniform::update(VulkanBuffer& buffer)
     VkBool32 hasDepth = VK_FALSE;
     buffer.write(&hasDepth, m_size, m_offset);
 }
+
+vkShade::OverlayOpenUniform::OverlayOpenUniform(reshadefx::uniform uniform)
+{
+    assert(uniform_has_source(uniform, "overlay_open"));
+
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
+}
+
+void vkShade::OverlayOpenUniform::update(VulkanBuffer& buffer)
+{
+    // TODO: Handle overlay open uniforms
+    VkBool32 overlayOpen = VK_FALSE;
+    buffer.write(&overlayOpen, m_size, m_offset);
+}
+
+vkShade::OverlayActiveUniform::OverlayActiveUniform(reshadefx::uniform uniform)
+{
+    assert(uniform_has_source(uniform, "overlay_active"));
+
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
+}
+
+void vkShade::OverlayActiveUniform::update(VulkanBuffer& buffer)
+{
+    // TODO: Handle overlay active uniforms
+    int32_t overlayActive = 0;
+    buffer.write(&overlayActive, m_size, m_offset);
+}
+
+vkShade::OverlayHoveredUniform::OverlayHoveredUniform(reshadefx::uniform uniform)
+{
+    assert(uniform_has_source(uniform, "overlay_hovered"));
+
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
+}
+
+void vkShade::OverlayHoveredUniform::update(VulkanBuffer& buffer)
+{
+    // TODO: Handle overlay hovered uniforms
+    int32_t overlayHovered = 0;
+    buffer.write(&overlayHovered, m_size, m_offset);
+}
