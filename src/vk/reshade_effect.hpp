@@ -10,6 +10,7 @@
 #include "core/uniform.hpp"
 #include "hooks/hooks.hpp"
 #include "vk/buffer.hpp"
+#include "vk/reshade_uniforms.hpp"
 #include "vk/shader_module.hpp"
 
 namespace reshadefx
@@ -20,11 +21,11 @@ namespace reshadefx
 
 namespace vkShade
 {
-    class Effect : public VulkanObject
+    class ReshadeEffect : public VulkanObject
     {
     public:
-        Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath);
-        ~Effect() override;
+        ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath);
+        ~ReshadeEffect() override;
 
         enum class Error
         {
@@ -37,6 +38,7 @@ namespace vkShade
 
         void apply(VkCommandBuffer cmd, VkExtent2D extent);
         void bind_input(VkImageView inputView);
+        void update();
 
         template <class T>
         std::expected<T, Error> get_uniform(const std::string& name)
@@ -88,6 +90,7 @@ namespace vkShade
         std::unique_ptr<reshadefx::effect_module> m_module {nullptr};
         std::unique_ptr<VulkanBuffer> m_uniformBuffer {nullptr};
         std::unordered_map<std::string, Uniform> m_uniformsByName;
+        std::vector<std::unique_ptr<ReshadeUniform>> m_builtinUniforms;
 
         VkPipeline m_pipeline;
         VkPipelineLayout m_pipelineLayout;

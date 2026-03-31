@@ -1,4 +1,4 @@
-#include "effect.hpp"
+#include "reshade_effect.hpp"
 
 #include <cstring>
 #include <filesystem>
@@ -6,6 +6,7 @@
 
 #include <effect_parser.hpp>
 #include <effect_codegen.hpp>
+#include <effect_module.hpp>
 #include <effect_preprocessor.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
@@ -13,10 +14,10 @@
 
 #include "core/service_locator.hpp"
 #include "config/config_manager.hpp"
-#include "effect_module.hpp"
 #include "vk/macros.hpp"
+#include "vk/reshade_uniforms.hpp"
 
-vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
+vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device)
 {
     spdlog::trace("Creating effect: {}", effectPath.filename().string());
@@ -47,7 +48,7 @@ vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format
     spdlog::debug("Created effect: {}", effectPath.filename().string());
 }
 
-vkShade::Effect::~Effect()
+vkShade::ReshadeEffect::~ReshadeEffect()
 {
     m_device.dispatch.DestroyPipeline(m_device.handle, m_pipeline, nullptr);
     m_device.dispatch.DestroyPipelineLayout(m_device.handle, m_pipelineLayout, nullptr);
@@ -55,7 +56,7 @@ vkShade::Effect::~Effect()
     m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_imageSetLayout, nullptr);
 }
 
-void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
+void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
 {
     // Bind pipeline
     m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
@@ -86,7 +87,7 @@ void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
     m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
-void vkShade::Effect::bind_input(VkImageView inputView)
+void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
 {
     VkDescriptorImageInfo imageInfo = {
         .sampler = m_sampler,
@@ -107,7 +108,7 @@ void vkShade::Effect::bind_input(VkImageView inputView)
     m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
 }
 
-bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
+bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path filePath)
 {
     const bool useDebugInfo = false;
     const bool useSpecConstants = false;
@@ -204,7 +205,7 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
     return true;
 }
 
-void vkShade::Effect::create_descriptor_sets()
+void vkShade::ReshadeEffect::create_descriptor_sets()
 {
     auto& pass = m_module->techniques[0].passes[0];
 
@@ -326,7 +327,7 @@ void vkShade::Effect::create_descriptor_sets()
     }
 }
 
-void vkShade::Effect::create_pipeline(VkFormat outputFormat)
+void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
 {
     auto& pass = m_module->techniques[0].passes[0];
 
@@ -429,7 +430,7 @@ void vkShade::Effect::create_pipeline(VkFormat outputFormat)
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
 }
 
-void vkShade::Effect::reflect_uniforms()
+void vkShade::ReshadeEffect::reflect_uniforms()
 {
     auto reflect_type = [](const reshadefx::type type) -> vkShade::Uniform::Type
     {
@@ -448,6 +449,52 @@ void vkShade::Effect::reflect_uniforms()
     // Convert the ReShade uniform to our own reflected type
     for (const auto& uniform : m_module->uniforms)
     {
+        auto sourceIt = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
+        {
+            return a.name == "source";
+        });
+
+        if (sourceIt != uniform.annotations.end())
+        {
+            const auto& source = sourceIt->value.string_data;
+
+            if (source == "frametime")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::FrameTimeUniform>(uniform));
+            else if (source == "framecount")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::FrameCountUniform>(uniform));
+            else if (source == "date")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::DateUniform>(uniform));
+            else if (source == "timer")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::TimerUniform>(uniform));
+            else if (source == "pingpong")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::PingPongUniform>(uniform));
+            else if (source == "random")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::RandomUniform>(uniform));
+            else if (source == "key")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::KeyUniform>(uniform));
+            else if (source == "mousebutton")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseButtonUniform>(uniform));
+            else if (source == "mousepoint")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MousePointUniform>(uniform));
+            else if (source == "mousedelta")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseDeltaUniform>(uniform));
+            else if (source == "mousewheel")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseWheelUniform>(uniform));
+            else if (source == "bufready_depth")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::DepthUniform>(uniform));
+            else if (source == "overlay_open")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayOpenUniform>(uniform));
+            else if (source == "overlay_active")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayActiveUniform>(uniform));
+            else if (source == "overlay_hovered")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayHoveredUniform>(uniform));
+            else if (source == "screenshot")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::ScreenshotUniform>(uniform));
+
+            continue;  // Skip GUI reflection for built-in uniforms
+        }
+
+        // Generic/GUI uniform
         m_uniformsByName[uniform.name] = {
             .name = uniform.name,
             .size = uniform.size,
@@ -461,5 +508,13 @@ void vkShade::Effect::reflect_uniforms()
             // NOTE: The initializer value is a union, so we just cast it to a pointer.
             m_uniformBuffer->write(&uniform.initializer_value.as_uint[0], uniform.size, uniform.offset);
         }
+    }
+}
+
+void vkShade::ReshadeEffect::update()
+{
+    for (auto& uniform : m_builtinUniforms)
+    {
+        uniform->update(*m_uniformBuffer);
     }
 }

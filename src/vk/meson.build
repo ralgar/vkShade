@@ -1,8 +1,9 @@
 libvk_source = [
   'buffer.cpp',
-  'effect.cpp',
   'image.cpp',
   'initializers.cpp',
+  'reshade_effect.cpp',
+  'reshade_uniforms.cpp',
   'shader_module.cpp',
   'swapchain.cpp',
 ]

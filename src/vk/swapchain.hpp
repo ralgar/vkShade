@@ -4,8 +4,8 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-#include "effect.hpp"
 #include "object.hpp"
+#include "reshade_effect.hpp"
 
 namespace vkShade
 {
@@ -38,7 +38,7 @@ namespace vkShade
         VkFence m_fence {VK_NULL_HANDLE};
         VkCommandPool m_commandPool {VK_NULL_HANDLE};
         VkCommandBuffer m_commandBuffer {VK_NULL_HANDLE};
-        std::vector<std::shared_ptr<Effect>> m_effects;
+        std::vector<std::shared_ptr<ReshadeEffect>> m_effects;
         std::shared_ptr<VulkanImage> m_pingPongA;
         std::shared_ptr<VulkanImage> m_pingPongB;
     };
