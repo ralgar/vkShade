@@ -125,18 +125,11 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
 	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
 	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
 
-    // Get the ReShade shaders directory
-    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-    auto effectsPath = config.get<std::string>("ReShade", "EffectsPath");
-    if (!effectsPath)
-    {
-        spdlog::error("ReShade shaders path is unset");
-        return false;
-    }
-
     // Add include paths
-    pp.add_include_path(filePath.parent_path());
-    pp.add_include_path(effectsPath.value());
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    auto effectPaths = config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
+    for (auto& path : effectPaths.value_or(std::vector<std::string>{}))
+        pp.add_include_path(path);
 
     // Add some conversion macros for compatibility with older versions of ReShade
     pp.append_string(

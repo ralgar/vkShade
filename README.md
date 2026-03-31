@@ -187,11 +187,11 @@ The configuration file is searched for in the following locations (in order):
 
 ### ReShade FX
 
-To use ReShade FX effects, you need to configure the search path.
+To use ReShade FX effects, you need to configure the search path. For example:
 
 ```ini
 [ReShade]
-EffectsPath = /opt/reshade/shaders
+EffectSearchPaths = /opt/reshade/shaders,/opt/reshade/shaders/SweetFX
 ```
 
 ### Input
