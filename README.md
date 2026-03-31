@@ -78,10 +78,12 @@ Many ReShade effects do not work yet. For example:
 
 ## Packaging Status
 
-No distro packages are available currently, but this will probably change in
- the future.
+vkShade has packages available in the following repositories:
 
-For now, you can build it from source very easily.
+[![Packaging status](https://repology.org/badge/vertical-allrepos/vkshade.svg)](https://repology.org/project/vkshade/versions)
+
+If vkShade is not packaged for your distro, you can
+ [build it from source](#building-from-source).
 
 ## Building from Source
 
