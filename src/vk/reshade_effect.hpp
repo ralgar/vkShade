@@ -20,11 +20,11 @@ namespace reshadefx
 
 namespace vkShade
 {
-    class Effect : public VulkanObject
+    class ReshadeEffect : public VulkanObject
     {
     public:
-        Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath);
-        ~Effect() override;
+        ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath);
+        ~ReshadeEffect() override;
 
         enum class Error
         {

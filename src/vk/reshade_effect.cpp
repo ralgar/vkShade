@@ -1,4 +1,4 @@
-#include "effect.hpp"
+#include "reshade_effect.hpp"
 
 #include <cstring>
 #include <filesystem>
@@ -16,7 +16,7 @@
 #include "effect_module.hpp"
 #include "vk/macros.hpp"
 
-vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
+vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device)
 {
     spdlog::trace("Creating effect: {}", effectPath.filename().string());
@@ -47,7 +47,7 @@ vkShade::Effect::Effect(VulkanDevice& device, VkExtent2D extent, VkFormat format
     spdlog::debug("Created effect: {}", effectPath.filename().string());
 }
 
-vkShade::Effect::~Effect()
+vkShade::ReshadeEffect::~ReshadeEffect()
 {
     m_device.dispatch.DestroyPipeline(m_device.handle, m_pipeline, nullptr);
     m_device.dispatch.DestroyPipelineLayout(m_device.handle, m_pipelineLayout, nullptr);
@@ -55,7 +55,7 @@ vkShade::Effect::~Effect()
     m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_imageSetLayout, nullptr);
 }
 
-void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
+void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
 {
     // Bind pipeline
     m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
@@ -86,7 +86,7 @@ void vkShade::Effect::apply(VkCommandBuffer cmd, VkExtent2D extent)
     m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
-void vkShade::Effect::bind_input(VkImageView inputView)
+void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
 {
     VkDescriptorImageInfo imageInfo = {
         .sampler = m_sampler,
@@ -107,7 +107,7 @@ void vkShade::Effect::bind_input(VkImageView inputView)
     m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
 }
 
-bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
+bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path filePath)
 {
     const bool useDebugInfo = false;
     const bool useSpecConstants = false;
@@ -204,7 +204,7 @@ bool vkShade::Effect::compile(VkExtent2D extent, std::filesystem::path filePath)
     return true;
 }
 
-void vkShade::Effect::create_descriptor_sets()
+void vkShade::ReshadeEffect::create_descriptor_sets()
 {
     auto& pass = m_module->techniques[0].passes[0];
 
@@ -326,7 +326,7 @@ void vkShade::Effect::create_descriptor_sets()
     }
 }
 
-void vkShade::Effect::create_pipeline(VkFormat outputFormat)
+void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
 {
     auto& pass = m_module->techniques[0].passes[0];
 
@@ -429,7 +429,7 @@ void vkShade::Effect::create_pipeline(VkFormat outputFormat)
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
 }
 
-void vkShade::Effect::reflect_uniforms()
+void vkShade::ReshadeEffect::reflect_uniforms()
 {
     auto reflect_type = [](const reshadefx::type type) -> vkShade::Uniform::Type
     {

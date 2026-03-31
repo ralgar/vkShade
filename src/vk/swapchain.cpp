@@ -114,7 +114,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
         {
             if (entry.path().filename() == effect)
             {
-                m_effects.push_back(std::make_shared<Effect>(m_device, m_extent, m_format, entry.path()));
+                m_effects.push_back(std::make_shared<ReshadeEffect>(m_device, m_extent, m_format, entry.path()));
                 found = true;
                 break;
             }
