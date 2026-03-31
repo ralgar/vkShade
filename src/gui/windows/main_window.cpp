@@ -93,17 +93,20 @@ void vkShade::MainWindow::render_effect_lists()
     activeEffects = activeEffectsOpt.value_or(std::vector<std::string>{});
 
     // Scan directory for all effects
-    std::string effectsPath = m_config.get<std::string>("ReShade", "EffectsPath").value_or("");
+    auto effectPaths = m_config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
     std::vector<std::string> allEffects;
 
     namespace fs = std::filesystem;
-    if (fs::exists(effectsPath) && fs::is_directory(effectsPath))
+    for (auto& path : effectPaths.value_or(std::vector<std::string>{}))
     {
-        for (const auto& entry : fs::directory_iterator(effectsPath))
+        if (fs::exists(path) && fs::is_directory(path))
         {
-            if (entry.is_regular_file() && entry.path().filename().string().ends_with(".fx"))
+            for (const auto& entry : fs::directory_iterator(path))
             {
-                allEffects.push_back(entry.path().filename().string());
+                if (entry.is_regular_file() && entry.path().filename().string().ends_with(".fx"))
+                {
+                    allEffects.push_back(entry.path().filename().string());
+                }
             }
         }
     }
