@@ -478,6 +478,8 @@ void vkShade::ReshadeEffect::reflect_uniforms()
                 m_builtinUniforms.push_back(std::make_unique<vkShade::MousePointUniform>(uniform));
             else if (source == "mousedelta")
                 m_builtinUniforms.push_back(std::make_unique<vkShade::MouseDeltaUniform>(uniform));
+            else if (source == "mousewheel")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseWheelUniform>(uniform));
             else if (source == "bufready_depth")
                 m_builtinUniforms.push_back(std::make_unique<vkShade::DepthUniform>(uniform));
 

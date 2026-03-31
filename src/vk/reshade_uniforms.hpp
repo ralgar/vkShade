@@ -120,6 +120,13 @@ namespace vkShade
         void update(VulkanBuffer& buffer) override;
     };
 
+    class MouseWheelUniform : public ReshadeUniform
+    {
+    public:
+        MouseWheelUniform(reshadefx::uniform uniformInfo);
+        void update(VulkanBuffer& buffer) override;
+    };
+
     class DepthUniform : public ReshadeUniform
     {
     public:

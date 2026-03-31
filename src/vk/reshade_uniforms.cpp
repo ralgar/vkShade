@@ -246,6 +246,21 @@ void vkShade::MouseDeltaUniform::update(VulkanBuffer& buffer)
     buffer.write(&mouseDelta, m_size, m_offset);
 }
 
+vkShade::MouseWheelUniform::MouseWheelUniform(reshadefx::uniform uniform)
+{
+    assert(uniform_has_source(uniform, "mousewheel"));
+
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
+}
+
+void vkShade::MouseWheelUniform::update(VulkanBuffer& buffer)
+{
+    // TODO: Handle mouse wheel uniforms
+    glm::vec2 mouseWheel {0.0f, 0.0f};
+    buffer.write(&mouseWheel, m_size, m_offset);
+}
+
 vkShade::DepthUniform::DepthUniform(reshadefx::uniform uniform)
 {
     assert(uniform_has_source(uniform, "bufready_depth"));
