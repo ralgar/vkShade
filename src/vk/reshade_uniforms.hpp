@@ -29,7 +29,7 @@ namespace vkShade
     class FrameTimeUniform : public ReshadeUniform
     {
     public:
-        FrameTimeUniform(reshadefx::uniform uniformInfo);
+        FrameTimeUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
 
     private:
@@ -39,7 +39,7 @@ namespace vkShade
     class FrameCountUniform : public ReshadeUniform
     {
     public:
-        FrameCountUniform(reshadefx::uniform uniformInfo);
+        FrameCountUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
 
     private:
@@ -49,14 +49,14 @@ namespace vkShade
     class DateUniform : public ReshadeUniform
     {
     public:
-        DateUniform(reshadefx::uniform uniformInfo);
+        DateUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
 
     class TimerUniform : public ReshadeUniform
     {
     public:
-        TimerUniform(reshadefx::uniform uniformInfo);
+        TimerUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
 
     private:
@@ -66,7 +66,7 @@ namespace vkShade
  class PingPongUniform : public ReshadeUniform
     {
     public:
-        PingPongUniform(reshadefx::uniform uniformInfo);
+        PingPongUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
 
     private:
@@ -84,7 +84,7 @@ namespace vkShade
     class RandomUniform : public ReshadeUniform
     {
     public:
-        RandomUniform(reshadefx::uniform uniformInfo);
+        RandomUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
 
     private:
@@ -95,42 +95,42 @@ namespace vkShade
     class KeyUniform : public ReshadeUniform
     {
     public:
-        KeyUniform(reshadefx::uniform uniformInfo);
+        KeyUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
 
     class MouseButtonUniform : public ReshadeUniform
     {
     public:
-        MouseButtonUniform(reshadefx::uniform uniformInfo);
+        MouseButtonUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
 
     class MousePointUniform : public ReshadeUniform
     {
     public:
-        MousePointUniform(reshadefx::uniform uniformInfo);
+        MousePointUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
 
     class MouseDeltaUniform : public ReshadeUniform
     {
     public:
-        MouseDeltaUniform(reshadefx::uniform uniformInfo);
+        MouseDeltaUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
 
     class MouseWheelUniform : public ReshadeUniform
     {
     public:
-        MouseWheelUniform(reshadefx::uniform uniformInfo);
+        MouseWheelUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
 
     class DepthUniform : public ReshadeUniform
     {
     public:
-        DepthUniform(reshadefx::uniform uniformInfo);
+        DepthUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
 } // namespace vkShade
