@@ -6,6 +6,7 @@
 
 #include <effect_parser.hpp>
 #include <effect_codegen.hpp>
+#include <effect_module.hpp>
 #include <effect_preprocessor.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
@@ -13,8 +14,8 @@
 
 #include "core/service_locator.hpp"
 #include "config/config_manager.hpp"
-#include "effect_module.hpp"
 #include "vk/macros.hpp"
+#include "vk/reshade_uniforms.hpp"
 
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device)
@@ -448,6 +449,42 @@ void vkShade::ReshadeEffect::reflect_uniforms()
     // Convert the ReShade uniform to our own reflected type
     for (const auto& uniform : m_module->uniforms)
     {
+        auto sourceIt = std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a)
+        {
+            return a.name == "source";
+        });
+
+        if (sourceIt != uniform.annotations.end())
+        {
+            const auto& source = sourceIt->value.string_data;
+
+            if (source == "frametime")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::FrameTimeUniform>(uniform));
+            else if (source == "framecount")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::FrameCountUniform>(uniform));
+            else if (source == "date")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::DateUniform>(uniform));
+            else if (source == "timer")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::TimerUniform>(uniform));
+            else if (source == "pingpong")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::PingPongUniform>(uniform));
+            else if (source == "random")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::RandomUniform>(uniform));
+            else if (source == "key")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::KeyUniform>(uniform));
+            else if (source == "mousebutton")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseButtonUniform>(uniform));
+            else if (source == "mousepoint")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MousePointUniform>(uniform));
+            else if (source == "mousedelta")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseDeltaUniform>(uniform));
+            else if (source == "bufready_depth")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::DepthUniform>(uniform));
+
+            continue;  // Skip GUI reflection for built-in uniforms
+        }
+
+        // Generic/GUI uniform
         m_uniformsByName[uniform.name] = {
             .name = uniform.name,
             .size = uniform.size,
@@ -461,5 +498,13 @@ void vkShade::ReshadeEffect::reflect_uniforms()
             // NOTE: The initializer value is a union, so we just cast it to a pointer.
             m_uniformBuffer->write(&uniform.initializer_value.as_uint[0], uniform.size, uniform.offset);
         }
+    }
+}
+
+void vkShade::ReshadeEffect::update()
+{
+    for (auto& uniform : m_builtinUniforms)
+    {
+        uniform->update(*m_uniformBuffer);
     }
 }

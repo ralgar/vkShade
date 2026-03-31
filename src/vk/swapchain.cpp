@@ -165,6 +165,9 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
             if (!effect)
                 continue;
 
+            // Update the effect uniforms
+            effect->update();
+
             // Barrier: Ensure read image is ready to sample
             VkImageMemoryBarrier2 barrier{};
             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
