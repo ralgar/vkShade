@@ -3,6 +3,7 @@
 #include <chrono>
 #include <effect_module.hpp>
 #include <glm/vec2.hpp>
+#include <random>
 #include <spdlog/spdlog.h>
 
 #include "vk/buffer.hpp"
@@ -114,33 +115,21 @@ vkShade::PingPongUniform::PingPongUniform(reshadefx::uniform uniform)
     if (source->value.string_data != "pingpong")
         throw std::runtime_error("Tried to create a PingPongUniform from a non-pingpong uniform");
 
-    if (auto minAnnotation =
-            std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a) { return a.name == "min"; });
-        minAnnotation != uniform.annotations.end())
+    auto to_float = [](const reshadefx::annotation& a, int idx = 0)
     {
-        m_min = minAnnotation->type.is_floating_point() ? minAnnotation->value.as_float[0] : static_cast<float>(minAnnotation->value.as_int[0]);
-    }
-    if (auto maxAnnotation =
-            std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a) { return a.name == "max"; });
-        maxAnnotation != uniform.annotations.end())
+        return a.type.is_floating_point() ? a.value.as_float[idx] : static_cast<float>(a.value.as_int[idx]);
+    };
+
+    for (const auto& a : uniform.annotations)
     {
-        m_max = maxAnnotation->type.is_floating_point() ? maxAnnotation->value.as_float[0] : static_cast<float>(maxAnnotation->value.as_int[0]);
-    }
-    if (auto smoothingAnnotation =
-            std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a) { return a.name == "smoothing"; });
-        smoothingAnnotation != uniform.annotations.end())
-    {
-        m_smoothing = smoothingAnnotation->type.is_floating_point() ? smoothingAnnotation->value.as_float[0]
-                                                                  : static_cast<float>(smoothingAnnotation->value.as_int[0]);
-    }
-    if (auto stepAnnotation =
-            std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a) { return a.name == "step"; });
-        stepAnnotation != uniform.annotations.end())
-    {
-        m_stepMin =
-            stepAnnotation->type.is_floating_point() ? stepAnnotation->value.as_float[0] : static_cast<float>(stepAnnotation->value.as_int[0]);
-        m_stepMax =
-            stepAnnotation->type.is_floating_point() ? stepAnnotation->value.as_float[1] : static_cast<float>(stepAnnotation->value.as_int[1]);
+        if      (a.name == "min")       m_min       = to_float(a);
+        else if (a.name == "max")       m_max       = to_float(a);
+        else if (a.name == "smoothing") m_smoothing = to_float(a);
+        else if (a.name == "step")
+        {
+            m_stepMin = to_float(a, 0);
+            m_stepMax = to_float(a, 1);
+        }
     }
 
     m_lastFrame = std::chrono::steady_clock::now();
@@ -150,29 +139,40 @@ vkShade::PingPongUniform::PingPongUniform(reshadefx::uniform uniform)
 
 void vkShade::PingPongUniform::update(VulkanBuffer& buffer)
 {
-    auto currentFrame = std::chrono::steady_clock::now();
+    // Compute delta time and update tracking
+    auto now = std::chrono::steady_clock::now();
+    float deltaTime = std::chrono::duration<float>(now - m_lastFrame).count();
+    m_lastFrame = now;
 
-    std::chrono::duration<float, std::ratio<1>> frameTime = currentFrame - m_lastFrame;
-
-    float increment = m_stepMax == 0 ? m_stepMin : (m_stepMin + std::fmod(static_cast<float>(std::rand()), m_stepMax - m_stepMin + 1.0f));
-    if (m_currentValue[1] >= 0)
+    // Pick a step size
+    float step = m_stepMin;
+    if (m_stepMax != 0.0f)
     {
-        increment = std::max(increment - std::max(0.0f, m_smoothing - (m_max - m_currentValue[0])), 0.05f);
-        increment *= frameTime.count();
+        static std::mt19937 rng(std::random_device{}());
+        std::uniform_real_distribution<float> dist(m_stepMin, m_stepMax);
+        step = dist(rng);
+    }
 
-        if ((m_currentValue[0] += increment) >= m_max)
+    // If going forwards, calculate smoothing reduction based on how
+    //  close we are to m_max, and apply it to step.
+    if (m_currentValue[1] >= 0.0f)
+    {
+        float smooth = std::max(0.0f, m_smoothing - (m_max - m_currentValue[0]));
+        m_currentValue[0] += std::max(step - smooth, 0.05f) * deltaTime;
+        if (m_currentValue[0] >= m_max)
         {
-            m_currentValue[0] = m_max, m_currentValue[1] = -1.0f;
+            m_currentValue[0] = m_max;
+            m_currentValue[1] = -1.0f;
         }
     }
-    else
+    else  // If going backwards, same logic in reverse.
     {
-        increment = std::max(increment - std::max(0.0f, m_smoothing - (m_currentValue[0] - m_min)), 0.05f);
-        increment *= frameTime.count();
-
-        if ((m_currentValue[0] -= increment) <= m_min)
+        float smooth = std::max(0.0f, m_smoothing - (m_currentValue[0] - m_min));
+        m_currentValue[0] -= std::max(step - smooth, 0.05f) * deltaTime;
+        if (m_currentValue[0] <= m_min)
         {
-            m_currentValue[0] = m_min, m_currentValue[1] = 1.0f;
+            m_currentValue[0] = m_min;
+            m_currentValue[1] = 1.0f;
         }
     }
 
@@ -189,17 +189,15 @@ vkShade::RandomUniform::RandomUniform(reshadefx::uniform uniform)
     if (source->value.string_data != "random")
         throw std::runtime_error("Tried to create a RandomUniform from a non-random uniform");
 
-    if (auto minAnnotation =
-            std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a) { return a.name == "min"; });
-        minAnnotation != uniform.annotations.end())
+    auto to_int = [](const reshadefx::annotation& a)
     {
-        m_min = minAnnotation->type.is_integral() ? minAnnotation->value.as_int[0] : static_cast<int>(minAnnotation->value.as_float[0]);
-    }
-    if (auto maxAnnotation =
-            std::find_if(uniform.annotations.begin(), uniform.annotations.end(), [](const auto& a) { return a.name == "max"; });
-        maxAnnotation != uniform.annotations.end())
+        return a.type.is_integral() ? a.value.as_int[0] : static_cast<int>(a.value.as_float[0]);
+    };
+
+    for (const auto& a : uniform.annotations)
     {
-        m_max = maxAnnotation->type.is_integral() ? maxAnnotation->value.as_int[0] : static_cast<int>(maxAnnotation->value.as_float[0]);
+        if      (a.name == "min") m_min = to_int(a);
+        else if (a.name == "max") m_max = to_int(a);
     }
 
     m_offset = uniform.offset;
@@ -208,7 +206,9 @@ vkShade::RandomUniform::RandomUniform(reshadefx::uniform uniform)
 
 void vkShade::RandomUniform::update(VulkanBuffer& buffer)
 {
-    int32_t value = m_min + (std::rand() % (m_max - m_min + 1));
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int32_t> dist(m_min, m_max);
+    int32_t value = dist(rng);
     buffer.write(&value, m_size, m_offset);
 }
 
