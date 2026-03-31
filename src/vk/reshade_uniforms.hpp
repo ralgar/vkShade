@@ -154,4 +154,11 @@ namespace vkShade
         OverlayHoveredUniform(reshadefx::uniform uniform);
         void update(VulkanBuffer& buffer) override;
     };
+
+    class ScreenshotUniform : public ReshadeUniform
+    {
+    public:
+        ScreenshotUniform(reshadefx::uniform uniform);
+        void update(VulkanBuffer& buffer) override;
+    };
 } // namespace vkShade

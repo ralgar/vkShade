@@ -488,6 +488,8 @@ void vkShade::ReshadeEffect::reflect_uniforms()
                 m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayActiveUniform>(uniform));
             else if (source == "overlay_hovered")
                 m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayHoveredUniform>(uniform));
+            else if (source == "screenshot")
+                m_builtinUniforms.push_back(std::make_unique<vkShade::ScreenshotUniform>(uniform));
 
             continue;  // Skip GUI reflection for built-in uniforms
         }

@@ -320,3 +320,18 @@ void vkShade::OverlayHoveredUniform::update(VulkanBuffer& buffer)
     int32_t overlayHovered = 0;
     buffer.write(&overlayHovered, m_size, m_offset);
 }
+
+vkShade::ScreenshotUniform::ScreenshotUniform(reshadefx::uniform uniform)
+{
+    assert(uniform_has_source(uniform, "screenshot"));
+
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
+}
+
+void vkShade::ScreenshotUniform::update(VulkanBuffer& buffer)
+{
+    // TODO: Handle screenshot uniforms? (if in-scope)
+    VkBool32 isScreenshot = VK_FALSE;
+    buffer.write(&isScreenshot, m_size, m_offset);
+}
