@@ -16,6 +16,7 @@
 #include "config/config_manager.hpp"
 #include "vk/macros.hpp"
 #include "vk/reshade_uniforms.hpp"
+#include "vk/sampler.hpp"
 
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device)
@@ -43,6 +44,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
 
     this->create_descriptor_sets();
     this->create_pipeline(format);
+    this->reflect_samplers();
     this->reflect_uniforms();
 
     spdlog::debug("Created effect: {}", effectPath.filename().string());
@@ -421,6 +423,14 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
     };
 
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
+}
+
+void vkShade::ReshadeEffect::reflect_samplers()
+{
+    for (const auto& samplerInfo : m_module->samplers)
+    {
+        m_samplersByTextureName[samplerInfo.texture_name] = std::make_unique<vkShade::VulkanSampler>(m_device, samplerInfo);
+    }
 }
 
 void vkShade::ReshadeEffect::reflect_uniforms()

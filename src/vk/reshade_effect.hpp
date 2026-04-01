@@ -21,6 +21,8 @@ namespace reshadefx
 
 namespace vkShade
 {
+    class VulkanSampler;
+
     class ReshadeEffect : public VulkanObject
     {
     public:
@@ -100,6 +102,7 @@ namespace vkShade
         VkDescriptorSetLayout m_uniformSetLayout;
         VkDescriptorSetLayout m_imageSetLayout;
         VkSampler m_sampler;
+        std::unordered_map<std::string, std::unique_ptr<VulkanSampler>> m_samplersByTextureName;
 
         // Shaders
         std::shared_ptr<vkShade::ShaderModule> m_vertShader;
@@ -135,6 +138,7 @@ namespace vkShade
             return false;
         }
 
+        void reflect_samplers();
         void reflect_uniforms();
     };
 } // namespace vkShade
