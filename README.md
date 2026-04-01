@@ -54,20 +54,25 @@ Many ReShade effects do not work yet. For example:
 
 #### Near-term (v0.1.x)
 
-- [x] Ping-pong rendering for multiple effects
+- [x] Chain together multiple effects
 - [x] Configuration system
     - [x] Application-level (global) options
-    - [ ] Per-game presets using ReShade format
+    - [ ] Per-game presets using ReShade's INI format
 - [x] Basic GUI overlay (browse/apply effects and save/load config)
 - [x] ReShade FX integration
     - [x] Basic ReShade FX support
+    - [x] Full support for ReShade's time-based runtime uniforms
+    - [x] Stub support for ReShade's other runtime uniforms
     - [ ] Image and sampler reflection
+    - [ ] Support for effects with multiple passes
     - [ ] Uniform reflection in the GUI and config system
 - [ ] Various fixes and improvements
 
 #### Mid-term (v0.2.x+)
 
-- [ ] Multi-pass effect support
+- [ ] Support for effects with multiple techniques
+- [ ] Full support for ReShade's input-based runtime uniforms
+- [ ] Full support for ReShade's overlay-based runtime uniforms
 - [ ] Hot-reloadable effects
 - [ ] Depth buffer access
 
