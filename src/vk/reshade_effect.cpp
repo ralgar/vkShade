@@ -39,7 +39,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
     // Compile the ReShade effect from source
     reshadefx::effect_module module;
     if (!this->compile(extent, effectPath))
-        throw std::runtime_error("Failed to compile ReShade effect");
+        throw std::runtime_error("Failed to load effect: " + effectPath.filename().string());
 
     this->create_descriptor_sets();
     this->create_pipeline(format);

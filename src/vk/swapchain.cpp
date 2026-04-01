@@ -105,20 +105,26 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
     for (const auto& effect : effects)
     {
         bool found = false;
+        bool error = false;
         for (const auto& path : searchPaths.value_or(std::vector<std::string>{}))
         {
             for (const auto& entry : std::filesystem::directory_iterator(path))
             {
                 if (entry.path().filename() == effect)
                 {
-                    m_effects.push_back(std::make_shared<ReshadeEffect>(m_device, m_extent, m_format, entry.path()));
-                    found = true;
+                    try {
+                        m_effects.push_back(std::make_shared<ReshadeEffect>(m_device, m_extent, m_format, entry.path()));
+                        found = true;
+                    } catch (const std::runtime_error& exception) {
+                        spdlog::error(exception.what());
+                        error = true;
+                    }
                     break;
                 }
             }
         }
 
-        if (!found)
+        if (!found && !error)
             spdlog::warn("Unable to find effect: {}", effect);
     }
 }
