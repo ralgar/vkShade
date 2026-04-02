@@ -10,6 +10,8 @@
 vkShade::VulkanSampler::VulkanSampler(VulkanDevice& device, const reshadefx::sampler& samplerInfo)
     : VulkanObject(device)
 {
+    spdlog::trace("Creating sampler");
+
     VkSamplerCreateInfo createInfo {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .pNext = nullptr,
@@ -27,13 +29,12 @@ vkShade::VulkanSampler::VulkanSampler(VulkanDevice& device, const reshadefx::sam
     };
 
 	VK_CHECK(m_device.dispatch.CreateSampler(m_device.handle, &createInfo, nullptr, &m_sampler));
-    spdlog::trace("Created VkSampler");
 }
 
 vkShade::VulkanSampler::~VulkanSampler()
 {
+    spdlog::trace("Destroying sampler");
     m_device.dispatch.DestroySampler(m_device.handle, m_sampler, nullptr);
-    spdlog::trace("Destroyed VkSampler");
 }
 
 VkSamplerAddressMode vkShade::VulkanSampler::convert_address_mode(reshadefx::texture_address_mode addressMode)

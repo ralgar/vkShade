@@ -23,20 +23,6 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
 {
     spdlog::trace("Creating effect: {}", effectPath.filename().string());
 
-    // Create sampler for input texture
-    VkSamplerCreateInfo samplerInfo = {
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_LINEAR,
-        .minFilter = VK_FILTER_LINEAR,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .minLod = 0.0f,
-        .maxLod = 0.0f,
-    };
-    VK_CHECK(m_device.dispatch.CreateSampler(m_device.handle, &samplerInfo, nullptr, &m_sampler));
-
     // Compile the ReShade effect from source
     reshadefx::effect_module module;
     if (!this->compile(extent, effectPath))
@@ -91,8 +77,15 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
 
 void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
 {
+    auto it = m_samplersByTextureName.find("V__ReShade__BackBufferTex");
+    if (it == m_samplersByTextureName.end())
+    {
+        spdlog::error("No sampler found for back buffer");
+        return;
+    }
+
     VkDescriptorImageInfo imageInfo = {
-        .sampler = m_sampler,
+        .sampler = it->second->handle(),
         .imageView = inputView,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };

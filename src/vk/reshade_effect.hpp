@@ -101,7 +101,6 @@ namespace vkShade
         VkDescriptorSet m_imageSet;
         VkDescriptorSetLayout m_uniformSetLayout;
         VkDescriptorSetLayout m_imageSetLayout;
-        VkSampler m_sampler;
         std::unordered_map<std::string, std::unique_ptr<VulkanSampler>> m_samplersByTextureName;
 
         // Shaders
