@@ -19,6 +19,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const std::string& fileP
 
     m_extent.width  = texWidth;
     m_extent.height = texHeight;
+    m_extent.depth  = 1;
     m_format = VK_FORMAT_R8G8B8A8_UNORM;
     m_usageFlags = usageFlags;
 
@@ -43,7 +44,9 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkExtent2D size, VkForma
         size.width, size.height, magic_enum::enum_name(format));
 
     // Set internal properties
-    m_extent = size;
+    m_extent.width  = size.width;
+    m_extent.height = size.height;
+    m_extent.depth  = 1;
     m_format = format;
     m_usageFlags = usageFlags;
 
@@ -59,7 +62,9 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
 
     // Set internal properties
     m_image = image;
-    m_extent = size;
+    m_extent.width  = size.width;
+    m_extent.height = size.height;
+    m_extent.depth  = 1;
     m_format = format;
     m_owning = false;  // IMPORTANT! We don't own the image here.
 

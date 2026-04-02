@@ -38,7 +38,7 @@ namespace vkShade
 
     private:
         bool              m_owning = true;
-        VkExtent2D        m_extent {0, 0};
+        VkExtent3D        m_extent {0, 0, 0};
         VkImage           m_image = VK_NULL_HANDLE;
         VkImageView       m_imageView = VK_NULL_HANDLE;
         VkImageUsageFlags m_usageFlags = 0;
