@@ -16,25 +16,12 @@
 #include "config/config_manager.hpp"
 #include "vk/macros.hpp"
 #include "vk/reshade_uniforms.hpp"
+#include "vk/sampler.hpp"
 
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device)
 {
     spdlog::trace("Creating effect: {}", effectPath.filename().string());
-
-    // Create sampler for input texture
-    VkSamplerCreateInfo samplerInfo = {
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_LINEAR,
-        .minFilter = VK_FILTER_LINEAR,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .minLod = 0.0f,
-        .maxLod = 0.0f,
-    };
-    VK_CHECK(m_device.dispatch.CreateSampler(m_device.handle, &samplerInfo, nullptr, &m_sampler));
 
     // Compile the ReShade effect from source
     reshadefx::effect_module module;
@@ -43,6 +30,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
 
     this->create_descriptor_sets();
     this->create_pipeline(format);
+    this->reflect_samplers();
     this->reflect_uniforms();
 
     spdlog::debug("Created effect: {}", effectPath.filename().string());
@@ -89,8 +77,15 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
 
 void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
 {
+    auto it = m_samplersByTextureName.find("V__ReShade__BackBufferTex");
+    if (it == m_samplersByTextureName.end())
+    {
+        spdlog::error("No sampler found for back buffer");
+        return;
+    }
+
     VkDescriptorImageInfo imageInfo = {
-        .sampler = m_sampler,
+        .sampler = it->second->handle(),
         .imageView = inputView,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
@@ -421,6 +416,14 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
     };
 
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
+}
+
+void vkShade::ReshadeEffect::reflect_samplers()
+{
+    for (const auto& samplerInfo : m_module->samplers)
+    {
+        m_samplersByTextureName[samplerInfo.texture_name] = std::make_unique<vkShade::VulkanSampler>(m_device, samplerInfo);
+    }
 }
 
 void vkShade::ReshadeEffect::reflect_uniforms()
