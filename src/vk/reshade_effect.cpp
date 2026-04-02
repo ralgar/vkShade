@@ -14,6 +14,7 @@
 
 #include "core/service_locator.hpp"
 #include "config/config_manager.hpp"
+#include "vk/image.hpp"
 #include "vk/macros.hpp"
 #include "vk/reshade_uniforms.hpp"
 #include "vk/sampler.hpp"
@@ -30,6 +31,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
 
     this->create_descriptor_sets();
     this->create_pipeline(format);
+    this->reflect_images();
     this->reflect_samplers();
     this->reflect_uniforms();
 
@@ -416,6 +418,17 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
     };
 
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
+}
+
+void vkShade::ReshadeEffect::reflect_images()
+{
+    for (const auto& info : m_module->textures)
+    {
+         if (!info.semantic.empty())
+             continue;  // Skip, it's a special texture (COLOR or DEPTH).
+
+         m_texturesByName[info.unique_name] = std::make_unique<vkShade::VulkanImage>(m_device, info);
+    }
 }
 
 void vkShade::ReshadeEffect::reflect_samplers()

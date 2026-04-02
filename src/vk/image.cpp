@@ -1,38 +1,97 @@
 #include "image.hpp"
 
+#include <effect_module.hpp>
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image.h>
+#include <stb_image_resize2.h>
 #include <vulkan/vulkan_core.h>
 
+#include "core/service_locator.hpp"
+#include "config/config_manager.hpp"
 #include "buffer.hpp"
 #include "initializers.hpp"
 #include "macros.hpp"
 
-vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const std::string& filePath, VkImageUsageFlags usageFlags)
+vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture& info)
     : VulkanObject(device)
 {
-    spdlog::trace("Creating image from file: {}", filePath);
+    spdlog::trace("Creating image from ReShade FX info");
 
-    int32_t texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    size_t imageSize = texWidth * texHeight * 4;
+    m_extent.width  = info.width;
+    m_extent.height = info.height;
+    m_extent.depth  = info.depth;
+    m_format = convert_format(info.format);
+    m_usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    m_extent.width  = texWidth;
-    m_extent.height = texHeight;
-    m_extent.depth  = 1;
-    m_format = VK_FORMAT_R8G8B8A8_UNORM;
-    m_usageFlags = usageFlags;
-
-    if (!pixels)
-    {
-        spdlog::error("Failed to load image: {}", filePath);
-        throw std::runtime_error("Failed to load image");
-    }
+    if (info.render_target)
+        m_usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    if (info.storage_access)
+        m_usageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
 
     this->create_image();
     this->create_image_view();
 
-    this->upload(pixels, imageSize);
+    // If image has a source (file) annotation, load it.
+    auto it = std::find_if(info.annotations.begin(), info.annotations.end(), [](const auto& a)
+    {
+        return a.name == "source";
+    });
+
+    if (it != info.annotations.end())
+    {
+        auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+        auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
+        std::string fileName = it->value.string_data;
+
+        bool found = false;
+        for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(path))
+            {
+                if (entry.path().filename() == fileName)
+                {
+                    this->load_from_file(entry.path());
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+            throw std::runtime_error("Unable to find texture: " + fileName);
+    }
+}
+
+void vkShade::VulkanImage::load_from_file(const std::string& filePath)
+{
+    spdlog::trace("Creating image from file: {}", filePath);
+
+    int32_t srcWidth, srcHeight, channels;
+    stbi_uc* pixels = stbi_load(filePath.c_str(), &srcWidth, &srcHeight, &channels, STBI_rgb_alpha);
+    channels = 4; // Forced RGBA by STBI_rgb_alpha
+
+    if (!pixels)
+    {
+        spdlog::error("Failed to load image: {}", filePath);
+        throw std::runtime_error("Failed to load image: " + filePath);
+    }
+
+    // Resize the image if it doesn't match the requested size
+    const void* uploadData = pixels;
+    std::vector<uint8_t> resized;
+
+    if (srcWidth != (int32_t)m_extent.width || srcHeight != (int32_t)m_extent.height)
+    {
+        resized.resize(m_extent.width * m_extent.height * channels);
+        stbir_resize_uint8_linear(pixels, srcWidth, srcHeight, 0,
+                                  resized.data(), m_extent.width, m_extent.height, 0,
+                                  STBIR_RGBA);
+        uploadData = resized.data();
+    }
+
+    size_t imageSize = m_extent.width * m_extent.height * 4;
+    this->upload(uploadData, imageSize);
 
     stbi_image_free(pixels);
 }
@@ -178,6 +237,38 @@ void vkShade::VulkanImage::blit(VkCommandBuffer cmd, VkImage source, VkImage des
 	m_device.dispatch.CmdBlitImage2(cmd, &blitInfo);
 }
 
+VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)
+{
+    switch (format)
+    {
+        case reshadefx::texture_format::unknown:    return VK_FORMAT_UNDEFINED;
+
+        case reshadefx::texture_format::r8:         return VK_FORMAT_R8_UNORM;
+        case reshadefx::texture_format::r16f:       return VK_FORMAT_R16_SFLOAT;
+        case reshadefx::texture_format::r16:        return VK_FORMAT_R16_UNORM;
+        case reshadefx::texture_format::r32f:       return VK_FORMAT_R32_SFLOAT;
+        case reshadefx::texture_format::r32u:       return VK_FORMAT_R32_UINT;
+        case reshadefx::texture_format::r32i:       return VK_FORMAT_R32_SINT;
+
+        case reshadefx::texture_format::rg8:        return VK_FORMAT_R8G8_UNORM;
+        case reshadefx::texture_format::rg16f:      return VK_FORMAT_R16G16_SFLOAT;
+        case reshadefx::texture_format::rg16:       return VK_FORMAT_R16G16_UNORM;
+        case reshadefx::texture_format::rg32f:      return VK_FORMAT_R32G32_SFLOAT;
+
+        case reshadefx::texture_format::rgba8:      return VK_FORMAT_R8G8B8A8_UNORM;
+        case reshadefx::texture_format::rgba16f:    return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case reshadefx::texture_format::rgba16:     return VK_FORMAT_R16G16B16A16_UNORM;
+        case reshadefx::texture_format::rgba32f:    return VK_FORMAT_R32G32B32A32_SFLOAT;
+        case reshadefx::texture_format::rgba32u:    return VK_FORMAT_R32G32B32A32_UINT;
+        case reshadefx::texture_format::rgba32i:    return VK_FORMAT_R32G32B32A32_SINT;
+
+        case reshadefx::texture_format::rgb10a2:    return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+        case reshadefx::texture_format::rg11b10f:   return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+    }
+
+    std::unreachable();
+}
+
 void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier2 imageBarrier = {
@@ -211,7 +302,7 @@ void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout 
     m_currentLayout = newLayout;  // Update tracked layout
 }
 
-void vkShade::VulkanImage::upload(void* data, size_t size)
+void vkShade::VulkanImage::upload(const void* data, size_t size)
 {
     // Create staging buffer
     VulkanBuffer staging(m_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
