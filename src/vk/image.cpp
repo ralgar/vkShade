@@ -54,7 +54,12 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         {
             for (const auto& entry : std::filesystem::directory_iterator(path))
             {
-                if (entry.path().filename() == fileName)
+                // Do a case insensitive comparison since ReShade is a Windows app
+                auto a = entry.path().filename().string();
+                auto b = fileName;
+                std::transform(a.begin(), a.end(), a.begin(), ::tolower);
+                std::transform(b.begin(), b.end(), b.begin(), ::tolower);
+                if (a == b)
                 {
                     int w, h, c;
                     if (stbi_info(entry.path().c_str(), &w, &h, &c))
@@ -87,7 +92,12 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         {
             for (const auto& entry : std::filesystem::directory_iterator(path))
             {
-                if (entry.path().filename() == fileName)
+                // Do a case insensitive comparison since ReShade is a Windows app
+                auto a = entry.path().filename().string();
+                auto b = fileName;
+                std::transform(a.begin(), a.end(), a.begin(), ::tolower);
+                std::transform(b.begin(), b.end(), b.begin(), ::tolower);
+                if (a == b)
                 {
                     this->load_from_file(entry.path());
                     found = true;
