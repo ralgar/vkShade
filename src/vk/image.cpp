@@ -390,7 +390,6 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
         }
     };
 
-    spdlog::info("Upload extent: {}, {}", m_extent.width, m_extent.height);
     m_device.dispatch.CmdCopyBufferToImage(cmd, staging.buffer(), m_image,
                                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
