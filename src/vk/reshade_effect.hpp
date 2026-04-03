@@ -103,8 +103,8 @@ namespace vkShade
         VkDescriptorSetLayout m_uniformSetLayout;
         VkDescriptorSetLayout m_imageSetLayout;
 
-        std::unordered_map<std::string, std::unique_ptr<VulkanImage>>   m_texturesByName;
-        std::unordered_map<std::string, std::unique_ptr<VulkanSampler>> m_samplersByTextureName;
+        std::unordered_map<std::string, std::unique_ptr<VulkanImage>> m_textures;
+        std::vector<std::unique_ptr<VulkanSampler>> m_samplers;
 
         // Shaders
         std::shared_ptr<vkShade::ShaderModule> m_vertShader;

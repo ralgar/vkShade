@@ -79,30 +79,47 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
 
 void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
 {
-    auto it = m_samplersByTextureName.find("V__ReShade__BackBufferTex");
-    if (it == m_samplersByTextureName.end())
+    auto& pass = m_module->techniques[0].passes[0];
+
+    std::vector<VkDescriptorImageInfo> imageInfos;  // Must outlive vkUpdateDescriptorSets()
+    imageInfos.reserve(pass.texture_bindings.size());
+
+    std::vector<VkWriteDescriptorSet> writes;
+    writes.reserve(pass.texture_bindings.size());
+
+    for (const auto& binding : pass.texture_bindings)
     {
-        spdlog::error("No sampler found for back buffer");
-        return;
+        auto& samplerInfo = m_module->samplers.at(binding.index);
+        auto& sampler = m_samplers.at(binding.index);
+        auto& texture = m_textures[samplerInfo.texture_name];
+
+        VkImageView imageView = VK_NULL_HANDLE;
+
+        // Skip semantic textures (COLOR and DEPTH) since we bind them above
+        if (samplerInfo.texture_name == "V__ReShade__BackBufferTex")
+            imageView = inputView;
+        else
+            imageView = texture->image_view();
+
+        imageInfos.push_back({
+            .sampler = sampler->handle(),
+            //.imageView = binding.srgb ? texture->srgbView() : texture->linearView(),  // TODO: linear/srgb views
+            .imageView = imageView,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        });
+
+        writes.push_back({
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = m_imageSet,
+            .dstBinding = binding.entry_point_binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo = &imageInfos.back(),
+        });
     }
 
-    VkDescriptorImageInfo imageInfo = {
-        .sampler = it->second->handle(),
-        .imageView = inputView,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    };
-
-    VkWriteDescriptorSet descriptorWrite = {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = m_imageSet,
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .pImageInfo = &imageInfo,
-    };
-
-    m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
+    m_device.dispatch.UpdateDescriptorSets(m_device.handle, writes.size(), writes.data(), 0, nullptr);
 }
 
 bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path filePath)
@@ -424,10 +441,10 @@ void vkShade::ReshadeEffect::reflect_images()
 {
     for (const auto& info : m_module->textures)
     {
-         if (!info.semantic.empty())
-             continue;  // Skip, it's a special texture (COLOR or DEPTH).
+        if (!info.semantic.empty())
+            continue;
 
-         m_texturesByName[info.unique_name] = std::make_unique<vkShade::VulkanImage>(m_device, info);
+        m_textures[info.unique_name] = std::make_unique<vkShade::VulkanImage>(m_device, info);
     }
 }
 
@@ -435,7 +452,7 @@ void vkShade::ReshadeEffect::reflect_samplers()
 {
     for (const auto& samplerInfo : m_module->samplers)
     {
-        m_samplersByTextureName[samplerInfo.texture_name] = std::make_unique<vkShade::VulkanSampler>(m_device, samplerInfo);
+        m_samplers.push_back(std::make_unique<vkShade::VulkanSampler>(m_device, samplerInfo));
     }
 }
 
