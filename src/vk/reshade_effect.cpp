@@ -14,6 +14,7 @@
 
 #include "core/service_locator.hpp"
 #include "config/config_manager.hpp"
+#include "vk/image.hpp"
 #include "vk/macros.hpp"
 #include "vk/reshade_uniforms.hpp"
 #include "vk/sampler.hpp"
@@ -30,6 +31,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
 
     this->create_descriptor_sets();
     this->create_pipeline(format);
+    this->reflect_images();
     this->reflect_samplers();
     this->reflect_uniforms();
 
@@ -77,30 +79,51 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
 
 void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
 {
-    auto it = m_samplersByTextureName.find("V__ReShade__BackBufferTex");
-    if (it == m_samplersByTextureName.end())
+    auto& pass = m_module->techniques[0].passes[0];
+
+    std::vector<VkDescriptorImageInfo> imageInfos;  // Must outlive vkUpdateDescriptorSets()
+    imageInfos.reserve(pass.texture_bindings.size());
+
+    std::vector<VkWriteDescriptorSet> writes;
+    writes.reserve(pass.texture_bindings.size());
+
+    for (const auto& binding : pass.texture_bindings)
     {
-        spdlog::error("No sampler found for back buffer");
-        return;
+        auto& samplerInfo = m_module->samplers.at(binding.index);
+        auto& sampler = m_samplers.at(binding.index);
+
+        auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
+            [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
+
+        // Handle semantic textures (COLOR and DEPTH)
+        VkImageView imageView = VK_NULL_HANDLE;
+        if (texIt != m_module->textures.end() && texIt->semantic == "COLOR")
+            imageView = inputView;
+        else
+        {
+            auto& texture = m_textures[samplerInfo.texture_name];
+            imageView = texture->image_view();
+        }
+
+        imageInfos.push_back({
+            .sampler = sampler->handle(),
+            //.imageView = binding.srgb ? texture->srgbView() : texture->linearView(),  // TODO: linear/srgb views
+            .imageView = imageView,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        });
+
+        writes.push_back({
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = m_imageSet,
+            .dstBinding = binding.entry_point_binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo = &imageInfos.back(),
+        });
     }
 
-    VkDescriptorImageInfo imageInfo = {
-        .sampler = it->second->handle(),
-        .imageView = inputView,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    };
-
-    VkWriteDescriptorSet descriptorWrite = {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = m_imageSet,
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .pImageInfo = &imageInfo,
-    };
-
-    m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &descriptorWrite, 0, nullptr);
+    m_device.dispatch.UpdateDescriptorSets(m_device.handle, writes.size(), writes.data(), 0, nullptr);
 }
 
 bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path filePath)
@@ -418,11 +441,31 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
     VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
 }
 
+void vkShade::ReshadeEffect::reflect_images()
+{
+    auto& pass = m_module->techniques[0].passes[0];
+
+    // Build a set of texture names actually used in this pass
+    std::unordered_set<std::string> usedTextureNames;
+    for (const auto& binding : pass.texture_bindings)
+        usedTextureNames.insert(m_module->samplers.at(binding.index).texture_name);
+
+    for (const auto& info : m_module->textures)
+    {
+        if (info.semantic == "DEPTH" && usedTextureNames.count(info.unique_name))
+            throw std::runtime_error("Effect requires depth buffer access, which is not yet supported.");
+        if (!info.semantic.empty())
+            continue;
+
+        m_textures[info.unique_name] = std::make_unique<vkShade::VulkanImage>(m_device, info);
+    }
+}
+
 void vkShade::ReshadeEffect::reflect_samplers()
 {
     for (const auto& samplerInfo : m_module->samplers)
     {
-        m_samplersByTextureName[samplerInfo.texture_name] = std::make_unique<vkShade::VulkanSampler>(m_device, samplerInfo);
+        m_samplers.push_back(std::make_unique<vkShade::VulkanSampler>(m_device, samplerInfo));
     }
 }
 

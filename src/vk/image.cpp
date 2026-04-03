@@ -1,37 +1,140 @@
 #include "image.hpp"
 
+#include <effect_module.hpp>
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image.h>
+#include <stb_image_resize2.h>
 #include <vulkan/vulkan_core.h>
 
+#include "core/service_locator.hpp"
+#include "config/config_manager.hpp"
 #include "buffer.hpp"
 #include "initializers.hpp"
 #include "macros.hpp"
 
-vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const std::string& filePath, VkImageUsageFlags usageFlags)
+vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture& info)
     : VulkanObject(device)
 {
-    spdlog::trace("Creating image from file: {}", filePath);
+    spdlog::trace("Creating image from ReShade FX info");
 
-    int32_t texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    size_t imageSize = texWidth * texHeight * 4;
+    m_extent.width  = info.width;
+    m_extent.height = info.height;
+    m_extent.depth  = info.depth;
 
-    m_extent.width  = texWidth;
-    m_extent.height = texHeight;
-    m_format = VK_FORMAT_R8G8B8A8_UNORM;
-    m_usageFlags = usageFlags;
+    m_format = convert_format(info.format);
 
-    if (!pixels)
+    // Format undefined is UB, so fallback to RGBA8 UNORM.
+    if (m_format == VK_FORMAT_UNDEFINED)
+        m_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    m_usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    if (info.render_target)
+        m_usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    if (info.storage_access)
+        m_usageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
+
+    // If image has a source (file) annotation, load it.
+    auto it = std::find_if(info.annotations.begin(), info.annotations.end(), [](const auto& a)
     {
-        spdlog::error("Failed to load image: {}", filePath);
-        throw std::runtime_error("Failed to load image");
+        return a.name == "source";
+    });
+
+    // If no explicit size is specified we need to extract it from the image file
+    if (it != info.annotations.end() && m_extent.width == 1 && m_extent.height == 1)
+    {
+        // Find the file and probe dimensions before creating the image
+        auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+        auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
+        std::string fileName = it->value.string_data;
+
+        bool found = false;
+        for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(path))
+            {
+                if (entry.path().filename() == fileName)
+                {
+                    int w, h, c;
+                    if (stbi_info(entry.path().c_str(), &w, &h, &c))
+                    {
+                        m_extent.width  = w;
+                        m_extent.height = h;
+                    }
+
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+            throw std::runtime_error("Unable to find texture: " + fileName);
     }
 
     this->create_image();
     this->create_image_view();
 
-    this->upload(pixels, imageSize);
+    if (it != info.annotations.end())
+    {
+        auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+        auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
+        std::string fileName = it->value.string_data;
+
+        bool found = false;
+        for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(path))
+            {
+                if (entry.path().filename() == fileName)
+                {
+                    this->load_from_file(entry.path());
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+            throw std::runtime_error("Unable to find texture: " + fileName);
+    }
+}
+
+void vkShade::VulkanImage::load_from_file(const std::string& filePath)
+{
+    spdlog::trace("Creating image from file: {}", filePath);
+
+    // We only handle RGBA8 UNORM for loaded textures right now
+    if (m_format != VK_FORMAT_R8G8B8A8_UNORM)
+        throw std::runtime_error("Unsupported format for file-sourced texture: " +
+            std::string(magic_enum::enum_name(m_format)));
+
+    int32_t srcWidth, srcHeight, channels;
+    stbi_uc* pixels = stbi_load(filePath.c_str(), &srcWidth, &srcHeight, &channels, STBI_rgb_alpha);
+    channels = 4; // Forced RGBA by STBI_rgb_alpha
+
+    if (!pixels)
+    {
+        spdlog::error("Failed to load image: {}", filePath);
+        throw std::runtime_error("Failed to load image: " + filePath);
+    }
+
+    // Resize the image if it doesn't match the requested size
+    const void* uploadData = pixels;
+    std::vector<uint8_t> resized;
+
+    if (srcWidth != (int32_t)m_extent.width || srcHeight != (int32_t)m_extent.height)
+    {
+        resized.resize(m_extent.width * m_extent.height * channels);
+        stbir_resize_uint8_linear(pixels, srcWidth, srcHeight, 0,
+                                  resized.data(), m_extent.width, m_extent.height, 0,
+                                  STBIR_RGBA);
+        uploadData = resized.data();
+    }
+
+    size_t imageSize = m_extent.width * m_extent.height * 4;
+    this->upload(uploadData, imageSize);
 
     stbi_image_free(pixels);
 }
@@ -43,7 +146,9 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkExtent2D size, VkForma
         size.width, size.height, magic_enum::enum_name(format));
 
     // Set internal properties
-    m_extent = size;
+    m_extent.width  = size.width;
+    m_extent.height = size.height;
+    m_extent.depth  = 1;
     m_format = format;
     m_usageFlags = usageFlags;
 
@@ -59,7 +164,9 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
 
     // Set internal properties
     m_image = image;
-    m_extent = size;
+    m_extent.width  = size.width;
+    m_extent.height = size.height;
+    m_extent.depth  = 1;
     m_format = format;
     m_owning = false;  // IMPORTANT! We don't own the image here.
 
@@ -173,6 +280,38 @@ void vkShade::VulkanImage::blit(VkCommandBuffer cmd, VkImage source, VkImage des
 	m_device.dispatch.CmdBlitImage2(cmd, &blitInfo);
 }
 
+VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)
+{
+    switch (format)
+    {
+        case reshadefx::texture_format::unknown:    return VK_FORMAT_UNDEFINED;
+
+        case reshadefx::texture_format::r8:         return VK_FORMAT_R8_UNORM;
+        case reshadefx::texture_format::r16f:       return VK_FORMAT_R16_SFLOAT;
+        case reshadefx::texture_format::r16:        return VK_FORMAT_R16_UNORM;
+        case reshadefx::texture_format::r32f:       return VK_FORMAT_R32_SFLOAT;
+        case reshadefx::texture_format::r32u:       return VK_FORMAT_R32_UINT;
+        case reshadefx::texture_format::r32i:       return VK_FORMAT_R32_SINT;
+
+        case reshadefx::texture_format::rg8:        return VK_FORMAT_R8G8_UNORM;
+        case reshadefx::texture_format::rg16f:      return VK_FORMAT_R16G16_SFLOAT;
+        case reshadefx::texture_format::rg16:       return VK_FORMAT_R16G16_UNORM;
+        case reshadefx::texture_format::rg32f:      return VK_FORMAT_R32G32_SFLOAT;
+
+        case reshadefx::texture_format::rgba8:      return VK_FORMAT_R8G8B8A8_UNORM;
+        case reshadefx::texture_format::rgba16f:    return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case reshadefx::texture_format::rgba16:     return VK_FORMAT_R16G16B16A16_UNORM;
+        case reshadefx::texture_format::rgba32f:    return VK_FORMAT_R32G32B32A32_SFLOAT;
+        case reshadefx::texture_format::rgba32u:    return VK_FORMAT_R32G32B32A32_UINT;
+        case reshadefx::texture_format::rgba32i:    return VK_FORMAT_R32G32B32A32_SINT;
+
+        case reshadefx::texture_format::rgb10a2:    return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+        case reshadefx::texture_format::rg11b10f:   return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+    }
+
+    std::unreachable();
+}
+
 void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier2 imageBarrier = {
@@ -206,7 +345,7 @@ void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout 
     m_currentLayout = newLayout;  // Update tracked layout
 }
 
-void vkShade::VulkanImage::upload(void* data, size_t size)
+void vkShade::VulkanImage::upload(const void* data, size_t size)
 {
     // Create staging buffer
     VulkanBuffer staging(m_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
@@ -218,8 +357,14 @@ void vkShade::VulkanImage::upload(void* data, size_t size)
     VkCommandBuffer cmd;
     m_device.dispatch.AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd);
 
-    VkCommandBufferBeginInfo beginInfo;
+    VkCommandBufferBeginInfo beginInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+    };
     m_device.dispatch.BeginCommandBuffer(cmd, &beginInfo);
+
+    // Transition UNDEFINED -> TRANSFER_DST_OPTIMAL
+    this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkBufferImageCopy copyRegion = {
         .imageSubresource = {
@@ -235,8 +380,12 @@ void vkShade::VulkanImage::upload(void* data, size_t size)
         }
     };
 
+    spdlog::info("Upload extent: {}, {}", m_extent.width, m_extent.height);
     m_device.dispatch.CmdCopyBufferToImage(cmd, staging.buffer(), m_image,
                                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+    // Transition TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
+    this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     m_device.dispatch.EndCommandBuffer(cmd);
 
@@ -246,8 +395,8 @@ void vkShade::VulkanImage::upload(void* data, size_t size)
         .pCommandBuffers = &cmd,
     };
 
-    m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, VK_NULL_HANDLE);
-    m_device.dispatch.QueueWaitIdle(m_device.queue);
+    VK_CHECK(m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, VK_NULL_HANDLE));
+    VK_CHECK(m_device.dispatch.QueueWaitIdle(m_device.queue));
 
     m_device.dispatch.FreeCommandBuffers(m_device.handle, m_device.commandPool, 1, &cmd);
 }

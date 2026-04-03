@@ -7,13 +7,19 @@
 
 #include "object.hpp"
 
+namespace reshadefx
+{
+    struct texture;
+    enum class texture_format : uint8_t;
+}
+
 namespace vkShade
 {
     class VulkanImage : public VulkanObject
     {
     public:
-        // Owning constructor: loads image from file + creates view
-        VulkanImage(VulkanDevice& device, const std::string& filePath, VkImageUsageFlags usageFlags);
+        // Owning constructor: creates or loads an image according to info struct
+        VulkanImage(VulkanDevice& device, const reshadefx::texture& info);
 
         // Owning constructor: creates image + view
         VulkanImage(VulkanDevice& device, VkExtent2D size, VkFormat format, VkImageUsageFlags usageFlags);
@@ -38,7 +44,7 @@ namespace vkShade
 
     private:
         bool              m_owning = true;
-        VkExtent2D        m_extent {0, 0};
+        VkExtent3D        m_extent {0, 0, 0};
         VkImage           m_image = VK_NULL_HANDLE;
         VkImageView       m_imageView = VK_NULL_HANDLE;
         VkImageUsageFlags m_usageFlags = 0;
@@ -52,6 +58,10 @@ namespace vkShade
         void create_image();
         void create_image_view();
 
-        void upload(void* data, size_t size);
+        void load_from_file(const std::string& filePath);
+
+        void upload(const void* data, size_t size);
+
+        static VkFormat convert_format(reshadefx::texture_format format);
     };
 } // namespace vkShade
