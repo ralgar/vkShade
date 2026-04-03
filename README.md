@@ -251,11 +251,8 @@ No, however you can probably use Zink (OpenGL to Vulkan translation) and use
 
 ## Acknowledgments
 
-A big thank you to these amazing projects, without which vkShade wouldn't be
- possible:
-
-- [vkBasalt](https://github.com/DadSchoorse/vkBasalt)
-- [ReShade](https://github.com/crosire/reshade)
+- [ReShade] - for the ReShade FX ecosystem
+- [vkBasalt] - for the original inspiration
 
 ## License
 
@@ -264,3 +261,8 @@ Copyright (c) 2026 Ryan Algar
 
 BSD 2-clause License (see [LICENSE](LICENSE) or
  [BSD 2-clause](https://choosealicense.com/licenses/bsd-2-clause/))
+
+<!----------------------------------------------------------------------------->
+
+[ReShade]: https://github.com/crosire/reshade
+[vkBasalt]: https://github.com/DadSchoorse/vkBasalt
