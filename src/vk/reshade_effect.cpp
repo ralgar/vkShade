@@ -44,6 +44,7 @@ vkShade::ReshadeEffect::~ReshadeEffect()
     m_device.dispatch.DestroyPipelineLayout(m_device.handle, m_pipelineLayout, nullptr);
     m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_uniformSetLayout, nullptr);
     m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_imageSetLayout, nullptr);
+    m_device.dispatch.DestroyDescriptorPool(m_device.handle, m_descriptorPool, nullptr);
 }
 
 void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
