@@ -21,7 +21,13 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
     m_extent.width  = info.width;
     m_extent.height = info.height;
     m_extent.depth  = info.depth;
+
     m_format = convert_format(info.format);
+
+    // Format undefined is UB, so fallback to RGBA8 UNORM.
+    if (m_format == VK_FORMAT_UNDEFINED)
+        m_format = VK_FORMAT_R8G8B8A8_UNORM;
+
     m_usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     if (info.render_target)
@@ -99,11 +105,14 @@ void vkShade::VulkanImage::load_from_file(const std::string& filePath)
 {
     spdlog::trace("Creating image from file: {}", filePath);
 
+    // We only handle RGBA8 UNORM for loaded textures right now
+    if (m_format != VK_FORMAT_R8G8B8A8_UNORM)
+        throw std::runtime_error("Unsupported format for file-sourced texture: " +
+            std::string(magic_enum::enum_name(m_format)));
+
     int32_t srcWidth, srcHeight, channels;
     stbi_uc* pixels = stbi_load(filePath.c_str(), &srcWidth, &srcHeight, &channels, STBI_rgb_alpha);
     channels = 4; // Forced RGBA by STBI_rgb_alpha
-
-    spdlog::info("Loading image: {} ({}x{} -> {}x{})", filePath, srcWidth, srcHeight, m_extent.width, m_extent.height);
 
     if (!pixels)
     {
