@@ -11,6 +11,12 @@ vkShade::MainWindow::MainWindow()
 
 void vkShade::MainWindow::render()
 {
+    // Set initial/default size and position
+    ImVec2 size = ImGui::GetMainViewport()->Size;
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(size.x * 0.5, size.y * 0.6), ImGuiCond_FirstUseEver);
+
     if (ImGui::Begin("vkShade", &m_visible, ImGuiWindowFlags_MenuBar))
     {
         render_menu_bar();
