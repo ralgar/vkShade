@@ -79,10 +79,11 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
         if (func)
         {
             spdlog::trace("[ImGui] Loaded {} from instance table: {}", function_name, (void*)func);
+            return func;
         }
 
-        spdlog::trace("[ImGui] Unable to load function {}", function_name);
-        return func;
+        spdlog::error("[ImGui] Failed to load function: {}", function_name);
+        return nullptr;
     }, &deviceContext);
 
 	// Dynamic rendering parameters for ImGui to use.
