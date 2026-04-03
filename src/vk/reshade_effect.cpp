@@ -91,15 +91,19 @@ void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
     {
         auto& samplerInfo = m_module->samplers.at(binding.index);
         auto& sampler = m_samplers.at(binding.index);
-        auto& texture = m_textures[samplerInfo.texture_name];
 
+        auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
+            [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
+
+        // Handle semantic textures (COLOR and DEPTH)
         VkImageView imageView = VK_NULL_HANDLE;
-
-        // Skip semantic textures (COLOR and DEPTH) since we bind them above
-        if (samplerInfo.texture_name == "V__ReShade__BackBufferTex")
+        if (texIt != m_module->textures.end() && texIt->semantic == "COLOR")
             imageView = inputView;
         else
+        {
+            auto& texture = m_textures[samplerInfo.texture_name];
             imageView = texture->image_view();
+        }
 
         imageInfos.push_back({
             .sampler = sampler->handle(),
@@ -439,8 +443,17 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
 
 void vkShade::ReshadeEffect::reflect_images()
 {
+    auto& pass = m_module->techniques[0].passes[0];
+
+    // Build a set of texture names actually used in this pass
+    std::unordered_set<std::string> usedTextureNames;
+    for (const auto& binding : pass.texture_bindings)
+        usedTextureNames.insert(m_module->samplers.at(binding.index).texture_name);
+
     for (const auto& info : m_module->textures)
     {
+        if (info.semantic == "DEPTH" && usedTextureNames.count(info.unique_name))
+            throw std::runtime_error("Effect requires depth buffer access, which is not yet supported.");
         if (!info.semantic.empty())
             continue;
 
