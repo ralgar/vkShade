@@ -43,12 +43,12 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
 
 ### Limitations
 
-Many ReShade effects do not work yet. For example:
+Many ReShade effects do not work properly yet. For example:
 
-- Effects relying on additional images and samplers
 - Effects with multiple techniques or passes
+- Effects relying on stencil and blending
 - Effects relying on the depth buffer
-- Probably more...
+- Possibly more...
 
 ### Roadmap
 
@@ -63,13 +63,14 @@ Many ReShade effects do not work yet. For example:
     - [x] Basic ReShade FX support
     - [x] Full support for ReShade's time-based runtime uniforms
     - [x] Stub support for ReShade's other runtime uniforms
-    - [ ] Image and sampler reflection
+    - [x] Image and sampler reflection
     - [ ] Support for effects with multiple passes
-    - [ ] Uniform reflection in the GUI and config system
+    - [ ] Pipeline state reflection (stencil and blending)
 - [ ] Various fixes and improvements
 
 #### Mid-term (v0.2.x+)
 
+- [ ] Uniform reflection in the GUI and config system
 - [ ] Support for effects with multiple techniques
 - [ ] Full support for ReShade's input-based runtime uniforms
 - [ ] Full support for ReShade's overlay-based runtime uniforms
@@ -192,11 +193,12 @@ The configuration file is searched for in the following locations (in order):
 
 ### ReShade FX
 
-To use ReShade FX effects, you need to configure the search path. For example:
+To use ReShade effects, you need to configure the search paths. For example:
 
 ```ini
 [ReShade]
 EffectSearchPaths = /opt/reshade/shaders,/opt/reshade/shaders/SweetFX
+TextureSearchPaths = /opt/reshade/textures,/opt/reshade/textures/SweetFX
 ```
 
 ### Input
