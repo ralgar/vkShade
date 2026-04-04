@@ -115,7 +115,6 @@ namespace vkShade
 
         std::vector<Pass> m_passes;
 
-        void create_descriptor_sets();
         void create_pipeline(VkFormat outputFormat);
 
         bool compile(VkExtent2D extent, std::filesystem::path filePath);
@@ -145,6 +144,7 @@ namespace vkShade
             return false;
         }
 
+        void reflect_descriptors();
         void reflect_images();
         void reflect_samplers();
         void reflect_uniforms();
