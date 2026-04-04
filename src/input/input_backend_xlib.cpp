@@ -22,16 +22,6 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
     std::memset(m_previousKeymap, 0, sizeof(m_previousKeymap));
 }
 
-vkShade::InputBackendXlib::~InputBackendXlib()
-{
-    if (m_xkbState)
-        xkb_state_unref(m_xkbState);
-    if (m_xkbKeymap)
-        xkb_keymap_unref(m_xkbKeymap);
-    if (m_xkbContext)
-        xkb_context_unref(m_xkbContext);
-}
-
 void vkShade::InputBackendXlib::process_events()
 {
     if (!m_display || !m_xkbState)
