@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <filesystem>
+#include <ranges>
 #include <stdexcept>
 
 #include <effect_parser.hpp>
@@ -15,6 +16,7 @@
 #include "core/service_locator.hpp"
 #include "config/config_manager.hpp"
 #include "vk/image.hpp"
+#include "vk/initializers.hpp"
 #include "vk/macros.hpp"
 #include "vk/reshade_uniforms.hpp"
 #include "vk/sampler.hpp"
@@ -29,10 +31,10 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
     if (!this->compile(extent, effectPath))
         throw std::runtime_error("Failed to load effect: " + effectPath.filename().string());
 
-    this->create_descriptor_sets();
-    this->create_pipeline(format);
     this->reflect_images();
     this->reflect_samplers();
+    this->create_descriptor_sets();
+    this->create_pipeline(format);
     this->reflect_uniforms();
 
     spdlog::debug("Created effect: {}", effectPath.filename().string());
@@ -40,91 +42,113 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
 
 vkShade::ReshadeEffect::~ReshadeEffect()
 {
-    m_device.dispatch.DestroyPipeline(m_device.handle, m_pipeline, nullptr);
-    m_device.dispatch.DestroyPipelineLayout(m_device.handle, m_pipelineLayout, nullptr);
+    for (const auto& pass : m_passes)
+    {
+        m_device.dispatch.DestroyPipeline(m_device.handle, pass.pipeline, nullptr);
+        m_device.dispatch.DestroyPipelineLayout(m_device.handle, pass.pipelineLayout, nullptr);
+        m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, pass.imageSetLayout, nullptr);
+    }
+
     m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_uniformSetLayout, nullptr);
-    m_device.dispatch.DestroyDescriptorSetLayout(m_device.handle, m_imageSetLayout, nullptr);
     m_device.dispatch.DestroyDescriptorPool(m_device.handle, m_descriptorPool, nullptr);
 }
 
-void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VkExtent2D extent)
+void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage)
 {
-    // Bind pipeline
-    m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    auto& technique = m_module->techniques[0];
 
-    // Set viewport and scissor
-    VkViewport viewport = {
-        .x = 0.0f,
-        .y = 0.0f,
-        .width = (float)extent.width,
-        .height = (float)extent.height,
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    };
-    m_device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
+    for (auto&& [pass, passInfo] : std::views::zip(m_passes, technique.passes))
+    {
+        bool isFinalPass = (&passInfo == &technique.passes.back());
 
-    VkRect2D scissor = {
-        .offset = {0, 0},
-        .extent = extent,
-    };
-    m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
+        // Determine the render target for this pass
+        VulkanImage* renderTargetImage = nullptr;
+        if (!passInfo.render_target_names[0].empty())
+            renderTargetImage = m_textures.at(passInfo.render_target_names[0]).get();
+        else
+            renderTargetImage = &outputImage;
 
-    // Bind descriptor sets
-    std::array<VkDescriptorSet, 2> sets = { m_uniformSet, m_imageSet };
-    m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_pipelineLayout, 0, sets.size(), sets.data(), 0, nullptr);
+        // Transition render target to COLOR_ATTACHMENT_OPTIMAL
+        renderTargetImage->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    // Draw fullscreen triangle (3 vertices, no vertex buffer)
-    m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
+        // Begin rendering
+        std::array<VkRenderingAttachmentInfo, 1> colorAttachments = {
+            vkinit::rendering_attachment_info(renderTargetImage->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+        };
+        VkExtent2D extent { .width = outputImage.extent().width, .height = outputImage.extent().height};
+        VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, nullptr);
+        m_device.dispatch.CmdBeginRendering(cmd, &renderingInfo);
+
+        // Bind pipeline
+        m_device.dispatch.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pass.pipeline);
+
+        // Set viewport and scissor
+        VkViewport viewport = {
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = (float)extent.width,
+            .height = (float)extent.height,
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f,
+        };
+        m_device.dispatch.CmdSetViewport(cmd, 0, 1, &viewport);
+
+        VkRect2D scissor = {
+            .offset = {0, 0},
+            .extent = extent,
+        };
+        m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
+
+        // Bind descriptor sets
+        std::array<VkDescriptorSet, 2> sets = { m_uniformSet, pass.imageSet };
+        m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pass.pipelineLayout, 0, sets.size(), sets.data(), 0, nullptr);
+
+        // Draw fullscreen triangle (3 vertices, no vertex buffer)
+        m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
+
+        m_device.dispatch.CmdEndRendering(cmd);
+
+        // Transition intermediate render targets to SHADER_READ_ONLY_OPTIMAL for next pass
+        if (!isFinalPass && renderTargetImage != &outputImage)
+            renderTargetImage->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
 }
 
 void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
 {
-    auto& pass = m_module->techniques[0].passes[0];
-
-    std::vector<VkDescriptorImageInfo> imageInfos;  // Must outlive vkUpdateDescriptorSets()
-    imageInfos.reserve(pass.texture_bindings.size());
-
-    std::vector<VkWriteDescriptorSet> writes;
-    writes.reserve(pass.texture_bindings.size());
-
-    for (const auto& binding : pass.texture_bindings)
+    for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
     {
-        auto& samplerInfo = m_module->samplers.at(binding.index);
-        auto& sampler = m_samplers.at(binding.index);
-
-        auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
-            [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
-
-        // Handle semantic textures (COLOR and DEPTH)
-        VkImageView imageView = VK_NULL_HANDLE;
-        if (texIt != m_module->textures.end() && texIt->semantic == "COLOR")
-            imageView = inputView;
-        else
+        for (const auto& binding : passInfo.texture_bindings)
         {
-            auto& texture = m_textures[samplerInfo.texture_name];
-            imageView = texture->image_view();
+            auto& samplerInfo = m_module->samplers.at(binding.index);
+            auto& sampler = m_samplers.at(binding.index);
+
+            auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
+                [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
+
+            // Only handle semantic textures here (COLOR and DEPTH)
+            if (texIt == m_module->textures.end() || texIt->semantic != "COLOR")
+                continue;
+
+            VkDescriptorImageInfo imageInfo = {
+                .sampler = sampler->handle(),
+                .imageView = inputView,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            };
+
+            VkWriteDescriptorSet write = {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = pass.imageSet,
+                .dstBinding = binding.entry_point_binding,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .pImageInfo = &imageInfo,
+            };
+
+            m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &write, 0, nullptr);
         }
-
-        imageInfos.push_back({
-            .sampler = sampler->handle(),
-            //.imageView = binding.srgb ? texture->srgbView() : texture->linearView(),  // TODO: linear/srgb views
-            .imageView = imageView,
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        });
-
-        writes.push_back({
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = m_imageSet,
-            .dstBinding = binding.entry_point_binding,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo = &imageInfos.back(),
-        });
     }
-
-    m_device.dispatch.UpdateDescriptorSets(m_device.handle, writes.size(), writes.data(), 0, nullptr);
 }
 
 bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path filePath)
@@ -184,53 +208,61 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
         return false;
     }
 
-    std::string vsEntryPoint = m_module->techniques[0].passes[0].vs_entry_point;
-    std::string psEntryPoint = m_module->techniques[0].passes[0].ps_entry_point;
-
-    std::string vs_binary, vs_asm, ps_binary, ps_asm, errors;
-
-    if (!backend->assemble_code_for_entry_point(vsEntryPoint, vs_binary, vs_asm, errors))
+    for (const auto& pass : m_module->techniques[0].passes)
     {
-        spdlog::error("Failed to assemble vertex shader: {}", errors);
-        return false;
+        std::string vsEntryPoint = pass.vs_entry_point;
+        std::string psEntryPoint = pass.ps_entry_point;
+
+        std::string vs_binary, vs_asm, ps_binary, ps_asm, errors;
+
+        if (!backend->assemble_code_for_entry_point(vsEntryPoint, vs_binary, vs_asm, errors))
+        {
+            spdlog::error("Failed to assemble vertex shader: {}", errors);
+            return false;
+        }
+
+        if (!backend->assemble_code_for_entry_point(psEntryPoint, ps_binary, ps_asm, errors))
+        {
+            spdlog::error("Failed to assemble pixel shader: {}", errors);
+            return false;
+        }
+
+        auto to_spirv = [](const std::string& binary)
+        {
+            std::vector<uint32_t> spirv(binary.size() / sizeof(uint32_t));
+            std::memcpy(spirv.data(), binary.data(), binary.size());
+            return spirv;
+        };
+
+        std::vector<uint32_t> vsBytecode = to_spirv(vs_binary);
+        std::vector<uint32_t> psBytecode = to_spirv(ps_binary);
+
+        m_passes.emplace_back(Pass{
+            .vertexShader = std::make_shared<vkShade::ShaderModule>(m_device, vsBytecode),
+            .fragmentShader = std::make_shared<vkShade::ShaderModule>(m_device, psBytecode)
+        });
     }
-
-    if (!backend->assemble_code_for_entry_point(psEntryPoint, ps_binary, ps_asm, errors))
-    {
-        spdlog::error("Failed to assemble pixel shader: {}", errors);
-        return false;
-    }
-
-    auto to_spirv = [](const std::string& binary)
-    {
-        std::vector<uint32_t> spirv(binary.size() / sizeof(uint32_t));
-        std::memcpy(spirv.data(), binary.data(), binary.size());
-        return spirv;
-    };
-
-    std::vector<uint32_t> vsBytecode = to_spirv(vs_binary);
-    std::vector<uint32_t> psBytecode = to_spirv(ps_binary);
-
-    m_vertShader = std::make_shared<vkShade::ShaderModule>(m_device, vsBytecode);
-    m_fragShader = std::make_shared<vkShade::ShaderModule>(m_device, psBytecode);
 
     return true;
 }
 
 void vkShade::ReshadeEffect::create_descriptor_sets()
 {
-    auto& pass = m_module->techniques[0].passes[0];
+    auto& technique = m_module->techniques[0];
 
-    // Create Descriptor Pool
+    // Create the descriptor pool
+    uint32_t totalImageBindings = 0;
+    for (const auto& pass : technique.passes)
+        totalImageBindings += pass.texture_bindings.size();
+
     std::vector<VkDescriptorPoolSize> poolSizes;
     if (m_module->total_uniform_size > 0)
         poolSizes.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 });
-    if (!pass.texture_bindings.empty())
-        poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                              (uint32_t)pass.texture_bindings.size() });
+    if (totalImageBindings > 0)
+        poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, totalImageBindings });
 
-    // Always at least 1 for the empty UBO set
-    uint32_t maxSets = 1 + (!pass.texture_bindings.empty() ? 1 : 0);
+    // Always at least 1 for the UBO set, whether it's present or not.
+    uint32_t maxSets = 1 + technique.passes.size();
 
     VkDescriptorPoolCreateInfo poolInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -306,14 +338,18 @@ void vkShade::ReshadeEffect::create_descriptor_sets()
         m_device.dispatch.UpdateDescriptorSets(m_device.handle, 1, &uboWrite, 0, nullptr);
     }
 
-    // Set 1: Texture Bindings
-    if (!pass.texture_bindings.empty())
+    // Per-pass texture sets
+    for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
     {
-        std::vector<VkDescriptorSetLayoutBinding> imageBindings;
-        for (auto& tb : pass.texture_bindings)
+        if (passInfo.texture_bindings.empty())
+            continue;
+
+        // Allocate the set
+        std::vector<VkDescriptorSetLayoutBinding> textureBindings;
+        for (auto& binding : passInfo.texture_bindings)
         {
-            imageBindings.push_back({
-                .binding = tb.entry_point_binding,
+            textureBindings.push_back({
+                .binding = binding.entry_point_binding,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 .descriptorCount = 1,
                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -322,124 +358,171 @@ void vkShade::ReshadeEffect::create_descriptor_sets()
 
         VkDescriptorSetLayoutCreateInfo layoutInfo = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = (uint32_t)imageBindings.size(),
-            .pBindings = imageBindings.data(),
+            .bindingCount = (uint32_t)textureBindings.size(),
+            .pBindings = textureBindings.data(),
         };
 
-        VK_CHECK(m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &layoutInfo, nullptr, &m_imageSetLayout));
+        VK_CHECK(m_device.dispatch.CreateDescriptorSetLayout(m_device.handle, &layoutInfo, nullptr, &pass.imageSetLayout));
 
         VkDescriptorSetAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
             .descriptorPool = m_descriptorPool,
             .descriptorSetCount = 1,
-            .pSetLayouts = &m_imageSetLayout,
+            .pSetLayouts = &pass.imageSetLayout,
         };
 
-        VK_CHECK(m_device.dispatch.AllocateDescriptorSets(m_device.handle, &allocInfo, &m_imageSet));
+        VK_CHECK(m_device.dispatch.AllocateDescriptorSets(m_device.handle, &allocInfo, &pass.imageSet));
+
+        // Write the set (unless its a COLOR or DEPTH image)
+        std::vector<VkDescriptorImageInfo> imageInfos;
+        imageInfos.reserve(passInfo.texture_bindings.size());
+        std::vector<VkWriteDescriptorSet> writes;
+
+        for (const auto& binding : passInfo.texture_bindings)
+        {
+            auto& samplerInfo = m_module->samplers.at(binding.index);
+            auto& sampler = m_samplers.at(binding.index);
+
+            auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
+                [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
+
+            if (texIt != m_module->textures.end() && !texIt->semantic.empty())
+                continue;  // Skip semantic textures, handled per-frame
+
+            auto& texture = m_textures.at(samplerInfo.texture_name);
+            imageInfos.push_back({
+                .sampler = sampler->handle(),
+                //.imageView = binding.srgb ? texture->srgbView() : texture->linearView(),  // TODO: linear/srgb views
+                .imageView = texture->image_view(),
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            });
+
+            writes.push_back({
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = pass.imageSet,
+                .dstBinding = binding.entry_point_binding,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .pImageInfo = &imageInfos.back(),
+            });
+        }
+
+        if (!writes.empty())
+            m_device.dispatch.UpdateDescriptorSets(m_device.handle, writes.size(), writes.data(), 0, nullptr);
     }
 }
 
 void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
 {
-    auto& pass = m_module->techniques[0].passes[0];
-
-    // Create pipeline layout
-    std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, m_imageSetLayout };
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = layouts.size(),
-        .pSetLayouts = layouts.data(),
-    };
-
-    VK_CHECK(m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
-
-    // Create graphics pipeline
-    VkPipelineShaderStageCreateInfo shaderStages[] = {
+    for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
+    {
+        // Determine output format. Use render target format if present, otherwise swapchain format.
+        VkFormat passFormat = outputFormat;
+        if (!passInfo.render_target_names[0].empty())
         {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = m_vertShader->module(),
-            .pName = pass.vs_entry_point.c_str(),
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = m_fragShader->module(),
-            .pName = pass.ps_entry_point.c_str(),
+            auto it = m_textures.find(passInfo.render_target_names[0]);
+            if (it != m_textures.end())
+                passFormat = it->second->format();
         }
-    };
 
-    // No vertex input (fullscreen triangle generated in vertex shader)
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-    };
+        // Create pipeline layout
+        std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .setLayoutCount = layouts.size(),
+            .pSetLayouts = layouts.data(),
+        };
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-    };
+        VK_CHECK(m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &pass.pipelineLayout));
 
-    VkPipelineViewportStateCreateInfo viewportState = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .scissorCount = 1,
-    };
+        // Create graphics pipeline
+        VkPipelineShaderStageCreateInfo shaderStages[] = {
+            {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = pass.vertexShader->module(),
+                .pName = passInfo.vs_entry_point.c_str(),
+            },
+            {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = pass.fragmentShader->module(),
+                .pName = passInfo.ps_entry_point.c_str(),
+            }
+        };
 
-    VkPipelineRasterizationStateCreateInfo rasterizer = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .polygonMode = VK_POLYGON_MODE_FILL,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .lineWidth = 1.0f,
-    };
+        // No vertex input (fullscreen triangle generated in vertex shader)
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        };
 
-    VkPipelineMultisampleStateCreateInfo multisampling = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-    };
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        };
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {
-        .blendEnable = VK_FALSE,
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    };
+        VkPipelineViewportStateCreateInfo viewportState = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .viewportCount = 1,
+            .scissorCount = 1,
+        };
 
-    VkPipelineColorBlendStateCreateInfo colorBlending = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments = &colorBlendAttachment,
-    };
+        VkPipelineRasterizationStateCreateInfo rasterizer = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .polygonMode = VK_POLYGON_MODE_FILL,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .lineWidth = 1.0f,
+        };
 
-    VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-    VkPipelineDynamicStateCreateInfo dynamicState = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = 2,
-        .pDynamicStates = dynamicStates,
-    };
+        VkPipelineMultisampleStateCreateInfo multisampling = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+        };
 
-    // Dynamic rendering info
-    VkPipelineRenderingCreateInfo renderingInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &outputFormat,
-    };
+        VkPipelineColorBlendAttachmentState colorBlendAttachment = {
+            .blendEnable = VK_FALSE,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                             VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        };
 
-    VkGraphicsPipelineCreateInfo pipelineInfo = {
-        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &renderingInfo,
-        .stageCount = 2,
-        .pStages = shaderStages,
-        .pVertexInputState = &vertexInputInfo,
-        .pInputAssemblyState = &inputAssembly,
-        .pViewportState = &viewportState,
-        .pRasterizationState = &rasterizer,
-        .pMultisampleState = &multisampling,
-        .pColorBlendState = &colorBlending,
-        .pDynamicState = &dynamicState,
-        .layout = m_pipelineLayout,
-    };
+        VkPipelineColorBlendStateCreateInfo colorBlending = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .attachmentCount = 1,
+            .pAttachments = &colorBlendAttachment,
+        };
 
-    VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline));
+        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        VkPipelineDynamicStateCreateInfo dynamicState = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = 2,
+            .pDynamicStates = dynamicStates,
+        };
+
+        // Dynamic rendering info
+        VkPipelineRenderingCreateInfo renderingInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &passFormat,
+        };
+
+        VkGraphicsPipelineCreateInfo pipelineInfo = {
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = &renderingInfo,
+            .stageCount = 2,
+            .pStages = shaderStages,
+            .pVertexInputState = &vertexInputInfo,
+            .pInputAssemblyState = &inputAssembly,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisampling,
+            .pColorBlendState = &colorBlending,
+            .pDynamicState = &dynamicState,
+            .layout = pass.pipelineLayout,
+        };
+
+        VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pass.pipeline));
+    }
 }
 
 void vkShade::ReshadeEffect::reflect_images()
