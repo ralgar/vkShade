@@ -72,9 +72,26 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         renderTargetImage->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
         // Begin rendering
-        std::array<VkRenderingAttachmentInfo, 1> colorAttachments = {
-            vkinit::rendering_attachment_info(renderTargetImage->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
-        };
+        std::vector<VkRenderingAttachmentInfo> colorAttachments;
+        for (const auto& name : passInfo.render_target_names)
+        {
+            if (name.empty())
+                break;  // render_target_names are contiguous, empty means end
+
+            auto* rt = m_textures.at(name).get();
+            rt->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            colorAttachments.push_back(
+                vkinit::rendering_attachment_info(rt->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
+        }
+
+        if (colorAttachments.empty())
+        {
+            outputImage.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            colorAttachments.push_back(vkinit::rendering_attachment_info(outputImage.image_view(),
+                                                                         nullptr,
+                                                                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
+        }
+
         VkExtent2D extent { .width = outputImage.extent().width, .height = outputImage.extent().height};
         VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, nullptr);
         m_device.dispatch.CmdBeginRendering(cmd, &renderingInfo);
@@ -250,14 +267,19 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
 {
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
     {
-        // Determine output format. Use render target format if present, otherwise swapchain format.
-        VkFormat passFormat = outputFormat;
-        if (!passInfo.render_target_names[0].empty())
+        std::vector<VkFormat> colorFormats;
+        for (const auto& name : passInfo.render_target_names)
         {
-            auto it = m_textures.find(passInfo.render_target_names[0]);
+            if (name.empty())
+                break;
+
+            auto it = m_textures.find(name);
             if (it != m_textures.end())
-                passFormat = it->second->format();
+                colorFormats.push_back(it->second->format());
         }
+
+        if (colorFormats.empty())
+            colorFormats.push_back(outputFormat);
 
         // Create pipeline layout
         std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };
@@ -320,10 +342,11 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
         };
 
+        std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(colorFormats.size(), colorBlendAttachment);
         VkPipelineColorBlendStateCreateInfo colorBlending = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-            .attachmentCount = 1,
-            .pAttachments = &colorBlendAttachment,
+            .attachmentCount = (uint32_t)blendAttachments.size(),
+            .pAttachments = blendAttachments.data(),
         };
 
         VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -336,8 +359,8 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
         // Dynamic rendering info
         VkPipelineRenderingCreateInfo renderingInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-            .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &passFormat,
+            .colorAttachmentCount = (uint32_t)colorFormats.size(),
+            .pColorAttachmentFormats = colorFormats.data(),
         };
 
         VkGraphicsPipelineCreateInfo pipelineInfo = {
