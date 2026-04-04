@@ -527,17 +527,22 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
 
 void vkShade::ReshadeEffect::reflect_images()
 {
-    auto& pass = m_module->techniques[0].passes[0];
+    for (const auto& pass : m_module->techniques[0].passes)
+    {
+        for (const auto& binding : pass.texture_bindings)
+        {
+            auto& textureName = m_module->samplers.at(binding.index).texture_name;
+            auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
+                [&](const auto& t) { return t.unique_name == textureName; });
 
-    // Build a set of texture names actually used in this pass
-    std::unordered_set<std::string> usedTextureNames;
-    for (const auto& binding : pass.texture_bindings)
-        usedTextureNames.insert(m_module->samplers.at(binding.index).texture_name);
+            if (texIt != m_module->textures.end() && texIt->semantic == "DEPTH")
+                throw std::runtime_error("Effect requires depth buffer access, which is not yet supported.");
+        }
+    }
 
+    // Create/load the textures
     for (const auto& info : m_module->textures)
     {
-        if (info.semantic == "DEPTH" && usedTextureNames.count(info.unique_name))
-            throw std::runtime_error("Effect requires depth buffer access, which is not yet supported.");
         if (!info.semantic.empty())
             continue;
 
