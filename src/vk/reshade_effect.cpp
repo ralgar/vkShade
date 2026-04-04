@@ -61,16 +61,6 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
     {
         bool isFinalPass = (&passInfo == &technique.passes.back());
 
-        // Determine the render target for this pass
-        VulkanImage* renderTargetImage = nullptr;
-        if (!passInfo.render_target_names[0].empty())
-            renderTargetImage = m_textures.at(passInfo.render_target_names[0]).get();
-        else
-            renderTargetImage = &outputImage;
-
-        // Transition render target to COLOR_ATTACHMENT_OPTIMAL
-        renderTargetImage->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
         // Begin rendering
         std::vector<VkRenderingAttachmentInfo> colorAttachments;
         for (const auto& name : passInfo.render_target_names)
@@ -127,8 +117,15 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         m_device.dispatch.CmdEndRendering(cmd);
 
         // Transition intermediate render targets to SHADER_READ_ONLY_OPTIMAL for next pass
-        if (!isFinalPass && renderTargetImage != &outputImage)
-            renderTargetImage->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        if (!isFinalPass)
+        {
+            for (const auto& name : passInfo.render_target_names)
+            {
+                if (name.empty()) break;
+                auto* rt = m_textures.at(name).get();
+                rt->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+        }
     }
 }
 
