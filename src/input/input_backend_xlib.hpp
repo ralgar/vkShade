@@ -11,7 +11,6 @@ namespace vkShade
     {
     public:
         InputBackendXlib(Display* display, Window window);
-        ~InputBackendXlib();
 
         void process_events() override;
 

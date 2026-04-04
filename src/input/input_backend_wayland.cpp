@@ -14,7 +14,6 @@ vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
 {
     // Set up input
     m_display = waylandDisplay;
-    m_xkbContext = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     wl_registry* reg = wl_display_get_registry(m_display);
     wl_registry_add_listener(reg, &reg_listener, this);     // Pass 'this' as void* in callbacks
     wl_display_roundtrip(m_display);  // Get globals
