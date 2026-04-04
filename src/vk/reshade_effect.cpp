@@ -474,9 +474,6 @@ void vkShade::ReshadeEffect::reflect_descriptors()
     // Per-pass texture sets
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
     {
-        if (passInfo.texture_bindings.empty())
-            continue;
-
         // Allocate the set
         std::vector<VkDescriptorSetLayoutBinding> textureBindings;
         for (auto& binding : passInfo.texture_bindings)
