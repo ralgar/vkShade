@@ -40,7 +40,7 @@ namespace vkShade
         };
 
         void apply(VkCommandBuffer cmd, VulkanImage& outputImage);
-        void bind_input(VkImageView inputView);
+        void bind_input(VkImageView colorView);
         void update();
 
         template <class T>

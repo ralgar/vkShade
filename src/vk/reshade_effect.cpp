@@ -68,10 +68,11 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
             if (name.empty())
                 break;  // render_target_names are contiguous, empty means end
 
-            auto* rt = m_textures.at(name).get();
-            rt->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            colorAttachments.push_back(
-                vkinit::rendering_attachment_info(rt->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
+            auto* renderTarget = m_textures.at(name).get();
+            renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            colorAttachments.push_back(vkinit::rendering_attachment_info(renderTarget->image_view(),
+                                                                         nullptr,
+                                                                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
         if (colorAttachments.empty())
@@ -121,15 +122,17 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         {
             for (const auto& name : passInfo.render_target_names)
             {
-                if (name.empty()) break;
-                auto* rt = m_textures.at(name).get();
-                rt->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                if (name.empty())
+                    break;
+
+                auto* renderTarget = m_textures.at(name).get();
+                renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
         }
     }
 }
 
-void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
+void vkShade::ReshadeEffect::bind_input(VkImageView colorView)
 {
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
     {
@@ -141,13 +144,13 @@ void vkShade::ReshadeEffect::bind_input(VkImageView inputView)
             auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
                 [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
 
-            // Only handle semantic textures here (COLOR and DEPTH)
+            // Only handle semantic textures here (COLOR) // TODO: Depth
             if (texIt == m_module->textures.end() || texIt->semantic != "COLOR")
                 continue;
 
             VkDescriptorImageInfo imageInfo = {
                 .sampler = sampler->handle(),
-                .imageView = inputView,
+                .imageView = colorView,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             };
 
@@ -394,7 +397,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
     if (totalImageBindings > 0)
         poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, totalImageBindings });
 
-    // Always at least 1 for the UBO set, whether it's present or not.
+    // One UBO set, and an image set per-pass.
     uint32_t maxSets = 1 + technique.passes.size();
 
     VkDescriptorPoolCreateInfo poolInfo = {
@@ -503,7 +506,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
 
         VK_CHECK(m_device.dispatch.AllocateDescriptorSets(m_device.handle, &allocInfo, &pass.imageSet));
 
-        // Write the set (unless its a COLOR or DEPTH image)
+        // Write the set, unless its a semantic (COLOR or DEPTH) image.
         std::vector<VkDescriptorImageInfo> imageInfos;
         imageInfos.reserve(passInfo.texture_bindings.size());
         std::vector<VkWriteDescriptorSet> writes;
@@ -517,7 +520,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
                 [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
 
             if (texIt != m_module->textures.end() && !texIt->semantic.empty())
-                continue;  // Skip semantic textures, handled per-frame
+                continue;  // Skip semantic textures, they're bound per-frame
 
             auto& texture = m_textures.at(samplerInfo.texture_name);
             imageInfos.push_back({
@@ -544,6 +547,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
 
 void vkShade::ReshadeEffect::reflect_images()
 {
+    // Iterate and check for depth textures since we don't support them yet
     for (const auto& pass : m_module->techniques[0].passes)
     {
         for (const auto& binding : pass.texture_bindings)
@@ -552,6 +556,7 @@ void vkShade::ReshadeEffect::reflect_images()
             auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
                 [&](const auto& t) { return t.unique_name == textureName; });
 
+            // Refuse to load the effect
             if (texIt != m_module->textures.end() && texIt->semantic == "DEPTH")
                 throw std::runtime_error("Effect requires depth buffer access, which is not yet supported.");
         }
@@ -561,7 +566,7 @@ void vkShade::ReshadeEffect::reflect_images()
     for (const auto& info : m_module->textures)
     {
         if (!info.semantic.empty())
-            continue;
+            continue;  // We don't own these, the application does.
 
         m_textures[info.unique_name] = std::make_unique<vkShade::VulkanImage>(m_device, info);
     }
