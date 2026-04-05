@@ -268,16 +268,16 @@ VkBlendFactor vkShade::ReshadeEffect::convert_blend_factor(reshadefx::blend_fact
 {
     switch (blendFactor)
     {
-        case reshadefx::blend_factor::zero:                return VK_BLEND_FACTOR_ZERO;
-        case reshadefx::blend_factor::one:                 return VK_BLEND_FACTOR_ONE;
-        case reshadefx::blend_factor::source_color:        return VK_BLEND_FACTOR_SRC_COLOR;
-        case reshadefx::blend_factor::one_minus_source_color: return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-        case reshadefx::blend_factor::dest_color:          return VK_BLEND_FACTOR_DST_COLOR;
-        case reshadefx::blend_factor::one_minus_dest_color: return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-        case reshadefx::blend_factor::source_alpha:        return VK_BLEND_FACTOR_SRC_ALPHA;
-        case reshadefx::blend_factor::one_minus_source_alpha: return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        case reshadefx::blend_factor::dest_alpha:          return VK_BLEND_FACTOR_DST_ALPHA;
-        case reshadefx::blend_factor::one_minus_dest_alpha: return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+        case reshadefx::blend_factor::zero:                     return VK_BLEND_FACTOR_ZERO;
+        case reshadefx::blend_factor::one:                      return VK_BLEND_FACTOR_ONE;
+        case reshadefx::blend_factor::source_color:             return VK_BLEND_FACTOR_SRC_COLOR;
+        case reshadefx::blend_factor::one_minus_source_color:   return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+        case reshadefx::blend_factor::dest_color:               return VK_BLEND_FACTOR_DST_COLOR;
+        case reshadefx::blend_factor::one_minus_dest_color:     return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+        case reshadefx::blend_factor::source_alpha:             return VK_BLEND_FACTOR_SRC_ALPHA;
+        case reshadefx::blend_factor::one_minus_source_alpha:   return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        case reshadefx::blend_factor::dest_alpha:               return VK_BLEND_FACTOR_DST_ALPHA;
+        case reshadefx::blend_factor::one_minus_dest_alpha:     return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
     }
 
     std::unreachable();
