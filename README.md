@@ -43,11 +43,11 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
 
 ### Limitations
 
-Many ReShade effects do not work properly yet. For example:
+Some ReShade effects do not work properly yet. For example:
 
-- Effects with multiple techniques or passes
 - Effects relying on stencil and blending
 - Effects relying on the depth buffer
+- Effects with multiple techniques
 - Possibly more...
 
 ### Roadmap
@@ -64,7 +64,7 @@ Many ReShade effects do not work properly yet. For example:
     - [x] Full support for ReShade's time-based runtime uniforms
     - [x] Stub support for ReShade's other runtime uniforms
     - [x] Image and sampler reflection
-    - [ ] Support for effects with multiple passes
+    - [x] Support for effects with multiple passes
     - [ ] Pipeline state reflection (stencil and blending)
 - [ ] Various fixes and improvements
 
