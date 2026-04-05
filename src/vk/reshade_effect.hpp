@@ -39,8 +39,8 @@ namespace vkShade
             WriteError,
         };
 
-        void apply(VkCommandBuffer cmd, VkExtent2D extent);
-        void bind_input(VkImageView inputView);
+        void apply(VkCommandBuffer cmd, VulkanImage& outputImage);
+        void bind_input(VkImageView colorView);
         void update();
 
         template <class T>
@@ -90,27 +90,31 @@ namespace vkShade
         }
 
     private:
+        struct Pass
+        {
+            VkPipeline            pipeline       {VK_NULL_HANDLE};
+            VkPipelineLayout      pipelineLayout {VK_NULL_HANDLE};
+            VkDescriptorSetLayout imageSetLayout {VK_NULL_HANDLE};
+            VkDescriptorSet       imageSet       {VK_NULL_HANDLE};
+
+            std::shared_ptr<ShaderModule> vertexShader;
+            std::shared_ptr<ShaderModule> fragmentShader;
+        };
+
         std::unique_ptr<reshadefx::effect_module> m_module {nullptr};
         std::unique_ptr<VulkanBuffer> m_uniformBuffer {nullptr};
         std::unordered_map<std::string, Uniform> m_uniformsByName;
         std::vector<std::unique_ptr<ReshadeUniform>> m_builtinUniforms;
 
-        VkPipeline m_pipeline;
-        VkPipelineLayout m_pipelineLayout;
         VkDescriptorPool m_descriptorPool;
-        VkDescriptorSet m_uniformSet;
-        VkDescriptorSet m_imageSet;
         VkDescriptorSetLayout m_uniformSetLayout;
-        VkDescriptorSetLayout m_imageSetLayout;
+        VkDescriptorSet m_uniformSet;
 
         std::unordered_map<std::string, std::unique_ptr<VulkanImage>> m_textures;
         std::vector<std::unique_ptr<VulkanSampler>> m_samplers;
 
-        // Shaders
-        std::shared_ptr<vkShade::ShaderModule> m_vertShader;
-        std::shared_ptr<vkShade::ShaderModule> m_fragShader;
+        std::vector<Pass> m_passes;
 
-        void create_descriptor_sets();
         void create_pipeline(VkFormat outputFormat);
 
         bool compile(VkExtent2D extent, std::filesystem::path filePath);
@@ -140,6 +144,7 @@ namespace vkShade
             return false;
         }
 
+        void reflect_descriptors();
         void reflect_images();
         void reflect_samplers();
         void reflect_uniforms();

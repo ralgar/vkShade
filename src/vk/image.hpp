@@ -41,6 +41,8 @@ namespace vkShade
         // Getters for handles
         const VkImage& image() const { return m_image; }
         const VkImageView& image_view() const { return m_imageView; }
+        const VkFormat format() const { return m_format; }
+        const VkExtent3D extent() const { return m_extent; }
 
     private:
         bool              m_owning = true;

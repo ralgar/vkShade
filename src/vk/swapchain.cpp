@@ -176,24 +176,13 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
             effect->update();
 
             // Barrier: Ensure read image is ready to sample
-            readImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            readImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
             // Bind the input (read) image
             effect->bind_input(readImage->image_view());
 
-            // Begin dynamic rendering using our write image
-            std::array<VkRenderingAttachmentInfo, 1> colorAttachments = {
-                vkinit::rendering_attachment_info(writeImage->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
-            };
-
-            VkRenderingInfo renderingInfo = vkinit::rendering_info(m_extent, colorAttachments, nullptr);
-            m_device.dispatch.CmdBeginRendering(m_commandBuffer, &renderingInfo);
-
             // Apply effect
-            effect->apply(m_commandBuffer, m_extent);
-
-            // End dynamic rendering
-            m_device.dispatch.CmdEndRendering(m_commandBuffer);
+            effect->apply(m_commandBuffer, *writeImage);
 
             // Swap ping-pong images for next pass
             std::swap(readImage, writeImage);
