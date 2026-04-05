@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <ranges>
 #include <stdexcept>
+#include <utility>
 
 #include <effect_parser.hpp>
 #include <effect_codegen.hpp>
@@ -263,6 +264,39 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
     return true;
 }
 
+VkBlendFactor vkShade::ReshadeEffect::convert_blend_factor(reshadefx::blend_factor blendFactor)
+{
+    switch (blendFactor)
+    {
+        case reshadefx::blend_factor::zero:                     return VK_BLEND_FACTOR_ZERO;
+        case reshadefx::blend_factor::one:                      return VK_BLEND_FACTOR_ONE;
+        case reshadefx::blend_factor::source_color:             return VK_BLEND_FACTOR_SRC_COLOR;
+        case reshadefx::blend_factor::one_minus_source_color:   return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+        case reshadefx::blend_factor::dest_color:               return VK_BLEND_FACTOR_DST_COLOR;
+        case reshadefx::blend_factor::one_minus_dest_color:     return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+        case reshadefx::blend_factor::source_alpha:             return VK_BLEND_FACTOR_SRC_ALPHA;
+        case reshadefx::blend_factor::one_minus_source_alpha:   return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        case reshadefx::blend_factor::dest_alpha:               return VK_BLEND_FACTOR_DST_ALPHA;
+        case reshadefx::blend_factor::one_minus_dest_alpha:     return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+    }
+
+    std::unreachable();
+}
+
+VkBlendOp vkShade::ReshadeEffect::convert_blend_op(reshadefx::blend_op blendOp)
+{
+    switch (blendOp)
+    {
+        case reshadefx::blend_op::add:              return VK_BLEND_OP_ADD;
+        case reshadefx::blend_op::subtract:         return VK_BLEND_OP_SUBTRACT;
+        case reshadefx::blend_op::reverse_subtract: return VK_BLEND_OP_REVERSE_SUBTRACT;
+        case reshadefx::blend_op::min:              return VK_BLEND_OP_MIN;
+        case reshadefx::blend_op::max:              return VK_BLEND_OP_MAX;
+    }
+
+    std::unreachable();
+}
+
 void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
 {
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
@@ -336,16 +370,23 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
             .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
         };
 
-        VkPipelineColorBlendAttachmentState colorBlendAttachment = {
-            .blendEnable = VK_FALSE,
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                             VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-        };
-
-        std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(colorFormats.size(), colorBlendAttachment);
+        std::vector<VkPipelineColorBlendAttachmentState> blendAttachments;
+        for (size_t i = 0; i < colorFormats.size(); i++)
+        {
+            blendAttachments.push_back({
+                .blendEnable         = passInfo.blend_enable[i],
+                .srcColorBlendFactor = convert_blend_factor(passInfo.source_color_blend_factor[i]),
+                .dstColorBlendFactor = convert_blend_factor(passInfo.dest_color_blend_factor[i]),
+                .colorBlendOp        = convert_blend_op(passInfo.color_blend_op[i]),
+                .srcAlphaBlendFactor = convert_blend_factor(passInfo.source_alpha_blend_factor[i]),
+                .dstAlphaBlendFactor = convert_blend_factor(passInfo.dest_alpha_blend_factor[i]),
+                .alphaBlendOp        = convert_blend_op(passInfo.alpha_blend_op[i]),
+                .colorWriteMask      = static_cast<VkColorComponentFlags>(passInfo.render_target_write_mask[i]),  // Yes, this works.
+            });
+        }
         VkPipelineColorBlendStateCreateInfo colorBlending = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-            .attachmentCount = (uint32_t)blendAttachments.size(),
+            .attachmentCount = static_cast<uint32_t>(blendAttachments.size()),
             .pAttachments = blendAttachments.data(),
         };
 

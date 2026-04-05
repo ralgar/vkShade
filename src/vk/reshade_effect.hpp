@@ -15,6 +15,8 @@
 
 namespace reshadefx
 {
+    enum class blend_factor : uint8_t;
+    enum class blend_op : uint8_t;
     struct effect_module;
     struct uniform;
 }
@@ -148,5 +150,8 @@ namespace vkShade
         void reflect_images();
         void reflect_samplers();
         void reflect_uniforms();
+
+        static VkBlendFactor convert_blend_factor(reshadefx::blend_factor blendFactor);
+        static VkBlendOp convert_blend_op(reshadefx::blend_op blendOp);
     };
 } // namespace vkShade
