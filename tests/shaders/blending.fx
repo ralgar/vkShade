@@ -29,30 +29,6 @@ sampler S_NoBlend  { Texture = RT_NoBlend; };
 static const uint ROWS = 3;
 static const uint COLS = 3;
 
-static const float EPSILON = 0.02;
-
-// Comparison functions
-bool approx_equal3(float3 a, float3 b)
-{
-    return all(abs(a - b) < EPSILON);
-}
-
-bool approx_equal4(float4 a, float4 b)
-{
-    return all(abs(a - b) < EPSILON);
-}
-
-// Source colors used as base (dest) and src in blend operations
-float4 PS_Red(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-    return float4(COLOR_RED, 0.5);
-}
-
-float4 PS_Blue(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-    return float4(COLOR_BLUE, 0.5);
-}
-
 // Final pass: Reads each RT, compares against expected value, then renders pass/fail grid.
 float4 PS_Grid(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 {
