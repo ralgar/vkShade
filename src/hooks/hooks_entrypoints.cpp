@@ -10,14 +10,13 @@
 
 // Layer book-keeping information
 // These are only modified during create/destroy
-// NOTE: These are declared in `vulkan_hooks.hpp`
+// NOTE: These are declared in `hooks.hpp`
 std::unordered_map<void*, VulkanInstance> g_vulkanInstances;
 std::unordered_map<void*, VulkanDevice>   g_vulkanDevices;
 
-// Single global lock, for simplicity
-// Only lock when WRITING (on create and destroy)
-// NOTE: This is declared in `vulkan_hooks.hpp`
-std::mutex global_lock;
+// Reader/writer lock for concurrent read access to bookkeeping maps.
+// NOTE: This is declared in `hooks.hpp`
+std::shared_mutex g_globalLock;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // GetProcAddr functions, the entry points of the layer.
@@ -42,9 +41,9 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
 
     GETPROCADDR(AllocateCommandBuffers);
 
+    // Acquire a reader lock
     {
-        std::lock_guard<std::mutex> lock(global_lock);
-
+        std::shared_lock lock(g_globalLock);
         auto& thisDevice = get_device_from_handle(device);
         return reinterpret_cast<PFN_vkVoidFunction>(thisDevice.dispatch.GetDeviceProcAddr(device, pName));
     }
@@ -68,9 +67,9 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInst
     GETPROCADDR(CreateXcbSurfaceKHR);
     GETPROCADDR(CreateXlibSurfaceKHR);
 
+    // Acquire a reader lock
     {
-        std::lock_guard<std::mutex> lock(global_lock);
-
+        std::shared_lock lock(g_globalLock);
         auto& thisInstance = get_instance_from_handle(instance);
         return reinterpret_cast<PFN_vkVoidFunction>(thisInstance.dispatch.GetInstanceProcAddr(instance, pName));
     }

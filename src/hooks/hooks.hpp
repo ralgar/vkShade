@@ -1,7 +1,7 @@
 #pragma once
 
 #include <assert.h>
-#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include <vk_mem_alloc.h>
@@ -63,9 +63,8 @@ inline VulkanDevice& get_device_from_handle(const void* handle)
     return it->second;
 }
 
-// Single global lock, for simplicity
-// Only lock when WRITING (on create and destroy)
-extern std::mutex global_lock;
+// Reader/writer lock for concurrent read access to bookkeeping maps.
+extern std::shared_mutex g_globalLock;
 
 // Make entrypoints C-linkable
 extern "C" PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice device, const char* pName);

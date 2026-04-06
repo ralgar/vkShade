@@ -197,7 +197,8 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 
     // Store device data
     {
-        std::lock_guard<std::mutex> lock(global_lock);
+        // Acquire a writer lock
+        std::unique_lock lock(g_globalLock);
         g_vulkanDevices.emplace(dispatch_key_from_handle(*pDevice), thisDevice);
     }
 
@@ -213,7 +214,7 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkA
     spdlog::trace("Intercepted VkDestroyDevice");
 
     // Lock here to prevent race conditions.
-    std::lock_guard<std::mutex> lock(global_lock);
+    std::unique_lock lock(g_globalLock);
 
     if (!device)
         return;
