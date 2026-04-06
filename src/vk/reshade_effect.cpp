@@ -23,7 +23,7 @@
 #include "vk/sampler.hpp"
 
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
-    : VulkanObject(device)
+    : VulkanObject(device), m_extent(extent), m_format(format)
 {
     spdlog::trace("Creating effect: {}", effectPath.filename().string());
 
@@ -35,7 +35,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
     this->reflect_images();
     this->reflect_samplers();
     this->reflect_descriptors();
-    this->create_pipeline(format);
+    this->create_pipeline();
     this->reflect_uniforms();
 
     spdlog::debug("Created effect: {}", effectPath.filename().string());
@@ -300,7 +300,7 @@ VkBlendOp vkShade::ReshadeEffect::convert_blend_op(reshadefx::blend_op blendOp)
     std::unreachable();
 }
 
-void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
+void vkShade::ReshadeEffect::create_pipeline()
 {
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
     {
@@ -316,7 +316,7 @@ void vkShade::ReshadeEffect::create_pipeline(VkFormat outputFormat)
         }
 
         if (colorFormats.empty())
-            colorFormats.push_back(outputFormat);
+            colorFormats.push_back(m_format);
 
         // Create pipeline layout
         std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };

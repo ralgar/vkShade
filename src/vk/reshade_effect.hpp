@@ -103,6 +103,9 @@ namespace vkShade
             std::shared_ptr<ShaderModule> fragmentShader;
         };
 
+        VkExtent2D m_extent;
+        VkFormat   m_format;
+
         std::unique_ptr<reshadefx::effect_module> m_module {nullptr};
         std::unique_ptr<VulkanBuffer> m_uniformBuffer {nullptr};
         std::unordered_map<std::string, Uniform> m_uniformsByName;
@@ -117,7 +120,7 @@ namespace vkShade
 
         std::vector<Pass> m_passes;
 
-        void create_pipeline(VkFormat outputFormat);
+        void create_pipeline();
 
         bool compile(VkExtent2D extent, std::filesystem::path filePath);
 
