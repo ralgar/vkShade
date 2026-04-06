@@ -136,7 +136,8 @@ VkRenderingAttachmentInfo vkinit::rendering_attachment_info(VkImageView         
 
 VkRenderingInfo vkinit::rendering_info(VkExtent2D                           renderExtent,
                                        std::span<VkRenderingAttachmentInfo> colorAttachments,
-                                       const VkRenderingAttachmentInfo*     depthAttachment)
+                                       const VkRenderingAttachmentInfo*     depthAttachment, /*= nullptr*/
+                                       const VkRenderingAttachmentInfo*     stencilAttachment /*= nullptr*/)
 {
     VkRenderingInfo renderInfo {};
     renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -147,7 +148,7 @@ VkRenderingInfo vkinit::rendering_info(VkExtent2D                           rend
     renderInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
     renderInfo.pColorAttachments = colorAttachments.data();
     renderInfo.pDepthAttachment = depthAttachment;
-    renderInfo.pStencilAttachment = nullptr;
+    renderInfo.pStencilAttachment = stencilAttachment;
 
     return renderInfo;
 }

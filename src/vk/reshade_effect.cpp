@@ -60,6 +60,7 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, technique.passes))
     {
+        bool isFirstPass = (&passInfo == &technique.passes.front());
         bool isFinalPass = (&passInfo == &technique.passes.back());
 
         const VkClearValue clearValue = { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } };
@@ -92,21 +93,21 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 
         if (passInfo.stencil_enable && m_stencilBuffer)
         {
-            m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
 
             const VkClearValue stencilClearValue = { .depthStencil = { .stencil = 0 } };
-            const VkClearValue* stencilClear = passInfo.clear_render_targets ? &stencilClearValue : nullptr;
+            const VkClearValue* stencilClear = isFirstPass ? &stencilClearValue : nullptr;
             stencilAttachmentInfo = vkinit::rendering_attachment_info(
                 m_stencilBuffer->image_view(),
                 stencilClear,
-                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
 
             stencilAttachment = &stencilAttachmentInfo;
         }
 
         // Begin render pass
         VkExtent2D extent { .width = outputImage.extent().width, .height = outputImage.extent().height};
-        VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, stencilAttachment);
+        VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, nullptr, stencilAttachment);
         m_device.dispatch.CmdBeginRendering(cmd, &renderingInfo);
 
         // Bind pipeline
@@ -133,6 +134,12 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         std::array<VkDescriptorSet, 2> sets = { m_uniformSet, pass.imageSet };
         m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
             pass.pipelineLayout, 0, sets.size(), sets.data(), 0, nullptr);
+
+        if (passInfo.stencil_enable)
+        {
+            m_device.dispatch.CmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_AND_BACK,
+                passInfo.stencil_reference_value);
+        }
 
         // Draw fullscreen triangle (3 vertices, no vertex buffer)
         m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
@@ -462,10 +469,15 @@ void vkShade::ReshadeEffect::create_pipeline()
             .pAttachments = blendAttachments.data(),
         };
 
-        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        VkDynamicState dynamicStates[] = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR,
+            VK_DYNAMIC_STATE_STENCIL_REFERENCE
+        };
+
         VkPipelineDynamicStateCreateInfo dynamicState = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .dynamicStateCount = 2,
+            .dynamicStateCount = 3,
             .pDynamicStates = dynamicStates,
         };
 
@@ -474,6 +486,7 @@ void vkShade::ReshadeEffect::create_pipeline()
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = (uint32_t)colorFormats.size(),
             .pColorAttachmentFormats = colorFormats.data(),
+            .stencilAttachmentFormat = passInfo.stencil_enable ? VK_FORMAT_S8_UINT : VK_FORMAT_UNDEFINED,
         };
 
         VkGraphicsPipelineCreateInfo pipelineInfo = {
