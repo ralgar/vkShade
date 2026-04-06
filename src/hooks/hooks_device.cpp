@@ -232,3 +232,27 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkA
     // Remove the VulkanDevice from layer's bookkeeping
     g_vulkanDevices.erase(dispatch_key_from_handle(device));
 }
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_AllocateCommandBuffers(VkDevice                           device,
+                                                                   const VkCommandBufferAllocateInfo* pAllocateInfo,
+                                                                   VkCommandBuffer*                   pCommandBuffers)
+{
+    auto& thisDevice = get_device_from_handle(device);
+    VkResult result = thisDevice.dispatch.AllocateCommandBuffers(device, pAllocateInfo, pCommandBuffers);
+
+    // Command buffers are dispatchable objects — the loader normally fixes up the dispatch table
+    // pointer in the handle, but only when the call goes through the loader trampoline. When a
+    // layer allocates command buffers internally via its own dispatch table, the trampoline is
+    // bypassed and the fixup never happens. We do it manually here so the validation layer can
+    // look up the device from any command buffer handle, regardless of who allocated it.
+    // NOTE: This is required for validation layers to work.
+    if (result == VK_SUCCESS)
+    {
+        for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; i++)
+        {
+            *reinterpret_cast<void**>(pCommandBuffers[i]) = *reinterpret_cast<void**>(device);
+        }
+    }
+
+    return result;
+}

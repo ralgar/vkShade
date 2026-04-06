@@ -40,6 +40,8 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
     GETPROCADDR(DestroySwapchainKHR);
     GETPROCADDR(QueuePresentKHR);
 
+    GETPROCADDR(AllocateCommandBuffers);
+
     {
         std::lock_guard<std::mutex> lock(global_lock);
 

@@ -82,3 +82,8 @@ void     VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCal
 VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);
 void     VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator);
 VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
+
+// Command Buffer hooks
+VkResult VKAPI_CALL vkShade_AllocateCommandBuffers(VkDevice                           device,
+                                                   const VkCommandBufferAllocateInfo* pAllocateInfo,
+                                                   VkCommandBuffer*                   pCommandBuffers);
