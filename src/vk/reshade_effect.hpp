@@ -119,6 +119,7 @@ namespace vkShade
 
         std::unordered_map<std::string, std::unique_ptr<VulkanImage>> m_textures;
         std::vector<std::unique_ptr<VulkanSampler>> m_samplers;
+        std::unique_ptr<VulkanImage> m_stencilBuffer;
 
         std::vector<Pass> m_passes;
 
