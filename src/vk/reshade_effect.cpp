@@ -300,6 +300,40 @@ VkBlendOp vkShade::ReshadeEffect::convert_blend_op(reshadefx::blend_op blendOp)
     std::unreachable();
 }
 
+VkCompareOp vkShade::ReshadeEffect::convert_stencil_func(reshadefx::stencil_func stencilFunc)
+{
+    switch (stencilFunc)
+    {
+        case reshadefx::stencil_func::never:         return VK_COMPARE_OP_NEVER;
+        case reshadefx::stencil_func::less:          return VK_COMPARE_OP_LESS;
+        case reshadefx::stencil_func::equal:         return VK_COMPARE_OP_EQUAL;
+        case reshadefx::stencil_func::less_equal:    return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case reshadefx::stencil_func::greater:       return VK_COMPARE_OP_GREATER;
+        case reshadefx::stencil_func::not_equal:     return VK_COMPARE_OP_NOT_EQUAL;
+        case reshadefx::stencil_func::greater_equal: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+        case reshadefx::stencil_func::always:        return VK_COMPARE_OP_ALWAYS;
+    }
+
+    std::unreachable();
+}
+
+VkStencilOp vkShade::ReshadeEffect::convert_stencil_op(reshadefx::stencil_op stencilOp)
+{
+    switch (stencilOp)
+    {
+        case reshadefx::stencil_op::zero:               return VK_STENCIL_OP_ZERO;
+        case reshadefx::stencil_op::keep:               return VK_STENCIL_OP_KEEP;
+        case reshadefx::stencil_op::replace:            return VK_STENCIL_OP_REPLACE;
+        case reshadefx::stencil_op::increment_saturate: return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+        case reshadefx::stencil_op::decrement_saturate: return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+        case reshadefx::stencil_op::invert:             return VK_STENCIL_OP_INVERT;
+        case reshadefx::stencil_op::increment:          return VK_STENCIL_OP_INCREMENT_AND_WRAP;
+        case reshadefx::stencil_op::decrement:          return VK_STENCIL_OP_DECREMENT_AND_WRAP;
+    }
+
+    std::unreachable();
+}
+
 void vkShade::ReshadeEffect::create_pipeline()
 {
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
