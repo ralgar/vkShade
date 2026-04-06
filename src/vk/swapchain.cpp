@@ -103,6 +103,9 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
     auto searchPaths = config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
 
+    // Wait for the command buffer to finish executing
+    m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000);
+
     m_effects.clear();
     for (const auto& effect : effects)
     {
