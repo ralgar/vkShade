@@ -62,7 +62,9 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
     {
         bool isFinalPass = (&passInfo == &technique.passes.back());
 
-        // Begin rendering
+        const VkClearValue clearValue = { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } };
+        const VkClearValue* clear = passInfo.clear_render_targets ? &clearValue : nullptr;
+
         std::vector<VkRenderingAttachmentInfo> colorAttachments;
         for (const auto& name : passInfo.render_target_names)
         {
@@ -72,7 +74,7 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
             auto* renderTarget = m_textures.at(name).get();
             renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             colorAttachments.push_back(vkinit::rendering_attachment_info(renderTarget->image_view(),
-                                                                         nullptr,
+                                                                         clear,
                                                                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
@@ -80,10 +82,11 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         {
             outputImage.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             colorAttachments.push_back(vkinit::rendering_attachment_info(outputImage.image_view(),
-                                                                         nullptr,
+                                                                         clear,
                                                                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
+        // Begin render pass
         VkExtent2D extent { .width = outputImage.extent().width, .height = outputImage.extent().height};
         VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, nullptr);
         m_device.dispatch.CmdBeginRendering(cmd, &renderingInfo);
