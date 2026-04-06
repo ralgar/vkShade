@@ -225,6 +225,8 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkA
     if (vkShade::Locator<vkShade::GuiManager>::has())
         vkShade::Locator<vkShade::GuiManager>::reset();
 
+    thisDevice.dispatch.DestroyCommandPool(thisDevice.handle, thisDevice.commandPool, nullptr);
+
     vmaDestroyAllocator(thisDevice.allocator);
 
     // Call down the chain to complete device destruction.
