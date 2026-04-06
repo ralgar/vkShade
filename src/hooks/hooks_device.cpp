@@ -77,12 +77,14 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         {
             myFeatures13 = *features13;
             myFeatures13.dynamicRendering = VK_TRUE;
+            myFeatures13.synchronization2 = VK_TRUE;
         }
         else
         {
             myFeatures13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
             myFeatures13.pNext = const_cast<void*>(pCreateInfo->pNext);
             myFeatures13.dynamicRendering = VK_TRUE;
+            myFeatures13.synchronization2 = VK_TRUE;
         }
 
         modifiedCreateInfo.pNext = &myFeatures13;
