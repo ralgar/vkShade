@@ -22,8 +22,12 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice         
 
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
 
+    // Add TRANSFER_SRC and TRANSFER_DST usages since we need to blit the image
+    VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
+    modifiedCreateInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
     // Call through to create the actual swapchain
-    VkResult result = thisDevice.dispatch.CreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain);
+    VkResult result = thisDevice.dispatch.CreateSwapchainKHR(device, &modifiedCreateInfo, pAllocator, pSwapchain);
     if (result != VK_SUCCESS)
         return result;
 

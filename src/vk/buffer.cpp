@@ -30,15 +30,6 @@ vkShade::VulkanBuffer::VulkanBuffer(VulkanDevice& device, size_t size, VkBufferU
 
     // Create the buffer
 	VK_CHECK(vmaCreateBuffer(m_device.allocator, &bufferInfo, &allocationCreateInfo, &m_buffer, &m_allocation, &m_allocationInfo));
-
-    // Get the address of the buffer if flag is set
-    if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-    {
-        VkBufferDeviceAddressInfo deviceAddressInfo {};
-        deviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-        deviceAddressInfo.buffer = m_buffer;
-        m_address = m_device.dispatch.GetBufferDeviceAddress(m_device.handle, &deviceAddressInfo);
-    }
 }
 
 vkShade::VulkanBuffer::~VulkanBuffer()

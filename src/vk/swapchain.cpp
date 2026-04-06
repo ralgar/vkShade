@@ -63,7 +63,7 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     // Allocate command buffer
     VkCommandBufferAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = m_device.commandPool,
+        .commandPool = m_commandPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
@@ -102,6 +102,9 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
 {
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
     auto searchPaths = config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
+
+    // Wait for the command buffer to finish executing
+    m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000);
 
     m_effects.clear();
     for (const auto& effect : effects)

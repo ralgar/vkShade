@@ -77,12 +77,14 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         {
             myFeatures13 = *features13;
             myFeatures13.dynamicRendering = VK_TRUE;
+            myFeatures13.synchronization2 = VK_TRUE;
         }
         else
         {
             myFeatures13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
             myFeatures13.pNext = const_cast<void*>(pCreateInfo->pNext);
             myFeatures13.dynamicRendering = VK_TRUE;
+            myFeatures13.synchronization2 = VK_TRUE;
         }
 
         modifiedCreateInfo.pNext = &myFeatures13;
@@ -185,7 +187,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         allocatorInfo.device = thisDevice.handle;
         allocatorInfo.instance = thisInstance.handle;
         allocatorInfo.pVulkanFunctions = &vulkanFunctions;
-        allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
         VkResult vmaResult = vmaCreateAllocator(&allocatorInfo, &thisDevice.allocator);
         if (vmaResult != VK_SUCCESS)
@@ -224,6 +225,8 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkA
     // First destroy anything that calls into Vulkan
     if (vkShade::Locator<vkShade::GuiManager>::has())
         vkShade::Locator<vkShade::GuiManager>::reset();
+
+    thisDevice.dispatch.DestroyCommandPool(thisDevice.handle, thisDevice.commandPool, nullptr);
 
     vmaDestroyAllocator(thisDevice.allocator);
 
