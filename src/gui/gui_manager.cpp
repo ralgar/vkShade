@@ -67,7 +67,7 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
         auto& instance = get_instance_from_handle(ctx->instance);
 
         // Try the device table first (most functions are device-level)
-        PFN_vkVoidFunction func = (PFN_vkVoidFunction)ctx->dispatch.GetDeviceProcAddr(ctx->handle, function_name);
+        PFN_vkVoidFunction func = vkShade_GetDeviceProcAddr(ctx->handle, function_name);
         if (func)
         {
             spdlog::trace("[ImGui] Loaded {} from device table:  {}", function_name, (void*)func);
@@ -75,7 +75,7 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
         }
 
         // Fall back to the instance table
-        func = (PFN_vkVoidFunction)instance.dispatch.GetInstanceProcAddr(instance.handle, function_name);
+        func = vkShade_GetInstanceProcAddr(instance.handle, function_name);
         if (func)
         {
             spdlog::trace("[ImGui] Loaded {} from instance table: {}", function_name, (void*)func);

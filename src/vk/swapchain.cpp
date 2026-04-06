@@ -68,7 +68,9 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
         .commandBufferCount = 1,
     };
 
-    VK_CHECK(m_device.dispatch.AllocateCommandBuffers(m_device.handle, &allocInfo, &m_commandBuffer));
+    // NOTE: Command buffers are dispatchable types. Their creation must go through our
+    //  own hook, not the dispatch table, to ensure the dispatch pointer fixup runs.
+    VK_CHECK(vkShade_AllocateCommandBuffers(m_device.handle, &allocInfo, &m_commandBuffer));
 
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
 

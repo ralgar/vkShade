@@ -1,7 +1,7 @@
 #pragma once
 
 #include <assert.h>
-#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include <vk_mem_alloc.h>
@@ -63,9 +63,8 @@ inline VulkanDevice& get_device_from_handle(const void* handle)
     return it->second;
 }
 
-// Single global lock, for simplicity
-// Only lock when WRITING (on create and destroy)
-extern std::mutex global_lock;
+// Reader/writer lock for concurrent read access to bookkeeping maps.
+extern std::shared_mutex g_globalLock;
 
 // Make entrypoints C-linkable
 extern "C" PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice device, const char* pName);
@@ -82,3 +81,8 @@ void     VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCal
 VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);
 void     VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator);
 VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
+
+// Command Buffer hooks
+VkResult VKAPI_CALL vkShade_AllocateCommandBuffers(VkDevice                           device,
+                                                   const VkCommandBufferAllocateInfo* pAllocateInfo,
+                                                   VkCommandBuffer*                   pCommandBuffers);

@@ -117,7 +117,8 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 
     // Store instance data
     {
-        std::lock_guard<std::mutex> lock(global_lock);
+        // Acquire a writer lock
+        std::unique_lock lock(g_globalLock);
         g_vulkanInstances.emplace(dispatch_key_from_handle(*pInstance), thisInstance);
     }
 
@@ -129,7 +130,7 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyInstance(VkInstance instance, con
     spdlog::trace("Intercepted VkDestroyInstance");
 
     // Lock here to prevent race conditions.
-    std::lock_guard<std::mutex> lock(global_lock);
+    std::unique_lock lock(g_globalLock);
 
     if (!instance)
         return;
