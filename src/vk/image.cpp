@@ -260,13 +260,11 @@ void vkShade::VulkanImage::blit(VkCommandBuffer cmd, VkImage source, VkImage des
 {
 	VkImageBlit2 blitRegion{ .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr };
 
-	blitRegion.srcOffsets[0].x = m_extent.width;
-	blitRegion.srcOffsets[0].y = m_extent.height;
-	blitRegion.srcOffsets[0].z = 1;
+    blitRegion.srcOffsets[0] = { 0, 0, 0 };
+    blitRegion.srcOffsets[1] = { (int32_t)m_extent.width, (int32_t)m_extent.height, 1 };
 
-	blitRegion.dstOffsets[0].x = m_extent.width;
-	blitRegion.dstOffsets[0].y = m_extent.height;
-	blitRegion.dstOffsets[0].z = 1;
+    blitRegion.dstOffsets[0] = { 0, 0, 0 };
+    blitRegion.dstOffsets[1] = { (int32_t)m_extent.width, (int32_t)m_extent.height, 1 };
 
 	blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	blitRegion.srcSubresource.baseArrayLayer = 0;
