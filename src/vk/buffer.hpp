@@ -20,14 +20,12 @@ namespace vkShade
         // Write into a CPU-only or CPU-to-GPU buffer.
         bool write(const void* data, size_t size, size_t offset = 0);
 
-        const VkDeviceAddress address() const { return m_address; }
         const VkBuffer& buffer() const { return m_buffer; }
         void* data() const { return m_allocationInfo.pMappedData; }
         size_t size() const { return m_allocationInfo.size; }
 
     private:
         VkBuffer          m_buffer;
-        VkDeviceAddress   m_address {0};
         VmaAllocation     m_allocation;
         VmaAllocationInfo m_allocationInfo;
     };

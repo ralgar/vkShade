@@ -187,7 +187,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         allocatorInfo.device = thisDevice.handle;
         allocatorInfo.instance = thisInstance.handle;
         allocatorInfo.pVulkanFunctions = &vulkanFunctions;
-        allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
         VkResult vmaResult = vmaCreateAllocator(&allocatorInfo, &thisDevice.allocator);
         if (vmaResult != VK_SUCCESS)
