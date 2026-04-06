@@ -363,7 +363,10 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
     VkCommandBufferAllocateInfo cmdBufAllocInfo = vkinit::command_buffer_allocate_info(m_device.commandPool);
 
     VkCommandBuffer cmd;
-    m_device.dispatch.AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd);
+
+    // NOTE: Command buffers are dispatchable types. Their creation must go through our
+    //  own hook, not the dispatch table, to ensure the dispatch pointer fixup runs.
+    vkShade_AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd);
 
     VkCommandBufferBeginInfo beginInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
