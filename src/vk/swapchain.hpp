@@ -33,6 +33,7 @@ namespace vkShade
         VkFormat m_format;
         VkExtent2D m_extent;
         std::vector<std::unique_ptr<VulkanImage>> m_images;
+        std::unique_ptr<VulkanImage> m_depthDummy;
 
         // Layer resources
         VkFence m_fence {VK_NULL_HANDLE};

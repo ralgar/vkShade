@@ -43,6 +43,13 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     m_pingPongA = std::shared_ptr<VulkanImage>(new VulkanImage(m_device, m_extent, m_format, drawImageUsages));
     m_pingPongB = std::shared_ptr<VulkanImage>(new VulkanImage(m_device, m_extent, m_format, drawImageUsages));
 
+    // Create a dummy depth image.
+	VkImageUsageFlags depthImageUsages {};
+	depthImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    m_depthDummy = std::make_unique<VulkanImage>(m_device, m_extent, VK_FORMAT_R32_SFLOAT, depthImageUsages);
+
     // Create command pool
     VkCommandPoolCreateInfo poolInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -161,6 +168,14 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
     swapchainImage->blit_to(m_commandBuffer, m_pingPongA->image());
     m_pingPongA->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
+    // Clear our dummy depth image and transition to SHADER_READ_ONLY
+    m_depthDummy->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkClearColorValue clearValue = { .float32 = { 1.0f, 0.0f, 0.0f, 0.0f } };
+    VkImageSubresourceRange range = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+    m_device.dispatch.CmdClearColorImage(m_commandBuffer, m_depthDummy->image(),
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &range);
+    m_depthDummy->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
     // Render effects if enabled
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
     static bool enabled = true;
@@ -183,8 +198,8 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
             // Barrier: Ensure read image is ready to sample
             readImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-            // Bind the input (read) image
-            effect->bind_input(readImage->image_view());
+            // Bind the color and depth images
+            effect->bind_input(*readImage, *m_depthDummy);
 
             // Apply effect
             effect->apply(m_commandBuffer, *writeImage);
