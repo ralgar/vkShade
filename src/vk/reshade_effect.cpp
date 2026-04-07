@@ -171,7 +171,7 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
     }
 }
 
-void vkShade::ReshadeEffect::bind_input(VkImageView colorView)
+void vkShade::ReshadeEffect::bind_input(VulkanImage& colorImage, VulkanImage& depthImage)
 {
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
     {
@@ -183,13 +183,20 @@ void vkShade::ReshadeEffect::bind_input(VkImageView colorView)
             auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
                 [&](const auto& t) { return t.unique_name == samplerInfo.texture_name; });
 
-            // Only handle semantic textures here (COLOR) // TODO: Depth
-            if (texIt == m_module->textures.end() || texIt->semantic != "COLOR")
+            if (texIt == m_module->textures.end())
                 continue;
+
+            VkImageView imageView;
+            if (texIt->semantic == "COLOR")
+                imageView = colorImage.image_view();
+            else if (texIt->semantic == "DEPTH")
+                imageView = depthImage.image_view();
+            else
+                continue;  // Skip other textures (we only bind COLOR and DEPTH here)
 
             VkDescriptorImageInfo imageInfo = {
                 .sampler = sampler->handle(),
-                .imageView = colorView,
+                .imageView = imageView,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             };
 
@@ -693,9 +700,9 @@ void vkShade::ReshadeEffect::reflect_images()
             auto texIt = std::find_if(m_module->textures.begin(), m_module->textures.end(),
                 [&](const auto& t) { return t.unique_name == textureName; });
 
-            // Refuse to load the effect
+            // Warn about lack of proper depth support
             if (texIt != m_module->textures.end() && texIt->semantic == "DEPTH")
-                throw std::runtime_error("Effect requires depth buffer access, which is not yet supported.");
+                spdlog::warn("Effect may require depth buffer access, which is not yet supported.");
         }
     }
 
