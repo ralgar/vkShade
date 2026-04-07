@@ -727,6 +727,7 @@ void vkShade::ReshadeEffect::reflect_images()
     if (hasStencil)
     {
         VkImageUsageFlags usage {};
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
         m_stencilBuffer = std::make_unique<VulkanImage>(m_device, m_extent, VK_FORMAT_S8_UINT, usage);
