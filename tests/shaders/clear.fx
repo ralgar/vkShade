@@ -14,6 +14,17 @@ sampler S_NoClear { Texture = RT_NoClear; };
 static const uint ROWS = 1;
 static const uint COLS = 2;
 
+// Source colors used as base (dest) and src in blend operations
+float4 PS_Red(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
+{
+    return float4(COLOR_RED, 0.5);
+}
+
+float4 PS_Blue(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
+{
+    return float4(COLOR_BLUE, 0.5);
+}
+
 float4 PS_Grid(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 {
     float2 local_uv;

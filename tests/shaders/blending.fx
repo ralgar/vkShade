@@ -29,6 +29,17 @@ sampler S_NoBlend  { Texture = RT_NoBlend; };
 static const uint ROWS = 3;
 static const uint COLS = 3;
 
+// Source colors used as base (dest) and src in blend operations
+float4 PS_Red(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
+{
+    return float4(COLOR_RED, 0.5);
+}
+
+float4 PS_Blue(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
+{
+    return float4(COLOR_BLUE, 0.5);
+}
+
 // Final pass: Reads each RT, compares against expected value, then renders pass/fail grid.
 float4 PS_Grid(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 {
