@@ -58,9 +58,21 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 {
     auto& technique = m_module->techniques[0];
 
+    // Clear the stencil buffer if we have one.
+    if (m_stencilBuffer)
+    {
+        m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkClearDepthStencilValue clearValue = { .depth = 0.0f, .stencil = 0 };
+        VkImageSubresourceRange range = vkinit::image_subresource_range(VK_IMAGE_ASPECT_STENCIL_BIT);
+
+        m_device.dispatch.CmdClearDepthStencilImage(cmd, m_stencilBuffer->image(),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &range);
+    }
+
+    // Iterate and apply effect passes
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, technique.passes))
     {
-        bool isFirstPass = (&passInfo == &technique.passes.front());
         bool isFinalPass = (&passInfo == &technique.passes.back());
 
         const VkClearValue clearValue = { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } };
@@ -95,11 +107,9 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         {
             m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
 
-            const VkClearValue stencilClearValue = { .depthStencil = { .stencil = 0 } };
-            const VkClearValue* stencilClear = isFirstPass ? &stencilClearValue : nullptr;
             stencilAttachmentInfo = vkinit::rendering_attachment_info(
                 m_stencilBuffer->image_view(),
-                stencilClear,
+                nullptr,
                 VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
 
             stencilAttachment = &stencilAttachmentInfo;
