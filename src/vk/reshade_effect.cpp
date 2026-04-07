@@ -58,6 +58,19 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 {
     auto& technique = m_module->techniques[0];
 
+    // Clear the stencil buffer if we have one.
+    if (m_stencilBuffer)
+    {
+        m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkClearDepthStencilValue clearValue = { .depth = 0.0f, .stencil = 0 };
+        VkImageSubresourceRange range = vkinit::image_subresource_range(VK_IMAGE_ASPECT_STENCIL_BIT);
+
+        m_device.dispatch.CmdClearDepthStencilImage(cmd, m_stencilBuffer->image(),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &range);
+    }
+
+    // Iterate and apply effect passes
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, technique.passes))
     {
         bool isFinalPass = (&passInfo == &technique.passes.back());
@@ -86,9 +99,25 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
                                                                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
+        // Set up stencil attachment if there is one
+        VkRenderingAttachmentInfo* stencilAttachment = nullptr;
+        VkRenderingAttachmentInfo stencilAttachmentInfo;
+
+        if (passInfo.stencil_enable && m_stencilBuffer)
+        {
+            m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
+
+            stencilAttachmentInfo = vkinit::rendering_attachment_info(
+                m_stencilBuffer->image_view(),
+                nullptr,
+                VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
+
+            stencilAttachment = &stencilAttachmentInfo;
+        }
+
         // Begin render pass
         VkExtent2D extent { .width = outputImage.extent().width, .height = outputImage.extent().height};
-        VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, nullptr);
+        VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, nullptr, stencilAttachment);
         m_device.dispatch.CmdBeginRendering(cmd, &renderingInfo);
 
         // Bind pipeline
@@ -115,6 +144,12 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         std::array<VkDescriptorSet, 2> sets = { m_uniformSet, pass.imageSet };
         m_device.dispatch.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
             pass.pipelineLayout, 0, sets.size(), sets.data(), 0, nullptr);
+
+        if (passInfo.stencil_enable)
+        {
+            m_device.dispatch.CmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_AND_BACK,
+                passInfo.stencil_reference_value);
+        }
 
         // Draw fullscreen triangle (3 vertices, no vertex buffer)
         m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
@@ -300,6 +335,40 @@ VkBlendOp vkShade::ReshadeEffect::convert_blend_op(reshadefx::blend_op blendOp)
     std::unreachable();
 }
 
+VkCompareOp vkShade::ReshadeEffect::convert_stencil_func(reshadefx::stencil_func stencilFunc)
+{
+    switch (stencilFunc)
+    {
+        case reshadefx::stencil_func::never:         return VK_COMPARE_OP_NEVER;
+        case reshadefx::stencil_func::less:          return VK_COMPARE_OP_LESS;
+        case reshadefx::stencil_func::equal:         return VK_COMPARE_OP_EQUAL;
+        case reshadefx::stencil_func::less_equal:    return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case reshadefx::stencil_func::greater:       return VK_COMPARE_OP_GREATER;
+        case reshadefx::stencil_func::not_equal:     return VK_COMPARE_OP_NOT_EQUAL;
+        case reshadefx::stencil_func::greater_equal: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+        case reshadefx::stencil_func::always:        return VK_COMPARE_OP_ALWAYS;
+    }
+
+    std::unreachable();
+}
+
+VkStencilOp vkShade::ReshadeEffect::convert_stencil_op(reshadefx::stencil_op stencilOp)
+{
+    switch (stencilOp)
+    {
+        case reshadefx::stencil_op::zero:               return VK_STENCIL_OP_ZERO;
+        case reshadefx::stencil_op::keep:               return VK_STENCIL_OP_KEEP;
+        case reshadefx::stencil_op::replace:            return VK_STENCIL_OP_REPLACE;
+        case reshadefx::stencil_op::increment_saturate: return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+        case reshadefx::stencil_op::decrement_saturate: return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+        case reshadefx::stencil_op::invert:             return VK_STENCIL_OP_INVERT;
+        case reshadefx::stencil_op::increment:          return VK_STENCIL_OP_INCREMENT_AND_WRAP;
+        case reshadefx::stencil_op::decrement:          return VK_STENCIL_OP_DECREMENT_AND_WRAP;
+    }
+
+    std::unreachable();
+}
+
 void vkShade::ReshadeEffect::create_pipeline()
 {
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
@@ -373,6 +442,23 @@ void vkShade::ReshadeEffect::create_pipeline()
             .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
         };
 
+        VkStencilOpState stencilOpState = {
+            .failOp      = convert_stencil_op(passInfo.stencil_fail_op),
+            .passOp      = convert_stencil_op(passInfo.stencil_pass_op),
+            .depthFailOp = convert_stencil_op(passInfo.stencil_depth_fail_op),
+            .compareOp   = convert_stencil_func(passInfo.stencil_comparison_func),
+            .compareMask = static_cast<uint32_t>(passInfo.stencil_read_mask),
+            .writeMask   = static_cast<uint32_t>(passInfo.stencil_write_mask),
+            .reference   = static_cast<uint32_t>(passInfo.stencil_reference_value),
+        };
+
+        VkPipelineDepthStencilStateCreateInfo depthStencilInfo = {
+            .sType             = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .stencilTestEnable = passInfo.stencil_enable,
+            .front             = stencilOpState,
+            .back              = stencilOpState,
+        };
+
         std::vector<VkPipelineColorBlendAttachmentState> blendAttachments;
         for (size_t i = 0; i < colorFormats.size(); i++)
         {
@@ -393,10 +479,15 @@ void vkShade::ReshadeEffect::create_pipeline()
             .pAttachments = blendAttachments.data(),
         };
 
-        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        VkDynamicState dynamicStates[] = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR,
+            VK_DYNAMIC_STATE_STENCIL_REFERENCE
+        };
+
         VkPipelineDynamicStateCreateInfo dynamicState = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .dynamicStateCount = 2,
+            .dynamicStateCount = 3,
             .pDynamicStates = dynamicStates,
         };
 
@@ -405,6 +496,7 @@ void vkShade::ReshadeEffect::create_pipeline()
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = (uint32_t)colorFormats.size(),
             .pColorAttachmentFormats = colorFormats.data(),
+            .stencilAttachmentFormat = passInfo.stencil_enable ? VK_FORMAT_S8_UINT : VK_FORMAT_UNDEFINED,
         };
 
         VkGraphicsPipelineCreateInfo pipelineInfo = {
@@ -417,6 +509,7 @@ void vkShade::ReshadeEffect::create_pipeline()
             .pViewportState = &viewportState,
             .pRasterizationState = &rasterizer,
             .pMultisampleState = &multisampling,
+            .pDepthStencilState = &depthStencilInfo,
             .pColorBlendState = &colorBlending,
             .pDynamicState = &dynamicState,
             .layout = pass.pipelineLayout,
@@ -613,6 +706,19 @@ void vkShade::ReshadeEffect::reflect_images()
             continue;  // We don't own these, the application does.
 
         m_textures[info.unique_name] = std::make_unique<vkShade::VulkanImage>(m_device, info);
+    }
+
+    // Allocate stencil buffer if any pass requires it
+    bool hasStencil = std::any_of(m_module->techniques[0].passes.begin(),
+                                  m_module->techniques[0].passes.end(),
+                                  [](const auto& p) { return p.stencil_enable; });
+
+    if (hasStencil)
+    {
+        VkImageUsageFlags usage {};
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+        m_stencilBuffer = std::make_unique<VulkanImage>(m_device, m_extent, VK_FORMAT_S8_UINT, usage);
     }
 }
 

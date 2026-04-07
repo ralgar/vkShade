@@ -223,9 +223,10 @@ void vkShade::VulkanImage::create_image_view()
 {
     // If the format is a depth format, we will need to have it use the correct aspect flag.
 	VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-	if (m_format == VK_FORMAT_D32_SFLOAT) {
+	if (m_format == VK_FORMAT_D32_SFLOAT)
 		aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
-	}
+	if (m_format == VK_FORMAT_S8_UINT)
+		aspectFlags = VK_IMAGE_ASPECT_STENCIL_BIT;
 
 	// Build an image view for the image.
     VkImageViewCreateInfo viewInfo = {
@@ -322,6 +323,12 @@ VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)
 
 void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout)
 {
+    VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    if (m_format == VK_FORMAT_D32_SFLOAT)
+        aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (m_format == VK_FORMAT_S8_UINT)
+        aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+
     VkImageMemoryBarrier2 imageBarrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
@@ -332,9 +339,7 @@ void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout 
         .newLayout = newLayout,
         .image = m_image,
         .subresourceRange = {
-            .aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
-                ? VK_IMAGE_ASPECT_DEPTH_BIT
-                : VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = aspectMask,
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,

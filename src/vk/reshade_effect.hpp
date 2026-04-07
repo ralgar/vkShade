@@ -17,6 +17,8 @@ namespace reshadefx
 {
     enum class blend_factor : uint8_t;
     enum class blend_op : uint8_t;
+    enum class stencil_func : uint8_t;
+    enum class stencil_op : uint8_t;
     struct effect_module;
     struct uniform;
 }
@@ -117,6 +119,7 @@ namespace vkShade
 
         std::unordered_map<std::string, std::unique_ptr<VulkanImage>> m_textures;
         std::vector<std::unique_ptr<VulkanSampler>> m_samplers;
+        std::unique_ptr<VulkanImage> m_stencilBuffer;
 
         std::vector<Pass> m_passes;
 
@@ -155,6 +158,8 @@ namespace vkShade
         void reflect_uniforms();
 
         static VkBlendFactor convert_blend_factor(reshadefx::blend_factor blendFactor);
-        static VkBlendOp convert_blend_op(reshadefx::blend_op blendOp);
+        static VkBlendOp     convert_blend_op(reshadefx::blend_op blendOp);
+        static VkCompareOp   convert_stencil_func(reshadefx::stencil_func stencilFunc);
+        static VkStencilOp   convert_stencil_op(reshadefx::stencil_op stencilOp);
     };
 } // namespace vkShade

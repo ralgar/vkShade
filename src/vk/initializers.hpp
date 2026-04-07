@@ -20,7 +20,8 @@ namespace vkinit
                                                           VkImageLayout       layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingInfo             rendering_info(VkExtent2D                           renderExtent,
                                                std::span<VkRenderingAttachmentInfo> colorAttachments,
-                                               const VkRenderingAttachmentInfo*     depthAttachment);
+                                               const VkRenderingAttachmentInfo*     depthAttachment = nullptr,
+                                               const VkRenderingAttachmentInfo*     stencilAttachment = nullptr);
     VkSemaphoreSubmitInfo       semaphore_submit_info(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore);
     VkSubmitInfo2               submit_info(const VkCommandBufferSubmitInfo* cmd,
                                             const VkSemaphoreSubmitInfo*     signalSemaphoreInfo,

@@ -53,14 +53,3 @@ bool approx_equal4(float4 a, float4 b)
 {
     return all(abs(a - b) < EPSILON);
 }
-
-// Source colors used as base (dest) and src in blend operations
-float4 PS_Red(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-    return float4(COLOR_RED, 0.5);
-}
-
-float4 PS_Blue(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-    return float4(COLOR_BLUE, 0.5);
-}
