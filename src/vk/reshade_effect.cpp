@@ -692,6 +692,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
 void vkShade::ReshadeEffect::reflect_images()
 {
     // Iterate and check for depth textures since we don't support them yet
+    bool warnedAboutDepth = false;
     for (const auto& pass : m_module->techniques[0].passes)
     {
         for (const auto& binding : pass.texture_bindings)
@@ -701,8 +702,11 @@ void vkShade::ReshadeEffect::reflect_images()
                 [&](const auto& t) { return t.unique_name == textureName; });
 
             // Warn about lack of proper depth support
-            if (texIt != m_module->textures.end() && texIt->semantic == "DEPTH")
+            if (!warnedAboutDepth && texIt != m_module->textures.end() && texIt->semantic == "DEPTH")
+            {
                 spdlog::warn("Effect may require depth buffer access, which is not yet supported.");
+                warnedAboutDepth = true;
+            }
         }
     }
 
