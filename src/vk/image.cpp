@@ -115,14 +115,29 @@ void vkShade::VulkanImage::load_from_file(const std::string& filePath)
 {
     spdlog::trace("Creating image from file: {}", filePath);
 
-    // We only handle RGBA8 UNORM for loaded textures right now
-    if (m_format != VK_FORMAT_R8G8B8A8_UNORM)
-        throw std::runtime_error("Unsupported format for file-sourced texture: " +
-            std::string(magic_enum::enum_name(m_format)));
+    int32_t channels;
+    stbir_pixel_layout stbirLayout;
+    switch (m_format)
+    {
+        case VK_FORMAT_R8_UNORM:
+            channels = 1;
+            stbirLayout = STBIR_1CHANNEL;
+            break;
+        case VK_FORMAT_R8G8_UNORM:
+            channels = 2;
+            stbirLayout = STBIR_2CHANNEL;
+            break;
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            channels = 4;
+            stbirLayout = STBIR_RGBA;
+            break;
+        default:
+            throw std::runtime_error("Unsupported format for file-sourced texture: " +
+                std::string(magic_enum::enum_name(m_format)));
+    }
 
-    int32_t srcWidth, srcHeight, channels;
-    stbi_uc* pixels = stbi_load(filePath.c_str(), &srcWidth, &srcHeight, &channels, STBI_rgb_alpha);
-    channels = 4; // Forced RGBA by STBI_rgb_alpha
+    int32_t srcWidth, srcHeight, srcChannels;
+    stbi_uc* pixels = stbi_load(filePath.c_str(), &srcWidth, &srcHeight, &srcChannels, channels);
 
     if (!pixels)
     {
@@ -139,11 +154,11 @@ void vkShade::VulkanImage::load_from_file(const std::string& filePath)
         resized.resize(m_extent.width * m_extent.height * channels);
         stbir_resize_uint8_linear(pixels, srcWidth, srcHeight, 0,
                                   resized.data(), m_extent.width, m_extent.height, 0,
-                                  STBIR_RGBA);
+                                  stbirLayout);
         uploadData = resized.data();
     }
 
-    size_t imageSize = m_extent.width * m_extent.height * 4;
+    size_t imageSize = m_extent.width * m_extent.height * channels;
     this->upload(uploadData, imageSize);
 
     stbi_image_free(pixels);
