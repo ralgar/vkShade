@@ -342,6 +342,20 @@ VkBlendOp vkShade::ReshadeEffect::convert_blend_op(reshadefx::blend_op blendOp)
     std::unreachable();
 }
 
+VkPrimitiveTopology vkShade::ReshadeEffect::convert_primitive_topology(reshadefx::primitive_topology topology)
+{
+    switch (topology)
+    {
+        case reshadefx::primitive_topology::point_list:     return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+        case reshadefx::primitive_topology::line_list:      return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+        case reshadefx::primitive_topology::line_strip:     return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+        case reshadefx::primitive_topology::triangle_list:  return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        case reshadefx::primitive_topology::triangle_strip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    }
+
+    std::unreachable();
+}
+
 VkCompareOp vkShade::ReshadeEffect::convert_stencil_func(reshadefx::stencil_func stencilFunc)
 {
     switch (stencilFunc)
@@ -427,7 +441,7 @@ void vkShade::ReshadeEffect::create_pipeline()
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .topology = convert_primitive_topology(passInfo.topology),
         };
 
         VkPipelineViewportStateCreateInfo viewportState = {
