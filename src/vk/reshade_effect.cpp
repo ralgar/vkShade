@@ -151,8 +151,8 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
                 passInfo.stencil_reference_value);
         }
 
-        // Draw fullscreen triangle (3 vertices, no vertex buffer)
-        m_device.dispatch.CmdDraw(cmd, 3, 1, 0, 0);
+        // Draw n vertices as defined in the pass (no vertex buffer)
+        m_device.dispatch.CmdDraw(cmd, passInfo.num_vertices, 1, 0, 0);
 
         m_device.dispatch.CmdEndRendering(cmd);
 
