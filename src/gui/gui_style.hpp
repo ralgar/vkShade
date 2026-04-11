@@ -55,6 +55,7 @@ namespace vkShade
             colors[ImGuiCol_Header]        = ImVec4(0.26f, 0.59f, 0.98f, 0.4f);
             colors[ImGuiCol_HeaderHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.6f);
             colors[ImGuiCol_HeaderActive]  = ImVec4(0.26f, 0.59f, 0.98f, 0.8f);
+            colors[ImGuiCol_TextDisabled] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
         }
     } // namespace UIStyle
 } // namespace vkShade

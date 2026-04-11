@@ -1,9 +1,5 @@
 #pragma once
 
-#include <filesystem>
-
-#include <spdlog/spdlog.h>
-
 #include "config_store.hpp"
 
 namespace vkShade
@@ -14,10 +10,12 @@ namespace vkShade
         ConfigManager();
 
         ConfigStore& app() { return m_config; }
+        ConfigStore& internal() { return m_internal; }
         ConfigStore& preset() { return m_preset; }
 
     private:
         ConfigStore m_config;
+        ConfigStore m_internal;
         ConfigStore m_preset;
     };
 } // namespace vkShade

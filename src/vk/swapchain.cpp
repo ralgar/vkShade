@@ -114,6 +114,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
     m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000);
 
     m_effects.clear();
+    std::vector<std::string> loadedEffects;
     for (const auto& effect : effects)
     {
         bool found = false;
@@ -128,6 +129,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
                     {
                         try {
                             m_effects.push_back(std::make_shared<ReshadeEffect>(m_device, m_extent, m_format, entry.path()));
+                            loadedEffects.push_back(effect);
                             found = true;
                         } catch (const std::runtime_error& exception) {
                             spdlog::error(exception.what());
@@ -142,6 +144,9 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
         if (!found && !error)
             spdlog::warn("Unable to find effect: {}", effect);
     }
+
+    auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();
+    internalCfg.set("__INTERNAL__", "LoadedEffects", loadedEffects);
 }
 
 void vkShade::VulkanSwapchain::render(uint32_t imageIndex)

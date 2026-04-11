@@ -93,10 +93,20 @@ void vkShade::MainWindow::render_menu_bar()
 
 void vkShade::MainWindow::render_effect_lists()
 {
-    // Get active effects from config
+    auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();
+
+    // Get actually-loaded effects from internal config
+    std::vector<std::string> loadedEffects;
+    auto loadedEffectsOpt = internalCfg.get<std::vector<std::string>>("__INTERNAL__", "LoadedEffects");
+    loadedEffects = loadedEffectsOpt.value_or(std::vector<std::string>{});
+
+    // Get configured/requested effects (what the user wants active)
     std::vector<std::string> activeEffects;
     auto activeEffectsOpt = m_config.get<std::vector<std::string>>("vkShade", "Effects");
     activeEffects = activeEffectsOpt.value_or(std::vector<std::string>{});
+
+    // Build a set of loaded effect names for fast lookup
+    std::unordered_set<std::string> loadedSet(loadedEffects.begin(), loadedEffects.end());
 
     // Scan directory for all effects
     auto effectPaths = m_config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
@@ -217,6 +227,11 @@ void vkShade::MainWindow::render_effect_lists()
         ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Active Effects (Ordered)");
         ImGui::Spacing();
 
+        std::unordered_set<std::string> flaggedEffects;
+        for (const auto& effect : activeEffects)
+            if (!loadedSet.count(effect))
+                flaggedEffects.insert(effect);
+
         // Content section (scrollable)
         {
             float headerHeight = ImGui::GetCursorPosY();
@@ -225,7 +240,8 @@ void vkShade::MainWindow::render_effect_lists()
                               false,
                               ImGuiWindowFlags_None);
 
-            if (render_effect_listbox("##ActiveEffects", activeEffects, m_selectedActive, ImVec2(-FLT_MIN, -FLT_MIN)))
+            if (render_effect_listbox("##ActiveEffects", activeEffects, m_selectedActive,
+                                      ImVec2(-FLT_MIN, -FLT_MIN), flaggedEffects))
                 m_selectedAvailable = -1;   // When we select in this listbox, deselect in the other.
 
             ImGui::EndChild();
@@ -284,7 +300,8 @@ void vkShade::MainWindow::render_uniform_controls()
 bool vkShade::MainWindow::render_effect_listbox(const char* label,
                                                 const std::vector<std::string>& effects,
                                                 int32_t& selected,
-                                                const ImVec2& size)
+                                                const ImVec2& size,
+                                                const std::unordered_set<std::string>& flaggedEffects)
 {
     bool changed = false;
 
@@ -293,23 +310,37 @@ bool vkShade::MainWindow::render_effect_listbox(const char* label,
         for (int32_t i = 0; i < (int32_t)effects.size(); i++)
         {
             const bool isSelected = (selected == i);
+            const bool isFlagged = flaggedEffects.count(effects[i]);
 
-            if (ImGui::Selectable(effects[i].c_str(), isSelected))
+            // Grey out items that are flagged
+            if (isFlagged)
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+
+            // Prepend (!) to the display label if flagged
+            std::string displayLabel = isFlagged ? "(!) " + effects[i] : effects[i];
+
+            if (ImGui::Selectable(displayLabel.c_str(), isSelected))
             {
                 selected = i;
                 changed = true;
             }
 
+            if (isFlagged)
+                ImGui::PopStyleColor();
+
             // Set the initial focus when opening the combo (scrolling + keyboard navigation)
             if (isSelected)
-            {
                 ImGui::SetItemDefaultFocus();
-            }
 
-            // Double-click to activate/deactivate
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+            if (ImGui::IsItemHovered())
             {
-                // TODO: Could trigger activation/deactivation here
+                if (isFlagged)
+                    ImGui::SetTooltip("This effect failed to load or is not currently active");
+
+                if (ImGui::IsMouseDoubleClicked(0))
+                {
+                    // TODO: Could trigger activation/deactivation here
+                }
             }
         }
 

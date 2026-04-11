@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_set>
+
 #include <imgui.h>
 
 #include "config/config_store.hpp"
@@ -38,6 +40,7 @@ namespace vkShade
         bool render_effect_listbox(const char* label,
                                    const std::vector<std::string>& effects,
                                    int32_t& selected,
-                                   const ImVec2& size);
+                                   const ImVec2& size,
+                                   const std::unordered_set<std::string>& flaggedEffects = {});
     };
 } // namespace vkShade

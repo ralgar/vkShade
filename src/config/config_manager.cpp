@@ -1,5 +1,7 @@
 #include "config_manager.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include "config_globals.hpp"
 
 vkShade::ConfigManager::ConfigManager()
