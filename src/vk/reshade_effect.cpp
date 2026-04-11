@@ -127,8 +127,8 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         VkViewport viewport = {
             .x = 0.0f,
             .y = 0.0f,
-            .width = (float)extent.width,
-            .height = (float)extent.height,
+            .width = (float)(passInfo.viewport_width ? passInfo.viewport_width : extent.width),
+            .height = (float)(passInfo.viewport_height ? passInfo.viewport_height : extent.height),
             .minDepth = 0.0f,
             .maxDepth = 1.0f,
         };
