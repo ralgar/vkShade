@@ -11,13 +11,11 @@ namespace vkShade
     public:
         virtual ~VulkanObject() = default;
 
-        // Non-copyable, movable.
+        // Non-copyable, non-movable.
         VulkanObject(const VulkanObject&) = delete;
         VulkanObject& operator=(const VulkanObject&) = delete;
-        VulkanObject(VulkanObject&&) noexcept = default;
-        VulkanObject& operator=(VulkanObject&&) noexcept = default;
-
-        VulkanDevice& device() const { return m_device; }
+        VulkanObject(VulkanObject&&) = delete;
+        VulkanObject& operator=(VulkanObject&&) = delete;
 
     protected:
         explicit VulkanObject(VulkanDevice& device) : m_device(device) {}
