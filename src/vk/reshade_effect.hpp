@@ -124,8 +124,6 @@ namespace vkShade
 
         std::vector<Pass> m_passes;
 
-        void create_pipeline();
-
         bool compile(VkExtent2D extent, std::filesystem::path filePath);
 
         Uniform* find_uniform(const std::string& name)
@@ -155,6 +153,7 @@ namespace vkShade
 
         void reflect_descriptors();
         void reflect_images();
+        void reflect_pipeline();
         void reflect_samplers();
         void reflect_uniforms();
 

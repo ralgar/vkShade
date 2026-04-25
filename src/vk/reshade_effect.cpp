@@ -35,7 +35,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
     this->reflect_images();
     this->reflect_samplers();
     this->reflect_descriptors();
-    this->create_pipeline();
+    this->reflect_pipeline();
     this->reflect_uniforms();
 
     spdlog::debug("Created effect: {}", effectPath.filename().string());
@@ -390,156 +390,6 @@ VkStencilOp vkShade::ReshadeEffect::convert_stencil_op(reshadefx::stencil_op ste
     std::unreachable();
 }
 
-void vkShade::ReshadeEffect::create_pipeline()
-{
-    for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
-    {
-        std::vector<VkFormat> colorFormats;
-        for (const auto& name : passInfo.render_target_names)
-        {
-            if (name.empty())
-                break;
-
-            auto it = m_textures.find(name);
-            if (it != m_textures.end())
-                colorFormats.push_back(it->second->format());
-        }
-
-        if (colorFormats.empty())
-            colorFormats.push_back(m_format);
-
-        // Create pipeline layout
-        std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .setLayoutCount = layouts.size(),
-            .pSetLayouts = layouts.data(),
-        };
-
-        VK_CHECK(m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &pass.pipelineLayout));
-
-        // Create graphics pipeline
-        VkPipelineShaderStageCreateInfo shaderStages[] = {
-            {
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                .module = pass.vertexShader->module(),
-                .pName = passInfo.vs_entry_point.c_str(),
-            },
-            {
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = pass.fragmentShader->module(),
-                .pName = passInfo.ps_entry_point.c_str(),
-            }
-        };
-
-        // No vertex input (fullscreen triangle generated in vertex shader)
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        };
-
-        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-            .topology = convert_primitive_topology(passInfo.topology),
-        };
-
-        VkPipelineViewportStateCreateInfo viewportState = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-            .viewportCount = 1,
-            .scissorCount = 1,
-        };
-
-        VkPipelineRasterizationStateCreateInfo rasterizer = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-            .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = VK_CULL_MODE_NONE,
-            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            .lineWidth = 1.0f,
-        };
-
-        VkPipelineMultisampleStateCreateInfo multisampling = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-        };
-
-        VkStencilOpState stencilOpState = {
-            .failOp      = convert_stencil_op(passInfo.stencil_fail_op),
-            .passOp      = convert_stencil_op(passInfo.stencil_pass_op),
-            .depthFailOp = convert_stencil_op(passInfo.stencil_depth_fail_op),
-            .compareOp   = convert_stencil_func(passInfo.stencil_comparison_func),
-            .compareMask = static_cast<uint32_t>(passInfo.stencil_read_mask),
-            .writeMask   = static_cast<uint32_t>(passInfo.stencil_write_mask),
-            .reference   = static_cast<uint32_t>(passInfo.stencil_reference_value),
-        };
-
-        VkPipelineDepthStencilStateCreateInfo depthStencilInfo = {
-            .sType             = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-            .stencilTestEnable = passInfo.stencil_enable,
-            .front             = stencilOpState,
-            .back              = stencilOpState,
-        };
-
-        std::vector<VkPipelineColorBlendAttachmentState> blendAttachments;
-        for (size_t i = 0; i < colorFormats.size(); i++)
-        {
-            blendAttachments.push_back({
-                .blendEnable         = passInfo.blend_enable[i],
-                .srcColorBlendFactor = convert_blend_factor(passInfo.source_color_blend_factor[i]),
-                .dstColorBlendFactor = convert_blend_factor(passInfo.dest_color_blend_factor[i]),
-                .colorBlendOp        = convert_blend_op(passInfo.color_blend_op[i]),
-                .srcAlphaBlendFactor = convert_blend_factor(passInfo.source_alpha_blend_factor[i]),
-                .dstAlphaBlendFactor = convert_blend_factor(passInfo.dest_alpha_blend_factor[i]),
-                .alphaBlendOp        = convert_blend_op(passInfo.alpha_blend_op[i]),
-                .colorWriteMask      = static_cast<VkColorComponentFlags>(passInfo.render_target_write_mask[i]),  // Yes, this works.
-            });
-        }
-        VkPipelineColorBlendStateCreateInfo colorBlending = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-            .attachmentCount = static_cast<uint32_t>(blendAttachments.size()),
-            .pAttachments = blendAttachments.data(),
-        };
-
-        VkDynamicState dynamicStates[] = {
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR,
-            VK_DYNAMIC_STATE_STENCIL_REFERENCE
-        };
-
-        VkPipelineDynamicStateCreateInfo dynamicState = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .dynamicStateCount = 3,
-            .pDynamicStates = dynamicStates,
-        };
-
-        // Dynamic rendering info
-        VkPipelineRenderingCreateInfo renderingInfo = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-            .colorAttachmentCount = (uint32_t)colorFormats.size(),
-            .pColorAttachmentFormats = colorFormats.data(),
-            .stencilAttachmentFormat = passInfo.stencil_enable ? VK_FORMAT_S8_UINT : VK_FORMAT_UNDEFINED,
-        };
-
-        VkGraphicsPipelineCreateInfo pipelineInfo = {
-            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .pNext = &renderingInfo,
-            .stageCount = 2,
-            .pStages = shaderStages,
-            .pVertexInputState = &vertexInputInfo,
-            .pInputAssemblyState = &inputAssembly,
-            .pViewportState = &viewportState,
-            .pRasterizationState = &rasterizer,
-            .pMultisampleState = &multisampling,
-            .pDepthStencilState = &depthStencilInfo,
-            .pColorBlendState = &colorBlending,
-            .pDynamicState = &dynamicState,
-            .layout = pass.pipelineLayout,
-        };
-
-        VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pass.pipeline));
-    }
-}
-
 void vkShade::ReshadeEffect::reflect_descriptors()
 {
     auto& technique = m_module->techniques[0];
@@ -745,6 +595,156 @@ void vkShade::ReshadeEffect::reflect_images()
         usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
         m_stencilBuffer = std::make_unique<VulkanImage>(m_device, m_extent, VK_FORMAT_S8_UINT, usage);
+    }
+}
+
+void vkShade::ReshadeEffect::reflect_pipeline()
+{
+    for (auto&& [pass, passInfo] : std::views::zip(m_passes, m_module->techniques[0].passes))
+    {
+        std::vector<VkFormat> colorFormats;
+        for (const auto& name : passInfo.render_target_names)
+        {
+            if (name.empty())
+                break;
+
+            auto it = m_textures.find(name);
+            if (it != m_textures.end())
+                colorFormats.push_back(it->second->format());
+        }
+
+        if (colorFormats.empty())
+            colorFormats.push_back(m_format);
+
+        // Create pipeline layout
+        std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .setLayoutCount = layouts.size(),
+            .pSetLayouts = layouts.data(),
+        };
+
+        VK_CHECK(m_device.dispatch.CreatePipelineLayout(m_device.handle, &pipelineLayoutInfo, nullptr, &pass.pipelineLayout));
+
+        // Create graphics pipeline
+        VkPipelineShaderStageCreateInfo shaderStages[] = {
+            {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = pass.vertexShader->module(),
+                .pName = passInfo.vs_entry_point.c_str(),
+            },
+            {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = pass.fragmentShader->module(),
+                .pName = passInfo.ps_entry_point.c_str(),
+            }
+        };
+
+        // No vertex input (fullscreen triangle generated in vertex shader)
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        };
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+            .topology = convert_primitive_topology(passInfo.topology),
+        };
+
+        VkPipelineViewportStateCreateInfo viewportState = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .viewportCount = 1,
+            .scissorCount = 1,
+        };
+
+        VkPipelineRasterizationStateCreateInfo rasterizer = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .polygonMode = VK_POLYGON_MODE_FILL,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .lineWidth = 1.0f,
+        };
+
+        VkPipelineMultisampleStateCreateInfo multisampling = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+        };
+
+        VkStencilOpState stencilOpState = {
+            .failOp      = convert_stencil_op(passInfo.stencil_fail_op),
+            .passOp      = convert_stencil_op(passInfo.stencil_pass_op),
+            .depthFailOp = convert_stencil_op(passInfo.stencil_depth_fail_op),
+            .compareOp   = convert_stencil_func(passInfo.stencil_comparison_func),
+            .compareMask = static_cast<uint32_t>(passInfo.stencil_read_mask),
+            .writeMask   = static_cast<uint32_t>(passInfo.stencil_write_mask),
+            .reference   = static_cast<uint32_t>(passInfo.stencil_reference_value),
+        };
+
+        VkPipelineDepthStencilStateCreateInfo depthStencilInfo = {
+            .sType             = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .stencilTestEnable = passInfo.stencil_enable,
+            .front             = stencilOpState,
+            .back              = stencilOpState,
+        };
+
+        std::vector<VkPipelineColorBlendAttachmentState> blendAttachments;
+        for (size_t i = 0; i < colorFormats.size(); i++)
+        {
+            blendAttachments.push_back({
+                .blendEnable         = passInfo.blend_enable[i],
+                .srcColorBlendFactor = convert_blend_factor(passInfo.source_color_blend_factor[i]),
+                .dstColorBlendFactor = convert_blend_factor(passInfo.dest_color_blend_factor[i]),
+                .colorBlendOp        = convert_blend_op(passInfo.color_blend_op[i]),
+                .srcAlphaBlendFactor = convert_blend_factor(passInfo.source_alpha_blend_factor[i]),
+                .dstAlphaBlendFactor = convert_blend_factor(passInfo.dest_alpha_blend_factor[i]),
+                .alphaBlendOp        = convert_blend_op(passInfo.alpha_blend_op[i]),
+                .colorWriteMask      = static_cast<VkColorComponentFlags>(passInfo.render_target_write_mask[i]),  // Yes, this works.
+            });
+        }
+        VkPipelineColorBlendStateCreateInfo colorBlending = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .attachmentCount = static_cast<uint32_t>(blendAttachments.size()),
+            .pAttachments = blendAttachments.data(),
+        };
+
+        VkDynamicState dynamicStates[] = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR,
+            VK_DYNAMIC_STATE_STENCIL_REFERENCE
+        };
+
+        VkPipelineDynamicStateCreateInfo dynamicState = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = 3,
+            .pDynamicStates = dynamicStates,
+        };
+
+        // Dynamic rendering info
+        VkPipelineRenderingCreateInfo renderingInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = (uint32_t)colorFormats.size(),
+            .pColorAttachmentFormats = colorFormats.data(),
+            .stencilAttachmentFormat = passInfo.stencil_enable ? VK_FORMAT_S8_UINT : VK_FORMAT_UNDEFINED,
+        };
+
+        VkGraphicsPipelineCreateInfo pipelineInfo = {
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = &renderingInfo,
+            .stageCount = 2,
+            .pStages = shaderStages,
+            .pVertexInputState = &vertexInputInfo,
+            .pInputAssemblyState = &inputAssembly,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisampling,
+            .pDepthStencilState = &depthStencilInfo,
+            .pColorBlendState = &colorBlending,
+            .pDynamicState = &dynamicState,
+            .layout = pass.pipelineLayout,
+        };
+
+        VK_CHECK(m_device.dispatch.CreateGraphicsPipelines(m_device.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pass.pipeline));
     }
 }
 
