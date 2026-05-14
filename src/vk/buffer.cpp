@@ -47,8 +47,8 @@ bool vkShade::VulkanBuffer::copy(VkCommandBuffer cmd, VkBuffer source, size_t si
     }
 
     VkBufferCopy bufferCopy {0};
-    bufferCopy.dstOffset = srcOffset;
-    bufferCopy.srcOffset = dstOffset;
+    bufferCopy.srcOffset = srcOffset;
+    bufferCopy.dstOffset = dstOffset;
     bufferCopy.size = size;
 
     m_device.dispatch.CmdCopyBuffer(cmd, source, m_buffer, 1, &bufferCopy);
