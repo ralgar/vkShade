@@ -32,12 +32,12 @@ option(
 option(
     'sdl2_renderer',
     type: 'feature',
-    value: 'auto',
+    value: 'disabled',
 )
 option(
     'sdl3_renderer',
     type: 'feature',
-    value: 'auto',
+    value: 'disabled',
 )
 option(
     'vulkan',
@@ -54,17 +54,17 @@ option(
 option(
     'glfw',
     type: 'feature',
-    value: 'auto',
+    value: 'disabled',
 )
 option(
     'sdl2',
     type: 'feature',
-    value: 'auto',
+    value: 'disabled',
 )
 option(
     'sdl3',
     type: 'feature',
-    value: 'auto',
+    value: 'disabled',
 )
 option(
     'osx',

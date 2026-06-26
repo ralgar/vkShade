@@ -9,10 +9,10 @@ version_hpp = declare_dependency(
 
 glm = dependency('glm', fallback: ['glm', 'glm_dep'])
 imgui = dependency('imgui', fallback: ['imgui', 'imgui_dep'], static: true)
-inih = dependency('inih', fallback: ['inih', 'inih_dep'])
+inih = dependency('inih', fallback: ['inih', 'inih_dep'], static: true)
 magic_enum = dependency('magic_enum', fallback: ['magic_enum', 'magic_enum_dep'])
 reshadefx = dependency('reshadefx', fallback: ['reshadefx', 'reshadefx_dep'])
-spdlog = dependency('spdlog', fallback: ['spdlog', 'spdlog_dep'])
+spdlog = dependency('spdlog', fallback: ['spdlog', 'spdlog_dep'], static: true)
 stb = dependency('stb', fallback: ['stb', 'stb_dep'])
 vma = dependency('vma', fallback: ['vulkan-memory-allocator', 'vma_allocator_dep'])
 wayland_client = dependency('wayland-client')
