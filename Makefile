@@ -24,7 +24,8 @@ config:
 .PHONY: config-lib32
 config-lib32:
 	ASFLAGS=--32 CFLAGS=-m32 CXXFLAGS=-m32 PKG_CONFIG_PATH=/usr/$(LIB32_DIR)/pkgconfig \
-		meson setup --prefix "$(HOME)/.local" --buildtype=release libdir=$(LIB32_DIR) $(BUILD32_DIR)
+		meson setup --prefix "$(HOME)/.local" --buildtype=release --libdir=$(LIB32_DIR) \
+		--force-fallback-for=inih,spdlog $(BUILD32_DIR)
 
 .PHONY: debug
 debug:
