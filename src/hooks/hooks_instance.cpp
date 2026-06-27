@@ -33,6 +33,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 
         auto logger = std::make_shared<spdlog::logger>("vkShade", sinks.begin(), sinks.end());
         spdlog::set_default_logger(logger);
+        logger->flush_on(spdlog::level::trace);  // Always flush on log events
 
         // Set log level
         const char* logLevelEnv = std::getenv("VKSHADE_LOG_LEVEL");
