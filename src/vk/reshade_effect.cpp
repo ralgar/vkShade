@@ -68,6 +68,16 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 {
     auto& technique = m_module->techniques[0];
 
+    // ReShade defines newly created effect textures to contain zero. Initialize
+    // all internal resources before any pass can sample temporal history or
+    // load an attachment that has not been written yet.
+    if (!m_imagesInitialized)
+    {
+        for (auto& [name, texture] : m_textures)
+            texture->initialize(cmd);
+        m_imagesInitialized = true;
+    }
+
     // Clear the stencil buffer if we have one.
     if (m_stencilBuffer)
     {

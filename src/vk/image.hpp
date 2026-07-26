@@ -38,6 +38,9 @@ namespace vkShade
         // Transition the image from its current layout into a new layout
         void transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout);
 
+        // Initialize effect-owned images before their first use.
+        void initialize(VkCommandBuffer cmd);
+
         // Getters for handles
         const VkImage& image() const { return m_image; }
         const VkImageView& image_view() const { return m_imageView; }
@@ -53,12 +56,14 @@ namespace vkShade
         VmaAllocation     m_allocation = VK_NULL_HANDLE;
         VkFormat          m_format = VK_FORMAT_UNDEFINED;
         VkImageLayout     m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        bool              m_needsInitialization = false;
 
         // The actual blit implementation
         void blit(VkCommandBuffer cmd, VkImage src, VkImage dest);
 
         void create_image();
         void create_image_view();
+        void destroy();
 
         void load_from_file(const std::string& filePath);
 

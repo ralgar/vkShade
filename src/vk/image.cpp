@@ -1,5 +1,6 @@
 #include "image.hpp"
 
+#include <optional>
 #include <effect_module.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -42,53 +43,13 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         return a.name == "source";
     });
 
-    // If no explicit size is specified we need to extract it from the image file
-    if (it != info.annotations.end() && m_extent.width == 1 && m_extent.height == 1)
-    {
-        // Find the file and probe dimensions before creating the image
-        auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-        auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
-        std::string fileName = it->value.string_data;
-
-        bool found = false;
-        for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
-        {
-            for (const auto& entry : std::filesystem::directory_iterator(path))
-            {
-                // Do a case insensitive comparison since ReShade is a Windows app
-                auto a = entry.path().filename().string();
-                auto b = fileName;
-                std::transform(a.begin(), a.end(), a.begin(), ::tolower);
-                std::transform(b.begin(), b.end(), b.begin(), ::tolower);
-                if (a == b)
-                {
-                    int w, h, c;
-                    if (stbi_info(entry.path().c_str(), &w, &h, &c))
-                    {
-                        m_extent.width  = w;
-                        m_extent.height = h;
-                    }
-
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        if (!found)
-            throw std::runtime_error("Unable to find texture: " + fileName);
-    }
-
-    this->create_image();
-    this->create_image_view();
-
+    std::optional<std::filesystem::path> sourcePath;
     if (it != info.annotations.end())
     {
         auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
         auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
         std::string fileName = it->value.string_data;
 
-        bool found = false;
         for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
         {
             for (const auto& entry : std::filesystem::directory_iterator(path))
@@ -100,15 +61,48 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
                 std::transform(b.begin(), b.end(), b.begin(), ::tolower);
                 if (a == b)
                 {
-                    this->load_from_file(entry.path());
-                    found = true;
+                    sourcePath = entry.path();
                     break;
                 }
             }
+
+            if (sourcePath)
+                break;
         }
 
-        if (!found)
+        if (!sourcePath)
             throw std::runtime_error("Unable to find texture: " + fileName);
+
+        // If no explicit size is specified, extract it before allocating the image.
+        if (m_extent.width == 1 && m_extent.height == 1)
+        {
+            int w, h, c;
+            if (!stbi_info(sourcePath->c_str(), &w, &h, &c))
+                throw std::runtime_error("Unable to read texture dimensions: " + fileName);
+
+            m_extent.width  = w;
+            m_extent.height = h;
+        }
+    }
+
+    try
+    {
+        this->create_image();
+        this->create_image_view();
+
+        // ReShade effects may sample persistent textures before their first write
+        // (for example, temporal luminance history). Vulkan leaves newly allocated
+        // image contents undefined, while the ReShade runtime initializes effect
+        // textures to zero.
+        m_needsInitialization = !sourcePath;
+
+        if (sourcePath)
+            this->load_from_file(*sourcePath);
+    }
+    catch (...)
+    {
+        this->destroy();
+        throw;
     }
 }
 
@@ -203,7 +197,11 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
 vkShade::VulkanImage::~VulkanImage()
 {
     Logger::trace("Destroying VulkanImage");
+    this->destroy();
+}
 
+void vkShade::VulkanImage::destroy()
+{
     if (m_imageView != VK_NULL_HANDLE)
         m_device.dispatch.DestroyImageView(m_device.handle, m_imageView, nullptr);
 
@@ -372,6 +370,22 @@ void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout 
     m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
 
     m_currentLayout = newLayout;  // Update tracked layout
+}
+
+void vkShade::VulkanImage::initialize(VkCommandBuffer cmd)
+{
+    if (!m_needsInitialization)
+        return;
+
+    this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    VkClearColorValue clearValue {};
+    VkImageSubresourceRange range = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+    m_device.dispatch.CmdClearColorImage(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                         &clearValue, 1, &range);
+
+    this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    m_needsInitialization = false;
 }
 
 void vkShade::VulkanImage::upload(const void* data, size_t size)
