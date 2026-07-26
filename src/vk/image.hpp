@@ -50,18 +50,24 @@ namespace vkShade
 
         // Getters for handles
         const VkImage& image() const { return m_image; }
-        const VkImageView& image_view() const { return m_imageView; }
-        const VkImageView& render_target_view() const { return m_renderTargetView; }
+        const VkImageView& image_view() const;
+        const VkImageView& sampled_view(bool srgb) const;
+        const VkImageView& render_target_view() const;
+        const VkImageView& render_target_view(bool srgb) const;
         const VkFormat format() const { return m_format; }
         const VkExtent3D extent() const { return m_extent; }
         uint32_t mip_levels() const { return m_mipLevels; }
+
+        static VkFormat view_format(VkFormat format, bool srgb);
 
     private:
         bool              m_owning = true;
         VkExtent3D        m_extent {0, 0, 0};
         VkImage           m_image = VK_NULL_HANDLE;
-        VkImageView       m_imageView = VK_NULL_HANDLE;
-        VkImageView       m_renderTargetView = VK_NULL_HANDLE;
+        VkImageView       m_linearImageView = VK_NULL_HANDLE;
+        VkImageView       m_srgbImageView = VK_NULL_HANDLE;
+        VkImageView       m_linearRenderTargetView = VK_NULL_HANDLE;
+        VkImageView       m_srgbRenderTargetView = VK_NULL_HANDLE;
         VkImageUsageFlags m_usageFlags = 0;
         VmaAllocation     m_allocation = VK_NULL_HANDLE;
         VkFormat          m_format = VK_FORMAT_UNDEFINED;

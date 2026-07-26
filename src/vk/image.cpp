@@ -208,10 +208,19 @@ vkShade::VulkanImage::~VulkanImage()
 
 void vkShade::VulkanImage::destroy()
 {
-    if (m_imageView != VK_NULL_HANDLE)
-        m_device.dispatch.DestroyImageView(m_device.handle, m_imageView, nullptr);
-    if (m_renderTargetView != VK_NULL_HANDLE && m_renderTargetView != m_imageView)
-        m_device.dispatch.DestroyImageView(m_device.handle, m_renderTargetView, nullptr);
+    if (m_srgbRenderTargetView != VK_NULL_HANDLE
+        && m_srgbRenderTargetView != m_linearRenderTargetView
+        && m_srgbRenderTargetView != m_srgbImageView
+        && m_srgbRenderTargetView != m_linearImageView)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_srgbRenderTargetView, nullptr);
+    if (m_linearRenderTargetView != VK_NULL_HANDLE
+        && m_linearRenderTargetView != m_srgbImageView
+        && m_linearRenderTargetView != m_linearImageView)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_linearRenderTargetView, nullptr);
+    if (m_srgbImageView != VK_NULL_HANDLE && m_srgbImageView != m_linearImageView)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_srgbImageView, nullptr);
+    if (m_linearImageView != VK_NULL_HANDLE)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_linearImageView, nullptr);
 
     if (m_owning && m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE)
         vmaDestroyImage(m_device.allocator, m_image, m_allocation);
@@ -221,9 +230,13 @@ void vkShade::VulkanImage::create_image()
 {
     m_mipLayouts.assign(m_mipLevels, VK_IMAGE_LAYOUT_UNDEFINED);
 
+    const bool mutableFormat = view_format(m_format, false) != view_format(m_format, true);
     VkImageCreateInfo imgInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = nullptr,
+        .flags = mutableFormat
+               ? VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT
+               : 0u,
         .imageType = VK_IMAGE_TYPE_2D,
         .format = m_format,
         .extent = VkExtent3D {m_extent.width, m_extent.height, 1},
@@ -252,13 +265,25 @@ void vkShade::VulkanImage::create_image_view()
 	if (m_format == VK_FORMAT_S8_UINT)
 		aspectFlags = VK_IMAGE_ASPECT_STENCIL_BIT;
 
-	// Build an image view for the image.
+    // Wrapped application images are not guaranteed to have been created with
+    // MUTABLE_FORMAT. vkShade-owned images opt into compatible UNORM/sRGB
+    // views in create_image().
+    const VkFormat linearFormat = m_owning ? view_format(m_format, false) : m_format;
+    const VkFormat srgbFormat = m_owning ? view_format(m_format, true) : m_format;
+
+    VkImageViewUsageCreateInfo viewUsageInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
+        .usage = m_usageFlags & (VK_IMAGE_USAGE_SAMPLED_BIT
+                               | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT),
+    };
+
+	// Build shader-resource views spanning the full mip chain.
     VkImageViewCreateInfo viewInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .pNext = nullptr,
+        .pNext = viewUsageInfo.usage ? &viewUsageInfo : nullptr,
         .image = m_image,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = m_format,
+        .format = linearFormat,
         .subresourceRange = {
             .aspectMask = aspectFlags,
             .baseMipLevel = 0,
@@ -268,17 +293,78 @@ void vkShade::VulkanImage::create_image_view()
         },
     };
 
-	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_imageView));
+	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                              &m_linearImageView));
+
+    if (srgbFormat != linearFormat)
+    {
+        viewInfo.format = srgbFormat;
+        VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                                    &m_srgbImageView));
+    }
+    else
+    {
+        m_srgbImageView = m_linearImageView;
+    }
 
     if (m_mipLevels > 1 && (m_usageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
     {
         viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.format = linearFormat;
         VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
-                                                    &m_renderTargetView));
+                                                    &m_linearRenderTargetView));
+        if (srgbFormat != linearFormat)
+        {
+            viewInfo.format = srgbFormat;
+            VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                                        &m_srgbRenderTargetView));
+        }
+        else
+        {
+            m_srgbRenderTargetView = m_linearRenderTargetView;
+        }
     }
     else
     {
-        m_renderTargetView = m_imageView;
+        m_linearRenderTargetView = m_linearImageView;
+        m_srgbRenderTargetView = m_srgbImageView;
+    }
+}
+
+const VkImageView& vkShade::VulkanImage::image_view() const
+{
+    return sampled_view(m_format == view_format(m_format, true)
+                        && m_format != view_format(m_format, false));
+}
+
+const VkImageView& vkShade::VulkanImage::sampled_view(bool srgb) const
+{
+    return srgb ? m_srgbImageView : m_linearImageView;
+}
+
+const VkImageView& vkShade::VulkanImage::render_target_view() const
+{
+    return render_target_view(m_format == view_format(m_format, true)
+                              && m_format != view_format(m_format, false));
+}
+
+const VkImageView& vkShade::VulkanImage::render_target_view(bool srgb) const
+{
+    return srgb ? m_srgbRenderTargetView : m_linearRenderTargetView;
+}
+
+VkFormat vkShade::VulkanImage::view_format(VkFormat format, bool srgb)
+{
+    switch (format)
+    {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            return srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            return srgb ? VK_FORMAT_B8G8R8A8_SRGB : VK_FORMAT_B8G8R8A8_UNORM;
+        default:
+            return format;
     }
 }
 
