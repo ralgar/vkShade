@@ -93,8 +93,6 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
     // Iterate and apply effect passes
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, technique.passes))
     {
-        bool isFinalPass = (&passInfo == &technique.passes.back());
-
         const VkClearValue clearValue = { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } };
         const VkClearValue* clear = passInfo.clear_render_targets ? &clearValue : nullptr;
 
@@ -114,10 +112,11 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
                 attachmentExtent.width = renderTarget->extent().width;
                 attachmentExtent.height = renderTarget->extent().height;
             }
-            renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            colorAttachments.push_back(vkinit::rendering_attachment_info(renderTarget->image_view(),
-                                                                         clear,
-                                                                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
+            renderTarget->transition_render_target_layout(
+                cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            colorAttachments.push_back(vkinit::rendering_attachment_info(
+                renderTarget->render_target_view(), clear,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
         if (colorAttachments.empty())
@@ -192,17 +191,19 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 
         m_device.dispatch.CmdEndRendering(cmd);
 
-        // Transition intermediate render targets to SHADER_READ_ONLY_OPTIMAL for next pass
-        if (!isFinalPass)
+        // Make internal render targets visible to subsequent passes and frames.
+        // ReShade regenerates their mip chain after every writing pass unless
+        // GenerateMipmaps is disabled on that pass.
+        for (const auto& name : passInfo.render_target_names)
         {
-            for (const auto& name : passInfo.render_target_names)
-            {
-                if (name.empty())
-                    break;
+            if (name.empty())
+                break;
 
-                auto* renderTarget = m_textures.at(name).get();
-                renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            }
+            auto* renderTarget = m_textures.at(name).get();
+            renderTarget->transition_render_target_layout(
+                cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            if (passInfo.generate_mipmaps)
+                renderTarget->generate_mipmaps(cmd);
         }
     }
 }

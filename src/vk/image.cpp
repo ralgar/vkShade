@@ -1,5 +1,6 @@
 #include "image.hpp"
 
+#include <cassert>
 #include <optional>
 #include <effect_module.hpp>
 #define STB_IMAGE_IMPLEMENTATION
@@ -23,6 +24,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
     m_extent.width  = info.width;
     m_extent.height = info.height;
     m_extent.depth  = info.depth;
+    m_mipLevels = info.levels;
 
     m_format = convert_format(info.format);
 
@@ -31,6 +33,9 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         m_format = VK_FORMAT_R8G8B8A8_UNORM;
 
     m_usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    if (m_mipLevels > 1)
+        m_usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     if (info.render_target)
         m_usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -189,6 +194,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
     m_extent.depth  = 1;
     m_format = format;
     m_owning = false;  // IMPORTANT! We don't own the image here.
+    m_mipLayouts.assign(m_mipLevels, VK_IMAGE_LAYOUT_UNDEFINED);
 
     // Only create the view (no image since we don't own it)
     this->create_image_view();
@@ -204,6 +210,8 @@ void vkShade::VulkanImage::destroy()
 {
     if (m_imageView != VK_NULL_HANDLE)
         m_device.dispatch.DestroyImageView(m_device.handle, m_imageView, nullptr);
+    if (m_renderTargetView != VK_NULL_HANDLE && m_renderTargetView != m_imageView)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_renderTargetView, nullptr);
 
     if (m_owning && m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE)
         vmaDestroyImage(m_device.allocator, m_image, m_allocation);
@@ -211,13 +219,15 @@ void vkShade::VulkanImage::destroy()
 
 void vkShade::VulkanImage::create_image()
 {
+    m_mipLayouts.assign(m_mipLevels, VK_IMAGE_LAYOUT_UNDEFINED);
+
     VkImageCreateInfo imgInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = nullptr,
         .imageType = VK_IMAGE_TYPE_2D,
         .format = m_format,
         .extent = VkExtent3D {m_extent.width, m_extent.height, 1},
-        .mipLevels = 1,
+        .mipLevels = m_mipLevels,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,   // 1 sample per pixel = no MSAA
         .tiling = VK_IMAGE_TILING_OPTIMAL,  // Let the GPU move the data as it sees fit
@@ -252,13 +262,24 @@ void vkShade::VulkanImage::create_image_view()
         .subresourceRange = {
             .aspectMask = aspectFlags,
             .baseMipLevel = 0,
-            .levelCount = 1,
+            .levelCount = m_mipLevels,
             .baseArrayLayer = 0,
             .layerCount = 1,
         },
     };
 
 	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_imageView));
+
+    if (m_mipLevels > 1 && (m_usageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
+    {
+        viewInfo.subresourceRange.levelCount = 1;
+        VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                                    &m_renderTargetView));
+    }
+    else
+    {
+        m_renderTargetView = m_imageView;
+    }
 }
 
 void vkShade::VulkanImage::blit_from(VkCommandBuffer cmd, VkImage source)
@@ -337,39 +358,166 @@ VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)
 
 void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout)
 {
+    transition_layout(cmd, newLayout, 0, m_mipLevels);
+}
+
+void vkShade::VulkanImage::transition_render_target_layout(VkCommandBuffer cmd,
+                                                            VkImageLayout newLayout)
+{
+    transition_layout(cmd, newLayout, 0, 1);
+}
+
+void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout,
+                                              uint32_t baseMipLevel, uint32_t levelCount)
+{
     VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     if (m_format == VK_FORMAT_D32_SFLOAT)
         aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     if (m_format == VK_FORMAT_S8_UINT)
         aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
 
-    VkImageMemoryBarrier2 imageBarrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-        .oldLayout = m_currentLayout,  // Track current layout
-        .newLayout = newLayout,
-        .image = m_image,
-        .subresourceRange = {
-            .aspectMask = aspectMask,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        },
+    const uint32_t endMipLevel = std::min(baseMipLevel + levelCount, m_mipLevels);
+    while (baseMipLevel < endMipLevel)
+    {
+        const VkImageLayout oldLayout = m_mipLayouts[baseMipLevel];
+        uint32_t endRange = baseMipLevel + 1;
+        while (endRange < endMipLevel && m_mipLayouts[endRange] == oldLayout)
+            ++endRange;
+
+        VkImageMemoryBarrier2 imageBarrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+            .oldLayout = oldLayout,
+            .newLayout = newLayout,
+            .image = m_image,
+            .subresourceRange = {
+                .aspectMask = aspectMask,
+                .baseMipLevel = baseMipLevel,
+                .levelCount = endRange - baseMipLevel,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        VkDependencyInfo depInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &imageBarrier,
+        };
+
+        m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
+        std::fill(m_mipLayouts.begin() + baseMipLevel,
+                  m_mipLayouts.begin() + endRange, newLayout);
+        baseMipLevel = endRange;
+    }
+}
+
+void vkShade::VulkanImage::generate_mipmaps(VkCommandBuffer cmd)
+{
+    if (m_mipLevels <= 1)
+        return;
+
+    auto barrier = [this, cmd](uint32_t baseMipLevel, uint32_t levelCount,
+                               VkImageLayout newLayout,
+                               VkPipelineStageFlags2 srcStageMask, VkAccessFlags2 srcAccessMask,
+                               VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask)
+    {
+        const VkImageLayout oldLayout = m_mipLayouts[baseMipLevel];
+        assert(std::all_of(m_mipLayouts.begin() + baseMipLevel,
+                           m_mipLayouts.begin() + baseMipLevel + levelCount,
+                           [oldLayout](VkImageLayout layout) { return layout == oldLayout; }));
+
+        VkImageMemoryBarrier2 imageBarrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = srcStageMask,
+            .srcAccessMask = srcAccessMask,
+            .dstStageMask = dstStageMask,
+            .dstAccessMask = dstAccessMask,
+            .oldLayout = oldLayout,
+            .newLayout = newLayout,
+            .image = m_image,
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = baseMipLevel,
+                .levelCount = levelCount,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        VkDependencyInfo dependencyInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &imageBarrier,
+        };
+        m_device.dispatch.CmdPipelineBarrier2(cmd, &dependencyInfo);
+        std::fill(m_mipLayouts.begin() + baseMipLevel,
+                  m_mipLayouts.begin() + baseMipLevel + levelCount, newLayout);
     };
 
-    VkDependencyInfo depInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &imageBarrier,
-    };
+    barrier(0, 1,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
 
-    m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
+    for (uint32_t level = 1; level < m_mipLevels; ++level)
+    {
+        barrier(level, 1,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
-    m_currentLayout = newLayout;  // Update tracked layout
+        VkImageBlit2 blitRegion = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+            .srcSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = level - 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+            .srcOffsets = {
+                {0, 0, 0},
+                {static_cast<int32_t>(std::max(1u, m_extent.width >> (level - 1))),
+                 static_cast<int32_t>(std::max(1u, m_extent.height >> (level - 1))), 1},
+            },
+            .dstSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = level,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+            .dstOffsets = {
+                {0, 0, 0},
+                {static_cast<int32_t>(std::max(1u, m_extent.width >> level)),
+                 static_cast<int32_t>(std::max(1u, m_extent.height >> level)), 1},
+            },
+        };
+
+        VkBlitImageInfo2 blitInfo = {
+            .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+            .srcImage = m_image,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstImage = m_image,
+            .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .regionCount = 1,
+            .pRegions = &blitRegion,
+            .filter = VK_FILTER_LINEAR,
+        };
+        m_device.dispatch.CmdBlitImage2(cmd, &blitInfo);
+
+        barrier(level, 1,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
+    }
+
+    barrier(0, m_mipLevels,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT);
 }
 
 void vkShade::VulkanImage::initialize(VkCommandBuffer cmd)
@@ -431,6 +579,9 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
 
     // Transition TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
     this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    if (m_mipLevels > 1)
+        this->generate_mipmaps(cmd);
 
     m_device.dispatch.EndCommandBuffer(cmd);
 
