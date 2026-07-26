@@ -115,16 +115,16 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
             renderTarget->transition_render_target_layout(
                 cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             colorAttachments.push_back(vkinit::rendering_attachment_info(
-                renderTarget->render_target_view(), clear,
+                renderTarget->render_target_view(passInfo.srgb_write_enable), clear,
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
         if (colorAttachments.empty())
         {
             outputImage.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            colorAttachments.push_back(vkinit::rendering_attachment_info(outputImage.image_view(),
-                                                                         clear,
-                                                                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
+            colorAttachments.push_back(vkinit::rendering_attachment_info(
+                outputImage.render_target_view(passInfo.srgb_write_enable), clear,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
         VkExtent2D passExtent {
@@ -225,9 +225,9 @@ void vkShade::ReshadeEffect::bind_input(VulkanImage& colorImage, VulkanImage& de
 
             VkImageView imageView;
             if (texIt->semantic == "COLOR")
-                imageView = colorImage.image_view();
+                imageView = colorImage.sampled_view(binding.srgb);
             else if (texIt->semantic == "DEPTH")
-                imageView = depthImage.image_view();
+                imageView = depthImage.sampled_view(binding.srgb);
             else
                 continue;  // Skip other textures (we only bind COLOR and DEPTH here)
 
@@ -601,8 +601,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
             auto& texture = m_textures.at(samplerInfo.texture_name);
             imageInfos.push_back({
                 .sampler = sampler->handle(),
-                //.imageView = binding.srgb ? texture->srgbView() : texture->linearView(),  // TODO: linear/srgb views
-                .imageView = texture->image_view(),
+                .imageView = texture->sampled_view(binding.srgb),
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             });
 
@@ -678,11 +677,13 @@ void vkShade::ReshadeEffect::reflect_pipeline()
 
             auto it = m_textures.find(name);
             if (it != m_textures.end())
-                colorFormats.push_back(it->second->format());
+                colorFormats.push_back(VulkanImage::view_format(it->second->format(),
+                                                                passInfo.srgb_write_enable));
         }
 
         if (colorFormats.empty())
-            colorFormats.push_back(m_format);
+            colorFormats.push_back(VulkanImage::view_format(m_format,
+                                                            passInfo.srgb_write_enable));
 
         // Create pipeline layout
         std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };
