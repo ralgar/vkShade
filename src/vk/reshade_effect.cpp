@@ -800,40 +800,50 @@ void vkShade::ReshadeEffect::reflect_uniforms()
         {
             const auto& source = sourceIt->value.string_data;
 
-            if (source == "frametime")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::FrameTimeUniform>(uniform));
-            else if (source == "framecount")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::FrameCountUniform>(uniform));
-            else if (source == "date")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::DateUniform>(uniform));
-            else if (source == "timer")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::TimerUniform>(uniform));
-            else if (source == "pingpong")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::PingPongUniform>(uniform));
-            else if (source == "random")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::RandomUniform>(uniform));
-            else if (source == "key")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::KeyUniform>(uniform));
-            else if (source == "mousebutton")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseButtonUniform>(uniform));
-            else if (source == "mousepoint")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::MousePointUniform>(uniform));
-            else if (source == "mousedelta")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseDeltaUniform>(uniform));
-            else if (source == "mousewheel")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::MouseWheelUniform>(uniform));
-            else if (source == "bufready_depth")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::DepthUniform>(uniform));
-            else if (source == "overlay_open")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayOpenUniform>(uniform));
-            else if (source == "overlay_active")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayActiveUniform>(uniform));
-            else if (source == "overlay_hovered")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayHoveredUniform>(uniform));
-            else if (source == "screenshot")
-                m_builtinUniforms.push_back(std::make_unique<vkShade::ScreenshotUniform>(uniform));
+            if (reshade_uniform_uses_initializer(source))
+                sourceIt = uniform.annotations.end();
+            else
+            {
+                // ReShade clears all source uniforms, including unknown sources,
+                // rather than applying their shader initializer.
+                std::vector<std::byte> zero(uniform.size);
+                m_uniformBuffer->write(zero.data(), zero.size(), uniform.offset);
 
-            continue;  // Skip GUI reflection for built-in uniforms
+                if (source == "frametime")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::FrameTimeUniform>(uniform));
+                else if (source == "framecount")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::FrameCountUniform>(uniform));
+                else if (source == "date")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::DateUniform>(uniform));
+                else if (source == "timer")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::TimerUniform>(uniform));
+                else if (source == "pingpong")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::PingPongUniform>(uniform));
+                else if (source == "random")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::RandomUniform>(uniform));
+                else if (source == "key")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::KeyUniform>(uniform));
+                else if (source == "mousebutton")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::MouseButtonUniform>(uniform));
+                else if (source == "mousepoint")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::MousePointUniform>(uniform));
+                else if (source == "mousedelta")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::MouseDeltaUniform>(uniform));
+                else if (source == "mousewheel")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::MouseWheelUniform>(uniform));
+                else if (source == "bufready_depth")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::DepthUniform>(uniform));
+                else if (source == "overlay_open")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayOpenUniform>(uniform));
+                else if (source == "overlay_active")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayActiveUniform>(uniform));
+                else if (source == "overlay_hovered")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::OverlayHoveredUniform>(uniform));
+                else if (source == "screenshot")
+                    m_builtinUniforms.push_back(std::make_unique<vkShade::ScreenshotUniform>(uniform));
+
+                continue;  // Skip GUI reflection for source uniforms
+            }
         }
 
         // Generic/GUI uniform

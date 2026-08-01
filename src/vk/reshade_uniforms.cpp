@@ -3,7 +3,6 @@
 #include <chrono>
 #include <effect_module.hpp>
 #include <glm/vec2.hpp>
-#include <random>
 #include <spdlog/spdlog.h>
 
 #include "vk/buffer.hpp"
@@ -29,7 +28,7 @@ vkShade::FrameTimeUniform::FrameTimeUniform(reshadefx::uniform uniform)
 
 void vkShade::FrameTimeUniform::update(VulkanBuffer& buffer, const ReshadeFrameState& frame)
 {
-    buffer.write(&frame.frame_time, m_size, m_offset);
+    buffer.write(&frame.frameTime, m_size, m_offset);
 }
 
 vkShade::FrameCountUniform::FrameCountUniform(reshadefx::uniform uniform)
@@ -42,7 +41,7 @@ vkShade::FrameCountUniform::FrameCountUniform(reshadefx::uniform uniform)
 
 void vkShade::FrameCountUniform::update(VulkanBuffer& buffer, const ReshadeFrameState& frame)
 {
-    buffer.write(&frame.frame_count, m_size, m_offset);
+    buffer.write(&frame.frameCount, m_size, m_offset);
 }
 
 vkShade::DateUniform::DateUniform(reshadefx::uniform uniform)
@@ -91,61 +90,24 @@ vkShade::PingPongUniform::PingPongUniform(reshadefx::uniform uniform)
 
     for (const auto& a : uniform.annotations)
     {
-        if      (a.name == "min")       m_min       = to_float(a);
-        else if (a.name == "max")       m_max       = to_float(a);
-        else if (a.name == "smoothing") m_smoothing = to_float(a);
+        if      (a.name == "min")       m_state.min       = to_float(a);
+        else if (a.name == "max")       m_state.max       = to_float(a);
+        else if (a.name == "smoothing") m_state.smoothing = to_float(a);
         else if (a.name == "step")
         {
-            m_stepMin = to_float(a, 0);
-            m_stepMax = to_float(a, 1);
+            m_state.stepMin = to_float(a, 0);
+            m_state.stepMax = to_float(a, 1);
         }
     }
 
-    m_lastFrame = std::chrono::steady_clock::now();
-    m_offset    = uniform.offset;
-    m_size      = uniform.size;
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
 }
 
-void vkShade::PingPongUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
+void vkShade::PingPongUniform::update(VulkanBuffer& buffer, const ReshadeFrameState& frame)
 {
-    // Compute delta time and update tracking
-    auto now = std::chrono::steady_clock::now();
-    float deltaTime = std::chrono::duration<float>(now - m_lastFrame).count();
-    m_lastFrame = now;
-
-    // Pick a step size
-    float step = m_stepMin;
-    if (m_stepMax != 0.0f)
-    {
-        static std::mt19937 rng(std::random_device{}());
-        std::uniform_real_distribution<float> dist(m_stepMin, m_stepMax);
-        step = dist(rng);
-    }
-
-    // If going forwards, calculate smoothing reduction based on how
-    //  close we are to m_max, and apply it to step.
-    if (m_currentValue[1] >= 0.0f)
-    {
-        float smooth = std::max(0.0f, m_smoothing - (m_max - m_currentValue[0]));
-        m_currentValue[0] += std::max(step - smooth, 0.05f) * deltaTime;
-        if (m_currentValue[0] >= m_max)
-        {
-            m_currentValue[0] = m_max;
-            m_currentValue[1] = -1.0f;
-        }
-    }
-    else  // If going backwards, same logic in reverse.
-    {
-        float smooth = std::max(0.0f, m_smoothing - (m_currentValue[0] - m_min));
-        m_currentValue[0] -= std::max(step - smooth, 0.05f) * deltaTime;
-        if (m_currentValue[0] <= m_min)
-        {
-            m_currentValue[0] = m_min;
-            m_currentValue[1] = 1.0f;
-        }
-    }
-
-    buffer.write(m_currentValue, m_size, m_offset);
+    m_state.advance(frame.frameTime * 0.001f, m_state.next_step(std::rand()));
+    buffer.write(m_state.value.data(), m_size, m_offset);
 }
 
 vkShade::RandomUniform::RandomUniform(reshadefx::uniform uniform)
@@ -159,8 +121,8 @@ vkShade::RandomUniform::RandomUniform(reshadefx::uniform uniform)
 
     for (const auto& a : uniform.annotations)
     {
-        if      (a.name == "min") m_min = to_int(a);
-        else if (a.name == "max") m_max = to_int(a);
+        if      (a.name == "min") m_range.min = to_int(a);
+        else if (a.name == "max") m_range.max = to_int(a);
     }
 
     m_offset = uniform.offset;
@@ -169,9 +131,7 @@ vkShade::RandomUniform::RandomUniform(reshadefx::uniform uniform)
 
 void vkShade::RandomUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
-    static std::mt19937 rng(std::random_device{}());
-    std::uniform_int_distribution<int32_t> dist(m_min, m_max);
-    int32_t value = dist(rng);
+    const int32_t value = m_range.value(static_cast<uint32_t>(std::rand()));
     buffer.write(&value, m_size, m_offset);
 }
 

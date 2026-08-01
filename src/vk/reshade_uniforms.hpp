@@ -3,6 +3,8 @@
 #include <chrono>
 #include <cstdint>
 
+#include "vk/reshade_runtime.hpp"
+
 namespace reshadefx
 {
     struct uniform;
@@ -10,7 +12,6 @@ namespace reshadefx
 
 namespace vkShade
 {
-    struct ReshadeFrameState;
     class VulkanBuffer;
 
     // Base class for a ReShade built-in uniform. These require special handling.
@@ -62,14 +63,7 @@ namespace vkShade
         void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
 
     private:
-        std::chrono::steady_clock::time_point m_lastFrame;
-
-        float m_min             {0.0f};
-        float m_max             {0.0f};
-        float m_stepMin         {0.0f};
-        float m_stepMax         {0.0f};
-        float m_smoothing       {0.0f};
-        float m_currentValue[2] {0.0f, 1.0f};
+        ReshadePingPongState m_state;
     };
 
 
@@ -80,8 +74,7 @@ namespace vkShade
         void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
 
     private:
-        int32_t m_max {0};
-        int32_t m_min {0};
+        ReshadeRandomRange m_range;
     };
 
     class KeyUniform : public ReshadeUniform
