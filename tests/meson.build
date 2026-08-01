@@ -36,7 +36,16 @@ event_bus_tests = executable('event_bus_tests',
   include_directories : include_directories('../src/core')
 )
 
+reshade_runtime_tests = executable('reshade_runtime_tests',
+  'reshade_runtime_tests.cpp',
+  dependencies : [
+    catch2,
+  ],
+  include_directories : include_directories('../src')
+)
+
 test('ConfigObserver', config_observer_tests)
 test('ConfigParser', config_parser_tests)
 test('ConfigStore', config_store_tests)
 test('EventBus', event_bus_tests)
+test('ReShadeRuntime', reshade_runtime_tests)

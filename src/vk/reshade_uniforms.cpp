@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 
 #include "vk/buffer.hpp"
+#include "vk/reshade_runtime.hpp"
 
 static bool uniform_has_source(const reshadefx::uniform& uniform, const std::string& source)
 {
@@ -30,9 +31,9 @@ vkShade::FrameTimeUniform::FrameTimeUniform(reshadefx::uniform uniform)
 void vkShade::FrameTimeUniform::update(VulkanBuffer& buffer)
 {
     auto currentFrame = std::chrono::steady_clock::now();
-    std::chrono::duration<float> duration = currentFrame - m_lastFrame;
+    auto duration = currentFrame - m_lastFrame;
     m_lastFrame = currentFrame;
-    float frametime = duration.count();
+    float frametime = reshade_frame_time(duration);
 
     buffer.write(&frametime, m_size, m_offset);
 }
