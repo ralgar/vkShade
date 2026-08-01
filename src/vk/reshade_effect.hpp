@@ -46,7 +46,7 @@ namespace vkShade
 
         void apply(VkCommandBuffer cmd, VulkanImage& outputImage);
         void bind_input(VulkanImage& colorImage, VulkanImage& depthImage);
-        void update();
+        void update(const ReshadeFrameState& frame);
 
         template <class T>
         std::expected<T, Error> get_uniform(const std::string& name)

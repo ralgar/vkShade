@@ -6,6 +6,7 @@
 
 #include "object.hpp"
 #include "reshade_effect.hpp"
+#include "reshade_runtime.hpp"
 
 namespace vkShade
 {
@@ -42,5 +43,6 @@ namespace vkShade
         std::vector<std::shared_ptr<ReshadeEffect>> m_effects;
         std::shared_ptr<VulkanImage> m_pingPongA;
         std::shared_ptr<VulkanImage> m_pingPongB;
+        ReshadeRuntime m_reshadeRuntime;
     };
 }  // namespace vkShade

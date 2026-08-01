@@ -23,19 +23,13 @@ vkShade::FrameTimeUniform::FrameTimeUniform(reshadefx::uniform uniform)
 {
     assert(uniform_has_source(uniform, "frametime"));
 
-    m_lastFrame = std::chrono::steady_clock::now();
-    m_offset    = uniform.offset;
-    m_size      = uniform.size;
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
 }
 
-void vkShade::FrameTimeUniform::update(VulkanBuffer& buffer)
+void vkShade::FrameTimeUniform::update(VulkanBuffer& buffer, const ReshadeFrameState& frame)
 {
-    auto currentFrame = std::chrono::steady_clock::now();
-    auto duration = currentFrame - m_lastFrame;
-    m_lastFrame = currentFrame;
-    float frametime = reshade_frame_time(duration);
-
-    buffer.write(&frametime, m_size, m_offset);
+    buffer.write(&frame.frame_time, m_size, m_offset);
 }
 
 vkShade::FrameCountUniform::FrameCountUniform(reshadefx::uniform uniform)
@@ -46,10 +40,9 @@ vkShade::FrameCountUniform::FrameCountUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::FrameCountUniform::update(VulkanBuffer& buffer)
+void vkShade::FrameCountUniform::update(VulkanBuffer& buffer, const ReshadeFrameState& frame)
 {
-    buffer.write(&m_count, m_size, m_offset);
-    m_count++;
+    buffer.write(&frame.frame_count, m_size, m_offset);
 }
 
 vkShade::DateUniform::DateUniform(reshadefx::uniform uniform)
@@ -60,7 +53,7 @@ vkShade::DateUniform::DateUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::DateUniform::update(VulkanBuffer& buffer)
+void vkShade::DateUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     auto        now         = std::chrono::system_clock::now();
     std::time_t nowC        = std::chrono::system_clock::to_time_t(now);
@@ -78,18 +71,13 @@ vkShade::TimerUniform::TimerUniform(reshadefx::uniform uniform)
 {
     assert(uniform_has_source(uniform, "timer"));
 
-    m_startTime = std::chrono::steady_clock::now();
-    m_offset    = uniform.offset;
-    m_size      = uniform.size;
+    m_offset = uniform.offset;
+    m_size   = uniform.size;
 }
 
-void vkShade::TimerUniform::update(VulkanBuffer& buffer)
+void vkShade::TimerUniform::update(VulkanBuffer& buffer, const ReshadeFrameState& frame)
 {
-    auto currentFrame = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(currentFrame - m_startTime);
-    float timer = static_cast<float>(elapsed.count());
-
-    buffer.write(&timer, m_size, m_offset);
+    buffer.write(&frame.timer, m_size, m_offset);
 }
 
 vkShade::PingPongUniform::PingPongUniform(reshadefx::uniform uniform)
@@ -118,7 +106,7 @@ vkShade::PingPongUniform::PingPongUniform(reshadefx::uniform uniform)
     m_size      = uniform.size;
 }
 
-void vkShade::PingPongUniform::update(VulkanBuffer& buffer)
+void vkShade::PingPongUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // Compute delta time and update tracking
     auto now = std::chrono::steady_clock::now();
@@ -179,7 +167,7 @@ vkShade::RandomUniform::RandomUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::RandomUniform::update(VulkanBuffer& buffer)
+void vkShade::RandomUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     static std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<int32_t> dist(m_min, m_max);
@@ -195,7 +183,7 @@ vkShade::KeyUniform::KeyUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::KeyUniform::update(VulkanBuffer& buffer)
+void vkShade::KeyUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle key press uniforms
     VkBool32 keyPressed = VK_FALSE;
@@ -210,7 +198,7 @@ vkShade::MouseButtonUniform::MouseButtonUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::MouseButtonUniform::update(VulkanBuffer& buffer)
+void vkShade::MouseButtonUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle mouse button uniforms
     VkBool32 buttonPressed = VK_FALSE;
@@ -225,7 +213,7 @@ vkShade::MousePointUniform::MousePointUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::MousePointUniform::update(VulkanBuffer& buffer)
+void vkShade::MousePointUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle mouse point uniforms
     glm::vec2 mousePos {0.0f, 0.0f};
@@ -240,7 +228,7 @@ vkShade::MouseDeltaUniform::MouseDeltaUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::MouseDeltaUniform::update(VulkanBuffer& buffer)
+void vkShade::MouseDeltaUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle mouse point uniforms
     glm::vec2 mouseDelta {0.0f, 0.0f};
@@ -255,7 +243,7 @@ vkShade::MouseWheelUniform::MouseWheelUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::MouseWheelUniform::update(VulkanBuffer& buffer)
+void vkShade::MouseWheelUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle mouse wheel uniforms
     glm::vec2 mouseWheel {0.0f, 0.0f};
@@ -270,7 +258,7 @@ vkShade::DepthUniform::DepthUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::DepthUniform::update(VulkanBuffer& buffer)
+void vkShade::DepthUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle depth ready uniforms
     VkBool32 hasDepth = VK_FALSE;
@@ -285,7 +273,7 @@ vkShade::OverlayOpenUniform::OverlayOpenUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::OverlayOpenUniform::update(VulkanBuffer& buffer)
+void vkShade::OverlayOpenUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle overlay open uniforms
     VkBool32 overlayOpen = VK_FALSE;
@@ -300,7 +288,7 @@ vkShade::OverlayActiveUniform::OverlayActiveUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::OverlayActiveUniform::update(VulkanBuffer& buffer)
+void vkShade::OverlayActiveUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle overlay active uniforms
     int32_t overlayActive = 0;
@@ -315,7 +303,7 @@ vkShade::OverlayHoveredUniform::OverlayHoveredUniform(reshadefx::uniform uniform
     m_size   = uniform.size;
 }
 
-void vkShade::OverlayHoveredUniform::update(VulkanBuffer& buffer)
+void vkShade::OverlayHoveredUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle overlay hovered uniforms
     int32_t overlayHovered = 0;
@@ -330,7 +318,7 @@ vkShade::ScreenshotUniform::ScreenshotUniform(reshadefx::uniform uniform)
     m_size   = uniform.size;
 }
 
-void vkShade::ScreenshotUniform::update(VulkanBuffer& buffer)
+void vkShade::ScreenshotUniform::update(VulkanBuffer& buffer, const ReshadeFrameState&)
 {
     // TODO: Handle screenshot uniforms? (if in-scope)
     VkBool32 isScreenshot = VK_FALSE;

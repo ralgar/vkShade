@@ -152,6 +152,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
 void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
 {
     VulkanImage* swapchainImage = m_images.at(imageIndex).get();
+    const ReshadeFrameState& reshadeFrame = m_reshadeRuntime.begin_frame();
 
     // Wait until the previous command buffer has finished executing. Timeout of 1 second.
 	VK_CHECK(m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000));
@@ -198,7 +199,7 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
                 continue;
 
             // Update the effect uniforms
-            effect->update();
+            effect->update(reshadeFrame);
 
             // Barrier: Ensure read image is ready to sample
             readImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

@@ -10,6 +10,7 @@ namespace reshadefx
 
 namespace vkShade
 {
+    struct ReshadeFrameState;
     class VulkanBuffer;
 
     // Base class for a ReShade built-in uniform. These require special handling.
@@ -17,7 +18,7 @@ namespace vkShade
     {
     public:
         virtual ~ReshadeUniform() = default;
-        virtual void update(VulkanBuffer& buffer) = 0;
+        virtual void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) = 0;
 
     protected:
         ReshadeUniform() = default;
@@ -30,44 +31,35 @@ namespace vkShade
     {
     public:
         FrameTimeUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
-
-    private:
-        std::chrono::steady_clock::time_point m_lastFrame;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class FrameCountUniform : public ReshadeUniform
     {
     public:
         FrameCountUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
-
-    private:
-        uint32_t m_count {0};
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class DateUniform : public ReshadeUniform
     {
     public:
         DateUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class TimerUniform : public ReshadeUniform
     {
     public:
         TimerUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
-
-    private:
-        std::chrono::steady_clock::time_point m_startTime;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
  class PingPongUniform : public ReshadeUniform
     {
     public:
         PingPongUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
 
     private:
         std::chrono::steady_clock::time_point m_lastFrame;
@@ -85,7 +77,7 @@ namespace vkShade
     {
     public:
         RandomUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
 
     private:
         int32_t m_max {0};
@@ -96,69 +88,69 @@ namespace vkShade
     {
     public:
         KeyUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class MouseButtonUniform : public ReshadeUniform
     {
     public:
         MouseButtonUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class MousePointUniform : public ReshadeUniform
     {
     public:
         MousePointUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class MouseDeltaUniform : public ReshadeUniform
     {
     public:
         MouseDeltaUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class MouseWheelUniform : public ReshadeUniform
     {
     public:
         MouseWheelUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class DepthUniform : public ReshadeUniform
     {
     public:
         DepthUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class OverlayOpenUniform : public ReshadeUniform
     {
     public:
         OverlayOpenUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class OverlayActiveUniform : public ReshadeUniform
     {
     public:
         OverlayActiveUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class OverlayHoveredUniform : public ReshadeUniform
     {
     public:
         OverlayHoveredUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 
     class ScreenshotUniform : public ReshadeUniform
     {
     public:
         ScreenshotUniform(reshadefx::uniform uniform);
-        void update(VulkanBuffer& buffer) override;
+        void update(VulkanBuffer& buffer, const ReshadeFrameState& frame) override;
     };
 } // namespace vkShade

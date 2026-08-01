@@ -853,10 +853,10 @@ void vkShade::ReshadeEffect::reflect_uniforms()
     }
 }
 
-void vkShade::ReshadeEffect::update()
+void vkShade::ReshadeEffect::update(const ReshadeFrameState& frame)
 {
     for (auto& uniform : m_builtinUniforms)
     {
-        uniform->update(*m_uniformBuffer);
+        uniform->update(*m_uniformBuffer, frame);
     }
 }
