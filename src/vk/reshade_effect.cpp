@@ -78,6 +78,10 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         const VkClearValue clearValue = { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } };
         const VkClearValue* clear = passInfo.clear_render_targets ? &clearValue : nullptr;
 
+        VkExtent2D attachmentExtent {
+            .width = outputImage.extent().width,
+            .height = outputImage.extent().height,
+        };
         std::vector<VkRenderingAttachmentInfo> colorAttachments;
         for (const auto& name : passInfo.render_target_names)
         {
@@ -85,6 +89,11 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
                 break;  // render_target_names are contiguous, empty means end
 
             auto* renderTarget = m_textures.at(name).get();
+            if (colorAttachments.empty())
+            {
+                attachmentExtent.width = renderTarget->extent().width;
+                attachmentExtent.height = renderTarget->extent().height;
+            }
             renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             colorAttachments.push_back(vkinit::rendering_attachment_info(renderTarget->image_view(),
                                                                          clear,
@@ -99,11 +108,18 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
                                                                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
+        VkExtent2D passExtent {
+            .width = passInfo.viewport_width ? passInfo.viewport_width : attachmentExtent.width,
+            .height = passInfo.viewport_height ? passInfo.viewport_height : attachmentExtent.height,
+        };
+
         // Set up stencil attachment if there is one
         VkRenderingAttachmentInfo* stencilAttachment = nullptr;
         VkRenderingAttachmentInfo stencilAttachmentInfo;
 
-        if (passInfo.stencil_enable && m_stencilBuffer)
+        if (passInfo.stencil_enable && m_stencilBuffer
+            && passExtent.width == m_stencilBuffer->extent().width
+            && passExtent.height == m_stencilBuffer->extent().height)
         {
             m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
 
@@ -116,8 +132,8 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         }
 
         // Begin render pass
-        VkExtent2D extent { .width = outputImage.extent().width, .height = outputImage.extent().height};
-        VkRenderingInfo renderingInfo = vkinit::rendering_info(extent, colorAttachments, nullptr, stencilAttachment);
+        VkRenderingInfo renderingInfo = vkinit::rendering_info(passExtent, colorAttachments,
+                                                               nullptr, stencilAttachment);
         m_device.dispatch.CmdBeginRendering(cmd, &renderingInfo);
 
         // Bind pipeline
@@ -127,8 +143,8 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         VkViewport viewport = {
             .x = 0.0f,
             .y = 0.0f,
-            .width = (float)(passInfo.viewport_width ? passInfo.viewport_width : extent.width),
-            .height = (float)(passInfo.viewport_height ? passInfo.viewport_height : extent.height),
+            .width = static_cast<float>(passExtent.width),
+            .height = static_cast<float>(passExtent.height),
             .minDepth = 0.0f,
             .maxDepth = 1.0f,
         };
@@ -136,7 +152,7 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 
         VkRect2D scissor = {
             .offset = {0, 0},
-            .extent = extent,
+            .extent = passExtent,
         };
         m_device.dispatch.CmdSetScissor(cmd, 0, 1, &scissor);
 
