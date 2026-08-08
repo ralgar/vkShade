@@ -4,6 +4,7 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
+#include "core/events/reload_effects.hpp"
 #include "object.hpp"
 #include "reshade_effect.hpp"
 #include "reshade_runtime.hpp"
@@ -24,6 +25,8 @@ namespace vkShade
         uint32_t image_count() const { return m_images.size(); }
 
         void on_effects_changed(std::vector<std::string> effects);
+
+        void on_reload_effects(const Events::ReloadEffects& event);
 
         // Render layer on top of swapchain
         void render(uint32_t imageIndex);

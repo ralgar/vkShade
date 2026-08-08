@@ -82,8 +82,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     // Get manager handles
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
     auto& gui = vkShade::Locator<vkShade::GuiManager>::get();
+    auto& eventBus = vkShade::Locator<vkShade::EventBus>::get();
 
     // Update managers
+    eventBus.update();
     input.update();
 
     // Test input and shader loading

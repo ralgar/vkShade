@@ -6,6 +6,7 @@
 #include <spdlog/spdlog.h>
 
 #include "config/config_manager.hpp"
+#include "core/event_bus.hpp"
 #include "core/service_locator.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_manager.hpp"
@@ -89,6 +90,10 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     {
         this->on_effects_changed(effects.value());
     }
+
+    // Subscribe to events
+    auto& eventBus = Locator<EventBus>::get();
+    eventBus.sink<Events::ReloadEffects>().connect<&VulkanSwapchain::on_reload_effects>(this);
 }
 
 vkShade::VulkanSwapchain::~VulkanSwapchain()
@@ -99,6 +104,10 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
     // Clean up
     m_device.dispatch.DestroyCommandPool(m_device.handle, m_commandPool, nullptr);
     m_device.dispatch.DestroyFence(m_device.handle, m_fence, nullptr);
+
+    // Unsubscribe from events
+    auto& eventBus = Locator<EventBus>::get();
+    eventBus.sink<Events::ReloadEffects>().disconnect<&VulkanSwapchain::on_reload_effects>(this);
 
     // Unsubscribe from config changes
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
@@ -147,6 +156,13 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
 
     auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();
     internalCfg.set("__INTERNAL__", "LoadedEffects", loadedEffects);
+}
+
+void vkShade::VulkanSwapchain::on_reload_effects(const Events::ReloadEffects& event)
+{
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    auto effects = config.get<std::vector<std::string>>("vkShade", "Effects");
+    this->on_effects_changed(effects.value_or(std::vector<std::string>{}));
 }
 
 void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
