@@ -20,6 +20,24 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
 
     // Initialize previous key states
     std::memset(m_previousKeymap, 0, sizeof(m_previousKeymap));
+
+    // Observe wheel button events without consuming the application's queue.
+    m_wheelDisplay = XOpenDisplay(DisplayString(m_display));
+    if (m_wheelDisplay)
+    {
+        XSelectInput(m_wheelDisplay, m_window, ButtonPressMask | ButtonReleaseMask);
+        XFlush(m_wheelDisplay);
+    }
+    else
+    {
+        Logger::warn("[Xlib] Could not open a display connection for mouse wheel input");
+    }
+}
+
+vkShade::InputBackendXlib::~InputBackendXlib()
+{
+    if (m_wheelDisplay)
+        XCloseDisplay(m_wheelDisplay);
 }
 
 void vkShade::InputBackendXlib::process_events()
@@ -49,6 +67,20 @@ void vkShade::InputBackendXlib::process_events()
     // Update previous state
     std::memcpy(m_previousKeymap, keymap, sizeof(keymap));
 
+    if (m_wheelDisplay)
+    {
+        while (XPending(m_wheelDisplay))
+        {
+            XEvent event {};
+            XNextEvent(m_wheelDisplay, &event);
+            if (event.type == ButtonPress
+                && (event.xbutton.button == Button4 || event.xbutton.button == Button5))
+            {
+                handle_mouse_wheel_event(event.xbutton.button == Button4 ? 1.0f : -1.0f);
+            }
+        }
+    }
+
     // Query mouse state
     query_mouse_state();
 }
@@ -74,7 +106,6 @@ void vkShade::InputBackendXlib::handle_key_event(uint32_t keyCode, bool pressed)
     // Call base class to update key state map
     this->handle_keyboard_event(keysym, pressed);
 }
-
 
 void vkShade::InputBackendXlib::query_mouse_state()
 {

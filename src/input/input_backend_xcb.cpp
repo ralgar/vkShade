@@ -114,14 +114,17 @@ void vkShade::InputBackendXcb::handle_key_event(uint32_t keyCode, bool pressed)
 void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
 {
     // XCB button codes: 1=left, 2=middle, 3=right, 4=scroll up, 5=scroll down
+    if (pressed && (button == 4 || button == 5))
+    {
+        handle_mouse_wheel_event(button == 4 ? 1.0f : -1.0f);
+        return;
+    }
+
     MouseButton mouseButton;
     switch (button) {
         case 1: mouseButton = MouseButton::LEFT; break;
         case 2: mouseButton = MouseButton::MIDDLE; break;
         case 3: mouseButton = MouseButton::RIGHT; break;
-        case 4:  // Scroll up
-        case 5:  // Scroll down
-            return;  // Ignore scroll for now
         default: return;
     }
 

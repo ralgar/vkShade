@@ -36,6 +36,7 @@ namespace vkShade
 
         glm::vec2 mouse_position() const { return m_currentMousePosition; }
         glm::vec2 mouse_delta() const { return m_mouseDelta; }
+        float consume_mouse_wheel_delta();
 
         virtual void process_events() = 0;
 
@@ -51,6 +52,7 @@ namespace vkShade
         void handle_keyboard_event(const xkb_keysym_t& keysym, bool pressed);
         void handle_mouse_button_event(MouseButton button, bool pressed);
         void handle_mouse_motion_event(float x, float y);
+        void handle_mouse_wheel_event(float delta);
 
         void on_keybind_changed(const std::string& configKey, std::string enumString);
 
@@ -71,6 +73,7 @@ namespace vkShade
         glm::vec2 m_currentMousePosition {0.0f, 0.0f};
         glm::vec2 m_previousMousePosition {0.0f, 0.0f};
         glm::vec2 m_mouseDelta {0.0f, 0.0f};
+        float m_mouseWheelDelta = 0.0f;
 
         std::unordered_map<MouseButton, bool> m_currentMouseStates;
         std::unordered_map<MouseButton, bool> m_previousMouseStates;

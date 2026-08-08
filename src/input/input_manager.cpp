@@ -113,6 +113,18 @@ void vkShade::InputManager::handle_mouse_motion_event(float x, float y)
     m_mouseDelta = m_currentMousePosition - m_previousMousePosition;
 }
 
+void vkShade::InputManager::handle_mouse_wheel_event(float delta)
+{
+    m_mouseWheelDelta += delta;
+}
+
+float vkShade::InputManager::consume_mouse_wheel_delta()
+{
+    float delta = m_mouseWheelDelta;
+    m_mouseWheelDelta = 0.0f;
+    return delta;
+}
+
 bool vkShade::InputManager::is_action_pressed(const std::string& actionName) const
 {
     auto it = m_actionBindings.find(actionName);

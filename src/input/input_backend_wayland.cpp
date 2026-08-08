@@ -96,7 +96,10 @@ void vkShade::InputBackendWayland::on_pointer_button(uint32_t serial, uint32_t t
 
 void vkShade::InputBackendWayland::on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value)
 {
-    // Handle scroll wheel
+    // TODO(wayland): Forward the vertical axis through
+    // handle_mouse_wheel_event() once this can be validated with a native
+    // Wayland Vulkan client. Confirm direction and discrete/value120 scaling
+    // instead of assuming X11 button-wheel semantics.
     float scroll = wl_fixed_to_double(value);
     Logger::trace("Scroll axis {} value {}", axis, scroll);
 }

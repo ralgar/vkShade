@@ -131,6 +131,9 @@ void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
     io.AddMouseButtonEvent(0, input.is_mouse_button_pressed(MouseButton::LEFT));
     io.AddMouseButtonEvent(1, input.is_mouse_button_pressed(MouseButton::RIGHT));
     io.AddMouseButtonEvent(2, input.is_mouse_button_pressed(MouseButton::MIDDLE));
+    float mouseWheelDelta = input.consume_mouse_wheel_delta();
+    if (mouseWheelDelta != 0.0f)
+        io.AddMouseWheelEvent(0.0f, mouseWheelDelta);
 
     io.DisplaySize = ImVec2((float)swapchainExtent.width, (float)swapchainExtent.height);
     io.DeltaTime = deltaTime;

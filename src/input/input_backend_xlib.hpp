@@ -11,11 +11,13 @@ namespace vkShade
     {
     public:
         InputBackendXlib(Display* display, Window window);
+        ~InputBackendXlib() override;
 
         void process_events() override;
 
     private:
         Display* m_display;
+        Display* m_wheelDisplay {nullptr};
         Window   m_window;
         char     m_previousKeymap[32];  // Track previous keyboard state
 
