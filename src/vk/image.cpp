@@ -8,6 +8,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "core/service_locator.hpp"
+#include "core/logger.hpp"
 #include "config/config_manager.hpp"
 #include "buffer.hpp"
 #include "initializers.hpp"
@@ -16,7 +17,7 @@
 vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture& info)
     : VulkanObject(device)
 {
-    spdlog::trace("Creating image from ReShade FX info");
+    Logger::trace("Creating image from ReShade FX info");
 
     m_extent.width  = info.width;
     m_extent.height = info.height;
@@ -113,7 +114,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
 
 void vkShade::VulkanImage::load_from_file(const std::string& filePath)
 {
-    spdlog::trace("Creating image from file: {}", filePath);
+    Logger::trace("Creating image from file: {}", filePath);
 
     int32_t channels;
     stbir_pixel_layout stbirLayout;
@@ -141,7 +142,7 @@ void vkShade::VulkanImage::load_from_file(const std::string& filePath)
 
     if (!pixels)
     {
-        spdlog::error("Failed to load image: {}", filePath);
+        Logger::error("Failed to load image: {}", filePath);
         throw std::runtime_error("Failed to load image: " + filePath);
     }
 
@@ -167,7 +168,7 @@ void vkShade::VulkanImage::load_from_file(const std::string& filePath)
 vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkExtent2D size, VkFormat format, VkImageUsageFlags usageFlags)
     : VulkanObject(device)
 {
-    spdlog::trace("Creating image (Size: {}x{}, Format: {})",
+    Logger::trace("Creating image (Size: {}x{}, Format: {})",
         size.width, size.height, magic_enum::enum_name(format));
 
     // Set internal properties
@@ -184,7 +185,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkExtent2D size, VkForma
 vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2D size, VkFormat format)
     : VulkanObject(device)
 {
-    spdlog::trace("Wrapping existing image (Size: {}x{}, Format: {})",
+    Logger::trace("Wrapping existing image (Size: {}x{}, Format: {})",
         size.width, size.height, magic_enum::enum_name(format));
 
     // Set internal properties
@@ -201,7 +202,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
 
 vkShade::VulkanImage::~VulkanImage()
 {
-    spdlog::trace("Destroying VulkanImage");
+    Logger::trace("Destroying VulkanImage");
 
     if (m_imageView != VK_NULL_HANDLE)
         m_device.dispatch.DestroyImageView(m_device.handle, m_imageView, nullptr);

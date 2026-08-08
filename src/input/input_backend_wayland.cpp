@@ -4,7 +4,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 #include <xkbcommon/xkbcommon.h>
 
 #include "mouse_button_codes.hpp"
@@ -63,12 +63,12 @@ void vkShade::InputBackendWayland::on_pointer_enter(wl_surface* surface, wl_fixe
     float fx = wl_fixed_to_double(x);
     float fy = wl_fixed_to_double(y);
     handle_mouse_motion_event(fx, fy);
-    spdlog::trace("Pointer entered at ({}, {})", fx, fy);
+    Logger::trace("Pointer entered at ({}, {})", fx, fy);
 }
 
 void vkShade::InputBackendWayland::on_pointer_leave(wl_surface* surface)
 {
-    spdlog::trace("Pointer left surface");
+    Logger::trace("Pointer left surface");
 }
 
 void vkShade::InputBackendWayland::on_pointer_motion(uint32_t time, wl_fixed_t x, wl_fixed_t y)
@@ -98,7 +98,7 @@ void vkShade::InputBackendWayland::on_pointer_axis(uint32_t time, uint32_t axis,
 {
     // Handle scroll wheel
     float scroll = wl_fixed_to_double(value);
-    spdlog::trace("Scroll axis {} value {}", axis, scroll);
+    Logger::trace("Scroll axis {} value {}", axis, scroll);
 }
 
 void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
@@ -107,7 +107,7 @@ void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t
     {
         wl_seat* seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, 1));
         wl_seat_add_listener(seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
-        spdlog::trace("Bound to wl_seat");
+        Logger::trace("Bound to wl_seat");
     }
 }
 
@@ -118,7 +118,7 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     {
         m_keyboard = wl_seat_get_keyboard(seat);
         wl_keyboard_add_listener(m_keyboard, &kb_listener, this);  // Pass 'this' as data* in callbacks
-        spdlog::trace("Bound to wl_keyboard");
+        Logger::trace("Bound to wl_keyboard");
     }
 
     // Add pointer handling
@@ -126,7 +126,7 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     {
         m_pointer = wl_seat_get_pointer(seat);
         wl_pointer_add_listener(m_pointer, &pointer_listener, this);
-        spdlog::trace("Bound to wl_pointer");
+        Logger::trace("Bound to wl_pointer");
     }
 }
 

@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 
 #include "resource.hpp"
 #include "resource_factory.hpp"
@@ -29,7 +29,7 @@ namespace vkShade
             if (auto resource = try_get(cacheKey))
                 return resource;
 
-            spdlog::debug("Loading resource: {}", cacheKey);
+            Logger::debug("Loading resource: {}", cacheKey);
             std::shared_ptr<T> resource;
 
             {
@@ -41,14 +41,14 @@ namespace vkShade
 
             if (!resource || !resource->is_valid())
             {
-                spdlog::error("Failed to create resource: {}", cacheKey);
+                Logger::error("Failed to create resource: {}", cacheKey);
                 return nullptr;
             }
 
             // Actually load the resource (outside of lock due to expense)
             if (!resource->load())
             {
-                spdlog::error("Failed to load resource: {}", cacheKey);
+                Logger::error("Failed to load resource: {}", cacheKey);
                 std::unique_lock lock(m_mutex);  // Write lock
                 m_cache.erase(cacheKey);
                 return nullptr;

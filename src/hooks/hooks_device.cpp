@@ -1,7 +1,6 @@
 #include "hooks.hpp"
 
 #include <magic_enum/magic_enum.hpp>
-#include <spdlog/spdlog.h>
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #define VMA_IMPLEMENTATION
@@ -11,6 +10,7 @@
 
 #include "config/config_manager.hpp"
 #include "core/event_bus.hpp"
+#include "core/logger.hpp"
 #include "core/service_locator.hpp"
 #include "core/resource_cache.hpp"
 #include "gui/gui_manager.hpp"
@@ -23,7 +23,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     const VkAllocationCallbacks*                pAllocator,
     VkDevice*                                   pDevice)
 {
-    spdlog::trace("Intercepted VkCreateDevice");
+    vkShade::Logger::trace("Intercepted VkCreateDevice");
 
     // Step through the pNext chain until we get to the layer link info
     VkLayerDeviceCreateInfo* layerInfo = (VkLayerDeviceCreateInfo*)pCreateInfo->pNext;
@@ -34,7 +34,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 
     if(!layerInfo)
     {
-        spdlog::error("Failed to find device layer link info");
+        vkShade::Logger::error("Failed to find device layer link info");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -47,7 +47,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     PFN_vkCreateDevice create_func = (PFN_vkCreateDevice)gipa(VK_NULL_HANDLE, "vkCreateDevice");
     if (!create_func)
     {
-        spdlog::error("Failed to get vkCreateDevice");
+        vkShade::Logger::error("Failed to get vkCreateDevice");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -72,7 +72,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 
     if (!features13 || !features13->dynamicRendering)
     {
-        spdlog::debug("Injecting Dynamic Rendering feature");
+        vkShade::Logger::debug("Injecting Dynamic Rendering feature");
 
         if (features13)
         {
@@ -96,7 +96,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     VkResult result = create_func(physicalDevice, finalCreateInfo, pAllocator, pDevice);
     if (result != VK_SUCCESS)
     {
-        spdlog::error("Failed to create device: {}", magic_enum::enum_name(result));
+        vkShade::Logger::error("Failed to create device: {}", magic_enum::enum_name(result));
         return result;
     }
 
@@ -125,10 +125,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 		// Find the first queue family which supports graphics and has at least one queue
 		if (queueProperties[queueInfo.queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 		{
-            spdlog::debug("Found graphics capable queue");
+            vkShade::Logger::debug("Found graphics capable queue");
 
             if (pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0] < 1.0f)
-				spdlog::warn("Selected graphics queue has a low priority: {}", pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0]);
+				vkShade::Logger::warn("Selected graphics queue has a low priority: {}", pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0]);
 
 			thisDevice.queueFamilyIndex = queueInfo.queueFamilyIndex;
             thisDevice.dispatch.GetDeviceQueue(thisDevice.handle, thisDevice.queueFamilyIndex, 0, &thisDevice.queue);
@@ -192,7 +192,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         VkResult vmaResult = vmaCreateAllocator(&allocatorInfo, &thisDevice.allocator);
         if (vmaResult != VK_SUCCESS)
         {
-            spdlog::error("Failed to create memory allocator: {}", magic_enum::enum_name(result));
+            vkShade::Logger::error("Failed to create memory allocator: {}", magic_enum::enum_name(result));
             return VK_ERROR_INITIALIZATION_FAILED;
         }
     }
@@ -208,13 +208,13 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     vkShade::Locator<vkShade::EventBus>::emplace();
     vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();
 
-    spdlog::info("Layer initialization complete");
+    vkShade::Logger::info("Layer initialization complete");
     return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator)
 {
-    spdlog::trace("Intercepted VkDestroyDevice");
+    vkShade::Logger::trace("Intercepted VkDestroyDevice");
 
     // Lock here to prevent race conditions.
     std::unique_lock lock(g_globalLock);

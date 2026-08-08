@@ -4,7 +4,7 @@
 #include <map>
 
 #include <ini.h>
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 
 // Static callback function for inih parser
 static int config_ini_handler(void* user, const char* section, const char* name, const char* value)
@@ -15,7 +15,7 @@ static int config_ini_handler(void* user, const char* section, const char* name,
     std::string key = std::string(section) + "::" + std::string(name);
     (*config)[key] = value;
 
-    spdlog::trace("Parsed configuration option: {}::{} ({})", section, name, value);
+    vkShade::Logger::trace("Parsed configuration option: {}::{} ({})", section, name, value);
 
     return 1;  // Success
 }
@@ -43,7 +43,7 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
     int result = ini_parse(filePath.string().c_str(), config_ini_handler, &m_config);
     if (result != 0)
     {
-        spdlog::error("Failed to load or parse config file: {}", filePath.c_str());
+        Logger::error("Failed to load or parse config file: {}", filePath.c_str());
         return false;
     }
 
@@ -56,7 +56,7 @@ bool vkShade::ConfigStore::save(std::filesystem::path filePath)
     std::ofstream file(filePath);
     if (!file.is_open())
     {
-        spdlog::error("Failed to open config file for writing: {}", filePath.string());
+        Logger::error("Failed to open config file for writing: {}", filePath.string());
         return false;
     }
 
@@ -108,7 +108,7 @@ bool vkShade::ConfigStore::save(std::filesystem::path filePath)
     }
 
     m_currentFile = filePath;
-    spdlog::trace("Saved configuration to: {}", filePath.string());
+    Logger::trace("Saved configuration to: {}", filePath.string());
     return true;
 }
 

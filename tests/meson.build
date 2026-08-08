@@ -24,6 +24,7 @@ config_store_tests = executable('config_store_tests',
     catch2,
     glm,
     libconfig,
+    spdlog,
   ],
   include_directories : include_directories('../src')
 )

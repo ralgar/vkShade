@@ -3,10 +3,10 @@
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <magic_enum/magic_enum.hpp>
-#include <spdlog/spdlog.h>
 
 #include "config/config_manager.hpp"
 #include "core/event_bus.hpp"
+#include "core/logger.hpp"
 #include "core/service_locator.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_manager.hpp"
@@ -141,7 +141,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
                             loadedEffects.push_back(effect);
                             found = true;
                         } catch (const std::runtime_error& exception) {
-                            spdlog::error(exception.what());
+                            Logger::error(exception.what());
                             error = true;
                         }
                         break;
@@ -151,7 +151,7 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
         }
 
         if (!found && !error)
-            spdlog::warn("Unable to find effect: {}", effect);
+            Logger::warn("Unable to find effect: {}", effect);
     }
 
     auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();

@@ -1,6 +1,6 @@
 #include "config_manager.hpp"
 
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 
 #include "config_globals.hpp"
 
@@ -34,10 +34,10 @@ vkShade::ConfigManager::ConfigManager()
     {
         if (m_config.load(filePath))
         {
-            spdlog::info("Loaded config file: {}", filePath);
+            Logger::info("Loaded config file: {}", filePath);
             return;
         }
     }
 
-    spdlog::warn("No config file found");
+    Logger::warn("No config file found");
 }

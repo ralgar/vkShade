@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
@@ -14,7 +14,7 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
 {
     if (!m_display)
     {
-        spdlog::error("[Xlib] Invalid display");
+        Logger::error("[Xlib] Invalid display");
         return;
     }
 

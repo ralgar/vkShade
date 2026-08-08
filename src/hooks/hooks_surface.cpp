@@ -1,7 +1,7 @@
 #include "hooks.hpp"
 #include "hooks_surface.hpp"
 
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 
 #include "core/service_locator.hpp"
 #include "input/input_backend_wayland.hpp"
@@ -14,7 +14,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance  
                                                                     const VkAllocationCallbacks*         pAllocator,
                                                                     VkSurfaceKHR*                        pSurface)
 {
-    spdlog::trace("Intercepted VkCreateWaylandSurfaceKHR");
+    vkShade::Logger::trace("Intercepted VkCreateWaylandSurfaceKHR");
 
     auto& thisInstance = get_instance_from_handle(instance);
 
@@ -32,7 +32,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateWaylandSurfaceKHR(VkInstance  
         if (!vkShade::Locator<vkShade::InputManager>::has())
             vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendWayland>(
                 pCreateInfo->display);
-        spdlog::debug("Wayland surface created");
+        vkShade::Logger::debug("Wayland surface created");
     }
 
     return result;
@@ -44,7 +44,7 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
                                                      const VkAllocationCallbacks*     pAllocator,
                                                      VkSurfaceKHR*                    pSurface)
 {
-    spdlog::trace("Intercepted VkCreateXcbSurfaceKHR");
+    vkShade::Logger::trace("Intercepted VkCreateXcbSurfaceKHR");
 
     auto* xcbCreateInfo = reinterpret_cast<const VkXcbSurfaceCreateInfoKHR*>(pCreateInfo);
     xcb_connection_t* connection = xcbCreateInfo->connection;
@@ -61,8 +61,8 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
     {
         vkShade::Locator<vkShade::InputManager>::reset();
         vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendXcb>(connection, window);
-        spdlog::debug("X11 (XCB) surface created");
-        spdlog::warn("XCB input is currently unsupported");
+        vkShade::Logger::debug("X11 (XCB) surface created");
+        vkShade::Logger::warn("XCB input is currently unsupported");
     }
 
     return result;
@@ -73,7 +73,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
                                                                  const VkAllocationCallbacks*      pAllocator,
                                                                  VkSurfaceKHR*                     pSurface)
 {
-    spdlog::trace("Intercepted VkCreateXlibSurfaceKHR");
+    vkShade::Logger::trace("Intercepted VkCreateXlibSurfaceKHR");
 
     auto* xlibCreateInfo = reinterpret_cast<const VkXlibSurfaceCreateInfoKHR*>(pCreateInfo);
     Window window = xlibCreateInfo->window;
@@ -90,7 +90,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
     {
         vkShade::Locator<vkShade::InputManager>::reset();
         vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendXlib>(display, window);
-        spdlog::debug("X11 (Xlib) surface created");
+        vkShade::Logger::debug("X11 (Xlib) surface created");
     }
 
     return result;

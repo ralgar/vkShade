@@ -11,7 +11,7 @@
 #include <effect_module.hpp>
 #include <effect_preprocessor.hpp>
 #include <magic_enum/magic_enum.hpp>
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 #include <vulkan/vulkan_core.h>
 
 #include "core/service_locator.hpp"
@@ -25,7 +25,7 @@
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device), m_extent(extent), m_format(format)
 {
-    spdlog::trace("Creating effect: {}", effectPath.filename().string());
+    Logger::trace("Creating effect: {}", effectPath.filename().string());
 
     // Compile the ReShade effect from source
     reshadefx::effect_module module;
@@ -38,7 +38,7 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
     this->reflect_pipeline();
     this->reflect_uniforms();
 
-    spdlog::debug("Created effect: {}", effectPath.filename().string());
+    Logger::debug("Created effect: {}", effectPath.filename().string());
 }
 
 vkShade::ReshadeEffect::~ReshadeEffect()
@@ -266,7 +266,7 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
 
     if (!pp.append_file(filePath))
 	{
-        spdlog::error(pp.errors());
+        Logger::error(pp.errors());
         return false;
 	}
 
@@ -276,14 +276,14 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
 	reshadefx::parser parser;
 	if (!parser.parse(pp.output(), backend.get()))
 	{
-        spdlog::error(parser.errors());
+        Logger::error(parser.errors());
         return false;
 	}
 
     m_module = std::make_unique<reshadefx::effect_module>(backend->module());
     if (m_module->techniques.empty() || m_module->techniques[0].passes.empty())
     {
-        spdlog::error("No techniques found: {}", filePath.string());
+        Logger::error("No techniques found: {}", filePath.string());
         return false;
     }
 
@@ -296,13 +296,13 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
 
         if (!backend->assemble_code_for_entry_point(vsEntryPoint, vs_binary, vs_asm, errors))
         {
-            spdlog::error("Failed to assemble vertex shader: {}", errors);
+            Logger::error("Failed to assemble vertex shader: {}", errors);
             return false;
         }
 
         if (!backend->assemble_code_for_entry_point(psEntryPoint, ps_binary, ps_asm, errors))
         {
-            spdlog::error("Failed to assemble pixel shader: {}", errors);
+            Logger::error("Failed to assemble pixel shader: {}", errors);
             return false;
         }
 
@@ -584,7 +584,7 @@ void vkShade::ReshadeEffect::reflect_images()
             // Warn about lack of proper depth support
             if (!warnedAboutDepth && texIt != m_module->textures.end() && texIt->semantic == "DEPTH")
             {
-                spdlog::warn("Effect may require depth buffer access, which is not yet supported.");
+                Logger::warn("Effect may require depth buffer access, which is not yet supported.");
                 warnedAboutDepth = true;
             }
         }

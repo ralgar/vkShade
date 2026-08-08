@@ -4,7 +4,7 @@
 #include <fstream>
 
 #include <magic_enum/magic_enum.hpp>
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 
 #include "hooks/hooks.hpp"
 
@@ -14,7 +14,7 @@ vkShade::ShaderModule::ShaderModule(VulkanDevice& device, const std::string& fil
 {
     if (!std::filesystem::exists(m_filePath) || !std::filesystem::is_regular_file(m_filePath))
     {
-        spdlog::error("File does not exist: {}", m_filePath);
+        Logger::error("File does not exist: {}", m_filePath);
         m_valid = false;
     }
 }
@@ -32,11 +32,11 @@ vkShade::ShaderModule::ShaderModule(VulkanDevice& device, std::span<const uint32
 
     if (result != VK_SUCCESS)
     {
-        spdlog::error("Failed to create shader module: {}", m_filePath);
+        Logger::error("Failed to create shader module: {}", m_filePath);
     }
 
     this->set_ready(true);
-    spdlog::trace("Created VkShaderModule from bytecode");
+    Logger::trace("Created VkShaderModule from bytecode");
 }
 
 bool vkShade::ShaderModule::load()
@@ -46,7 +46,7 @@ bool vkShade::ShaderModule::load()
 
     if (!file.is_open())
     {
-        spdlog::error("Failed to open file: {}", m_filePath);
+        Logger::error("Failed to open file: {}", m_filePath);
         return false;
     }
 
@@ -67,12 +67,12 @@ bool vkShade::ShaderModule::load()
 
     if (result != VK_SUCCESS)
     {
-        spdlog::error("Failed to create shader module: {}", m_filePath);
+        Logger::error("Failed to create shader module: {}", m_filePath);
         return false;
     }
 
     this->set_ready(true);
-    spdlog::trace("Created VkShaderModule from: {}", m_filePath);
+    Logger::trace("Created VkShaderModule from: {}", m_filePath);
     return true;
 }
 
@@ -81,6 +81,6 @@ vkShade::ShaderModule::~ShaderModule()
     if (m_module != VK_NULL_HANDLE)
     {
         m_device.dispatch.DestroyShaderModule(m_device.handle, m_module, nullptr);
-        spdlog::trace("Destroyed VkShaderModule");
+        Logger::trace("Destroyed VkShaderModule");
     }
 }

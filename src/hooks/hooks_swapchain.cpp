@@ -5,8 +5,7 @@
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vulkan_core.h>
-#include <spdlog/spdlog.h>
-
+#include "core/logger.hpp"
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
 
@@ -18,7 +17,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice         
                                                                const VkAllocationCallbacks*    pAllocator,
                                                                VkSwapchainKHR*                 pSwapchain)
 {
-    spdlog::trace("Intercepted VkCreateSwapchainKHR");
+    vkShade::Logger::trace("Intercepted VkCreateSwapchainKHR");
 
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
 
@@ -37,7 +36,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice         
         g_swapchains[*pSwapchain] = std::make_unique<vkShade::VulkanSwapchain>(thisDevice, *pSwapchain, *pCreateInfo);
     }
 
-    spdlog::debug("Swapchain created");
+    vkShade::Logger::debug("Swapchain created");
     return VK_SUCCESS;
 }
 
@@ -45,7 +44,7 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
                                                             VkSwapchainKHR               swapchain,
                                                             const VkAllocationCallbacks* pAllocator)
 {
-    spdlog::trace("Intercepted VkDestroySwapchainKHR");
+    vkShade::Logger::trace("Intercepted VkDestroySwapchainKHR");
 
     // Clean up our bookkeeping data
     {
@@ -57,7 +56,7 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(device)];
     thisDevice.dispatch.DestroySwapchainKHR(device, swapchain, pAllocator);
 
-    spdlog::debug("Swapchain destroyed");
+    vkShade::Logger::debug("Swapchain destroyed");
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo)
@@ -69,7 +68,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     auto it = g_swapchains.find(pPresentInfo->pSwapchains[0]);
     if (it == g_swapchains.end())
     {
-        spdlog::error("Swapchain not found in present");
+        vkShade::Logger::error("Swapchain not found in present");
         return thisDevice.dispatch.QueuePresentKHR(queue, pPresentInfo);
     }
 
@@ -105,7 +104,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         auto it = g_swapchains.find(swapchain);
         if (it == g_swapchains.end())
         {
-            spdlog::error("Swapchain not found in present");
+            vkShade::Logger::error("Swapchain not found in present");
             return thisDevice.dispatch.QueuePresentKHR(queue, pPresentInfo);
         }
 

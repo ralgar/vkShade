@@ -1,64 +1,16 @@
 #include "hooks.hpp"
 
-#include <cstdlib>
-#include <mutex>
-
 #include <magic_enum/magic_enum.hpp>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
 #include <vulkan/vk_layer.h>
+
+#include "core/logger.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     const VkInstanceCreateInfo*                 pCreateInfo,
     const VkAllocationCallbacks*                pAllocator,
     VkInstance*                                 pInstance)
 {
-    // Initialize spdlog once even when instances are created concurrently.
-    static std::once_flag spdlogInit;
-    std::call_once(spdlogInit, []
-    {
-        std::vector<spdlog::sink_ptr> sinks;
-
-        // Always add console sink
-        auto consoleSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
-        sinks.push_back(consoleSink);
-
-        // Optionally add file sink
-        const char* logFileEnv = std::getenv("VKSHADE_LOG_FILE");
-        if (logFileEnv != nullptr)
-        {
-            auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFileEnv, true);
-            sinks.push_back(fileSink);
-        }
-
-        auto logger = std::make_shared<spdlog::logger>("vkShade", sinks.begin(), sinks.end());
-        spdlog::set_default_logger(logger);
-        logger->flush_on(spdlog::level::trace);  // Always flush on log events
-
-        // Set log level
-        const char* logLevelEnv = std::getenv("VKSHADE_LOG_LEVEL");
-        std::string level = logLevelEnv ? logLevelEnv : "";
-
-        if (level == "trace")
-            spdlog::set_level(spdlog::level::trace);
-        else if (level == "debug")
-            spdlog::set_level(spdlog::level::debug);
-        else if (level == "info")
-            spdlog::set_level(spdlog::level::info);
-        else if (level == "warn" || level == "warning")
-            spdlog::set_level(spdlog::level::warn);
-        else if (level == "error")
-            spdlog::set_level(spdlog::level::err);
-        else if (level == "critical")
-            spdlog::set_level(spdlog::level::critical);
-        else if (level == "off")
-            spdlog::set_level(spdlog::level::off);
-        else
-            spdlog::set_level(spdlog::level::info);
-    });
-
-    spdlog::trace("Intercepted VkCreateInstance");
+    vkShade::Logger::trace("Intercepted VkCreateInstance");
 
     // Step through the pNext chain until we get to the layer link info
     const VkLayerInstanceCreateInfo* layerInfo = reinterpret_cast<const VkLayerInstanceCreateInfo*>(pCreateInfo->pNext);
@@ -69,7 +21,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 
     if(!layerInfo)
     {
-        spdlog::error("Failed to find instance layer link info");
+        vkShade::Logger::error("Failed to find instance layer link info");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -83,7 +35,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     PFN_vkCreateInstance create_func = (PFN_vkCreateInstance)gpa(VK_NULL_HANDLE, "vkCreateInstance");
     if (!create_func)
     {
-        spdlog::error("Failed to get vkCreateInstance");
+        vkShade::Logger::error("Failed to get vkCreateInstance");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -95,7 +47,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 	// vkShade requires at least Vulkan 1.3
 	if (appInfo.apiVersion < VK_API_VERSION_1_3)
 	{
-        spdlog::info("Replacing requested Vulkan API version with 1.3");
+        vkShade::Logger::info("Replacing requested Vulkan API version with 1.3");
 		appInfo.apiVersion = VK_API_VERSION_1_3;
 	}
 
@@ -107,7 +59,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     VkResult result = create_func(&modifiedCreateInfo, pAllocator, pInstance);
     if (result != VK_SUCCESS)
     {
-        spdlog::error("Failed to create instance: {}", magic_enum::enum_name(result));
+        vkShade::Logger::error("Failed to create instance: {}", magic_enum::enum_name(result));
         return result;
     }
 
@@ -127,7 +79,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
 
 VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator)
 {
-    spdlog::trace("Intercepted VkDestroyInstance");
+    vkShade::Logger::trace("Intercepted VkDestroyInstance");
 
     // Lock here to prevent race conditions.
     std::unique_lock lock(g_globalLock);

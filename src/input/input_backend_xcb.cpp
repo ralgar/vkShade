@@ -1,6 +1,6 @@
 #include "input_backend_xcb.hpp"
 
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon.h>
@@ -11,7 +11,7 @@ vkShade::InputBackendXcb::InputBackendXcb(xcb_connection_t* connection, xcb_wind
 {
     if (!m_connection)
     {
-        spdlog::error("[InputBackendXcb] Invalid connection");
+        Logger::error("[InputBackendXcb] Invalid connection");
         return;
     }
 
@@ -127,7 +127,7 @@ void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
 
     handle_mouse_button_event(mouseButton, pressed);
 
-    spdlog::debug("[InputBackendXcb] Mouse button {} {}",
+    Logger::debug("[InputBackendXcb] Mouse button {} {}",
                   (int)mouseButton, pressed ? "pressed" : "released");
 }
 
