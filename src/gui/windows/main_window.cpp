@@ -1,12 +1,14 @@
 #include "main_window.hpp"
 
 #include "config/config_manager.hpp"
+#include "core/events/reload_effects.hpp"
 #include "core/service_locator.hpp"
 #include "../gui_helpers.hpp"
 #include "../gui_style.hpp"
 
 vkShade::MainWindow::MainWindow()
-    : m_config(vkShade::Locator<ConfigManager>::get().app())
+    : m_config(vkShade::Locator<ConfigManager>::get().app()),
+      m_eventBus(vkShade::Locator<EventBus>::get())
 {}
 
 void vkShade::MainWindow::render()
@@ -20,6 +22,8 @@ void vkShade::MainWindow::render()
     if (ImGui::Begin("vkShade", &m_visible, ImGuiWindowFlags_MenuBar))
     {
         render_menu_bar();
+
+        render_controls_bar();
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -36,6 +40,20 @@ void vkShade::MainWindow::render()
         m_aboutWindow.render();
 
     ImGui::End();
+}
+
+void vkShade::MainWindow::render_controls_bar()
+{
+    const char* label = "Reload Active Effects";
+    float buttonWidth = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttonWidth);
+
+    if (ImGui::Button(label))
+    {
+        Events::ReloadEffects event {};
+        m_eventBus.enqueue(event);
+    }
 }
 
 void vkShade::MainWindow::render_menu_bar()

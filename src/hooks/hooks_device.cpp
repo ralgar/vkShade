@@ -10,6 +10,7 @@
 #include <vulkan/vk_layer.h>
 
 #include "config/config_manager.hpp"
+#include "core/event_bus.hpp"
 #include "core/service_locator.hpp"
 #include "core/resource_cache.hpp"
 #include "gui/gui_manager.hpp"
@@ -203,7 +204,8 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         g_vulkanDevices.emplace(dispatch_key_from_handle(*pDevice), thisDevice);
     }
 
-    // Initialize resource caches
+    // Initialize vkShade subsystems here
+    vkShade::Locator<vkShade::EventBus>::emplace();
     vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();
 
     spdlog::info("Layer initialization complete");

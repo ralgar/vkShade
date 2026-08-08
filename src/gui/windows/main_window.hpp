@@ -5,6 +5,7 @@
 #include <imgui.h>
 
 #include "config/config_store.hpp"
+#include "core/event_bus.hpp"
 #include "../window.hpp"
 #include "about_window.hpp"
 
@@ -20,6 +21,7 @@ namespace vkShade
 
     private:
         ConfigStore& m_config;
+        EventBus&    m_eventBus;
 
         // Sub-windows
         AboutWindow m_aboutWindow;
@@ -31,6 +33,7 @@ namespace vkShade
         ImVec2 m_windowSize = ImVec2(600, 450);
 
         void render_about_dialog();
+        void render_controls_bar();
         void render_menu_bar();
 
         void render_effect_lists();
