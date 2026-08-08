@@ -23,6 +23,41 @@
 #include "vk/reshade_uniforms.hpp"
 #include "vk/sampler.hpp"
 
+namespace
+{
+    uint32_t format_bit_depth(VkFormat format)
+    {
+        switch (format)
+        {
+            case VK_FORMAT_R5G6B5_UNORM_PACK16:
+            case VK_FORMAT_B5G6R5_UNORM_PACK16:
+            case VK_FORMAT_R5G5B5A1_UNORM_PACK16:
+            case VK_FORMAT_B5G5R5A1_UNORM_PACK16:
+            case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
+                return 5;
+            case VK_FORMAT_R8G8B8A8_UNORM:
+            case VK_FORMAT_R8G8B8A8_SRGB:
+            case VK_FORMAT_B8G8R8A8_UNORM:
+            case VK_FORMAT_B8G8R8A8_SRGB:
+                return 8;
+            case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32:
+                return 9;
+            case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+                return 10;
+            case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
+                return 11;
+            case VK_FORMAT_R16G16B16A16_SFLOAT:
+                return 16;
+            case VK_FORMAT_R32G32B32_SFLOAT:
+            case VK_FORMAT_R32G32B32A32_SFLOAT:
+                return 32;
+            default:
+                return 0;
+        }
+    }
+}
+
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device), m_extent(extent), m_format(format), m_fileName(effectPath.filename())
 {
@@ -267,6 +302,7 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
 	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(extent.height));
 	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
 	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
+	pp.add_macro_definition("BUFFER_COLOR_BIT_DEPTH", std::to_string(format_bit_depth(m_format)));
 
     // Add include paths
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
