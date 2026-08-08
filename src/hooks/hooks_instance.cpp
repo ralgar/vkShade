@@ -1,6 +1,7 @@
 #include "hooks.hpp"
 
 #include <cstdlib>
+#include <mutex>
 
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -13,9 +14,9 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     const VkAllocationCallbacks*                pAllocator,
     VkInstance*                                 pInstance)
 {
-    // Initialize spdlog on first instance creation
-    static bool spdlogInitialized = false;
-    if (!spdlogInitialized)
+    // Initialize spdlog once even when instances are created concurrently.
+    static std::once_flag spdlogInit;
+    std::call_once(spdlogInit, []
     {
         std::vector<spdlog::sink_ptr> sinks;
 
@@ -55,9 +56,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
             spdlog::set_level(spdlog::level::off);
         else
             spdlog::set_level(spdlog::level::info);
-
-        spdlogInitialized = true;
-    }
+    });
 
     spdlog::trace("Intercepted VkCreateInstance");
 
