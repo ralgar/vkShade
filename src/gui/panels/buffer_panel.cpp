@@ -192,6 +192,14 @@ void vkShade::BufferPanel::render()
         for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
         {
             const TrackedImageSnapshot& image = *displayedImages[row];
+            const bool dimRow = hasPriority &&
+                                static_cast<size_t>(row) >= prioritizedCount;
+            if (dimRow)
+            {
+                ImGui::PushStyleColor(
+                    ImGuiCol_Text,
+                    ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            }
             ImGui::TableNextRow();
 
             ImGui::TableSetColumnIndex(0);
@@ -223,6 +231,9 @@ void vkShade::BufferPanel::render()
                 ImGui::Text("%llu / %llu",
                             static_cast<unsigned long long>(image.lastSeenFrame),
                             static_cast<unsigned long long>(image.useCount));
+
+            if (dimRow)
+                ImGui::PopStyleColor();
         }
     }
 
