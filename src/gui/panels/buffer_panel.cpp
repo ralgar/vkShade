@@ -1,6 +1,8 @@
 #include "buffer_panel.hpp"
 
+#include <algorithm>
 #include <array>
+#include <iterator>
 #include <string>
 #include <utility>
 
@@ -104,9 +106,61 @@ void vkShade::BufferPanel::render()
         m_nextRefresh = ImGui::GetTime() + 0.25;
     }
 
-    ImGui::TextDisabled(
-        "%zu live render images. Application images appear after attachment use or with storage usage.",
-        m_trackedImages.size());
+    ImGui::TextUnformatted("Prioritize:");
+    ImGui::SameLine();
+    ImGui::Checkbox("Color", &m_prioritizeColorBuffers);
+    ImGui::SameLine();
+    ImGui::Checkbox("Depth/Stencil", &m_prioritizeDepthBuffers);
+    ImGui::SameLine();
+    ImGui::Checkbox("Storage", &m_prioritizeStorageBuffers);
+    ImGui::SameLine();
+    ImGui::Checkbox("Swapchain", &m_prioritizeSwapchainBuffers);
+    ImGui::SameLine();
+    ImGui::Checkbox("Internal", &m_prioritizeInternalBuffers);
+
+    const bool hasPriority = m_prioritizeColorBuffers ||
+                             m_prioritizeDepthBuffers ||
+                             m_prioritizeStorageBuffers ||
+                             m_prioritizeSwapchainBuffers ||
+                             m_prioritizeInternalBuffers;
+
+    std::vector<const TrackedImageSnapshot*> displayedImages;
+    displayedImages.reserve(m_trackedImages.size());
+    std::transform(
+        m_trackedImages.begin(), m_trackedImages.end(),
+        std::back_inserter(displayedImages),
+        [](const TrackedImageSnapshot& image) { return &image; });
+
+    size_t prioritizedCount = 0;
+    if (hasPriority)
+    {
+        const auto priorityEnd = std::stable_partition(
+            displayedImages.begin(), displayedImages.end(),
+            [this](const TrackedImageSnapshot* image)
+            {
+                return (m_prioritizeColorBuffers &&
+                        (image->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) ||
+                       (m_prioritizeDepthBuffers &&
+                        (image->usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) ||
+                       (m_prioritizeStorageBuffers &&
+                        (image->usage & VK_IMAGE_USAGE_STORAGE_BIT)) ||
+                       (m_prioritizeSwapchainBuffers &&
+                        image->origin == TrackedImageOrigin::Swapchain) ||
+                       (m_prioritizeInternalBuffers &&
+                        image->origin == TrackedImageOrigin::VkShade);
+            });
+        prioritizedCount = std::distance(displayedImages.begin(), priorityEnd);
+
+        ImGui::TextDisabled(
+            "%zu of %zu tracked images prioritized; none are hidden.",
+            prioritizedCount, m_trackedImages.size());
+    }
+    else
+    {
+        ImGui::TextDisabled(
+            "%zu tracked images. Select categories to prioritize them without hiding others.",
+            m_trackedImages.size());
+    }
     ImGui::Separator();
 
     constexpr ImGuiTableFlags tableFlags =
@@ -132,12 +186,12 @@ void vkShade::BufferPanel::render()
     ImGui::TableHeadersRow();
 
     ImGuiListClipper clipper;
-    clipper.Begin(static_cast<int>(m_trackedImages.size()));
+    clipper.Begin(static_cast<int>(displayedImages.size()));
     while (clipper.Step())
     {
         for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
         {
-            const TrackedImageSnapshot& image = m_trackedImages[row];
+            const TrackedImageSnapshot& image = *displayedImages[row];
             ImGui::TableNextRow();
 
             ImGui::TableSetColumnIndex(0);
