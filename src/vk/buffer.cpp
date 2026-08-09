@@ -1,7 +1,7 @@
 #include "buffer.hpp"
 
 #include <magic_enum/magic_enum.hpp>
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 #include <vulkan/vulkan_core.h>
 
 #include "macros.hpp"
@@ -12,7 +12,7 @@ vkShade::VulkanBuffer::VulkanBuffer(VulkanDevice& device, size_t size, VkBufferU
     if (size == 0)
         throw std::runtime_error("Cannot initialize buffer with size '0'!");
 
-    spdlog::trace("Creating buffer ({} bytes, {})", size, magic_enum::enum_name(memoryUsage));
+    Logger::trace("Creating buffer ({} bytes, {})", size, magic_enum::enum_name(memoryUsage));
 
     // Allocate the buffer
 	VkBufferCreateInfo bufferInfo = {};
@@ -34,7 +34,7 @@ vkShade::VulkanBuffer::VulkanBuffer(VulkanDevice& device, size_t size, VkBufferU
 
 vkShade::VulkanBuffer::~VulkanBuffer()
 {
-    spdlog::trace("Destroying buffer");
+    Logger::trace("Destroying buffer");
     vmaDestroyBuffer(m_device.allocator, m_buffer, m_allocation);
 }
 
@@ -42,7 +42,7 @@ bool vkShade::VulkanBuffer::copy(VkCommandBuffer cmd, VkBuffer source, size_t si
 {
     if (dstOffset + size > m_allocationInfo.size)
     {
-        spdlog::error("Buffer copy would overflow destination");
+        Logger::error("Buffer copy would overflow destination");
         return false;
     }
 
@@ -60,13 +60,13 @@ bool vkShade::VulkanBuffer::write(const void* data, size_t size, size_t offset)
     // Make sure the buffer is mapped on the CPU
     if (!m_allocationInfo.pMappedData)
     {
-        spdlog::error("Cannot write to unmapped buffer");
+        Logger::error("Cannot write to unmapped buffer");
         return false;
     }
 
     if (offset + size > m_allocationInfo.size)
     {
-        spdlog::error("Write would overflow buffer");
+        Logger::error("Write would overflow buffer");
         return false;
     }
 

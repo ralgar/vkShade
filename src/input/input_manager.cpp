@@ -2,7 +2,7 @@
 #include "input/key_codes.hpp"
 
 #include <magic_enum/magic_enum.hpp>
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 #include <xkbcommon/xkbcommon.h>
 
 #include "config/config_manager.hpp"
@@ -10,13 +10,13 @@
 
 vkShade::InputManager::InputManager()
 {
-    spdlog::debug("Initializing InputManager");
+    Logger::debug("Initializing InputManager");
 
     // Initialize XKB context
     m_xkbContext = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     if (!m_xkbContext)
     {
-        spdlog::error("[InputManager] Failed to create XKB context");
+        Logger::error("[InputManager] Failed to create XKB context");
         return;
     }
 
@@ -35,7 +35,7 @@ vkShade::InputManager::InputManager()
 
     if (!m_xkbKeymap)
     {
-        spdlog::error("[InputManager] Failed to create XKB keymap");
+        Logger::error("[InputManager] Failed to create XKB keymap");
         return;
     }
 
@@ -43,7 +43,7 @@ vkShade::InputManager::InputManager()
     m_xkbState = xkb_state_new(m_xkbKeymap);
     if (!m_xkbState)
     {
-        spdlog::error("[InputManager] Failed to create XKB state");
+        Logger::error("[InputManager] Failed to create XKB state");
         return;
     }
 
@@ -90,7 +90,7 @@ vkShade::InputManager::~InputManager()
 void vkShade::InputManager::bind_action(const std::string& actionName, vkShade::KeyCode keyCode)
 {
     m_actionBindings[actionName] = ActionBinding {keyCode};
-    spdlog::debug("Bound action '{}' to '{}'", actionName, magic_enum::enum_name(keyCode));
+    Logger::debug("Bound action '{}' to '{}'", actionName, magic_enum::enum_name(keyCode));
 }
 
 void vkShade::InputManager::handle_keyboard_event(const xkb_keysym_t& keysym, bool pressed)

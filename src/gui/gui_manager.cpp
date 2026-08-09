@@ -5,6 +5,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "core/service_locator.hpp"
+#include "core/logger.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_manager.hpp"
 #include "windows/main_window.hpp"
@@ -70,7 +71,7 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
         PFN_vkVoidFunction func = vkShade_GetDeviceProcAddr(ctx->handle, function_name);
         if (func)
         {
-            spdlog::trace("[ImGui] Loaded {} from device table:  {}", function_name, (void*)func);
+            Logger::trace("[ImGui] Loaded {} from device table:  {}", function_name, (void*)func);
             return func;
         }
 
@@ -78,11 +79,11 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
         func = vkShade_GetInstanceProcAddr(instance.handle, function_name);
         if (func)
         {
-            spdlog::trace("[ImGui] Loaded {} from instance table: {}", function_name, (void*)func);
+            Logger::trace("[ImGui] Loaded {} from instance table: {}", function_name, (void*)func);
             return func;
         }
 
-        spdlog::error("[ImGui] Failed to load function: {}", function_name);
+        Logger::error("[ImGui] Failed to load function: {}", function_name);
         return nullptr;
     }, &deviceContext);
 

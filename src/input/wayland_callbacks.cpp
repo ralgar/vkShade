@@ -2,8 +2,6 @@
 
 #include <string.h>
 
-#include <spdlog/spdlog.h>
-
 #include "input/input_backend_wayland.hpp"
 
 // Keyboard callbacks

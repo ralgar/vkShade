@@ -3,14 +3,14 @@
 #include <utility>
 
 #include <effect_module.hpp>
-#include <spdlog/spdlog.h>
+#include "core/logger.hpp"
 
 #include "macros.hpp"
 
 vkShade::VulkanSampler::VulkanSampler(VulkanDevice& device, const reshadefx::sampler& samplerInfo)
     : VulkanObject(device)
 {
-    spdlog::trace("Creating sampler");
+    Logger::trace("Creating sampler");
 
     VkSamplerCreateInfo createInfo {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -33,7 +33,7 @@ vkShade::VulkanSampler::VulkanSampler(VulkanDevice& device, const reshadefx::sam
 
 vkShade::VulkanSampler::~VulkanSampler()
 {
-    spdlog::trace("Destroying sampler");
+    Logger::trace("Destroying sampler");
     m_device.dispatch.DestroySampler(m_device.handle, m_sampler, nullptr);
 }
 

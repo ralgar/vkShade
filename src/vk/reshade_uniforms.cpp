@@ -3,8 +3,6 @@
 #include <chrono>
 #include <effect_module.hpp>
 #include <glm/vec2.hpp>
-#include <spdlog/spdlog.h>
-
 #include "vk/buffer.hpp"
 #include "vk/reshade_runtime.hpp"
 
