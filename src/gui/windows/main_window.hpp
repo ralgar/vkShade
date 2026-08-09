@@ -1,8 +1,11 @@
 #pragma once
 
+#include <memory>
+
 #include <imgui.h>
 
 #include "config/config_store.hpp"
+#include "../panels/buffer_panel.hpp"
 #include "../panels/effects_panel.hpp"
 #include "../panels/log_panel.hpp"
 #include "../window.hpp"
@@ -14,7 +17,7 @@ namespace vkShade
     class MainWindow : public GuiWindow
     {
     public:
-        MainWindow();
+        explicit MainWindow(std::shared_ptr<ImageTracker> imageTracker);
 
         void render() override;
 
@@ -23,6 +26,7 @@ namespace vkShade
 
         // Panels
         EffectsPanel m_effectsPanel;
+        BufferPanel  m_bufferPanel;
         LogPanel     m_logPanel;
 
         // Sub-windows

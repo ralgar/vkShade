@@ -3,8 +3,9 @@
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 
-vkShade::MainWindow::MainWindow()
-    : m_preset(vkShade::Locator<ConfigManager>::get().preset())
+vkShade::MainWindow::MainWindow(std::shared_ptr<ImageTracker> imageTracker)
+    : m_preset(vkShade::Locator<ConfigManager>::get().preset()),
+      m_bufferPanel(std::move(imageTracker))
 {}
 
 void vkShade::MainWindow::render()
@@ -24,6 +25,12 @@ void vkShade::MainWindow::render()
             if (ImGui::BeginTabItem("Effects###effects"))
             {
                 m_effectsPanel.render();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Buffers###buffers"))
+            {
+                m_bufferPanel.render();
                 ImGui::EndTabItem();
             }
 
