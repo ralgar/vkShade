@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -9,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/ringbuffer_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace vkShade
@@ -19,6 +21,8 @@ namespace vkShade
     class Logger
     {
     public:
+        static constexpr std::size_t recent_message_capacity = 2000;
+
         static void trace(std::string_view msg)
         {
             get().trace(msg);
@@ -85,14 +89,30 @@ namespace vkShade
             get().critical(fmt, std::forward<Args>(args)...);
         }
 
+        static std::vector<std::string> recent_messages(std::size_t limit = 0)
+        {
+            return state().history->last_formatted(limit);
+        }
+
     private:
-        static spdlog::logger& get()
+        struct State
+        {
+            std::shared_ptr<spdlog::sinks::ringbuffer_sink_mt> history;
+            std::shared_ptr<spdlog::logger> logger;
+        };
+
+        static State& state()
         {
             // Keep the logger independent from spdlog's process-wide registry.
-            static auto logger = []
+            static State instance = []
             {
+                State result;
                 std::vector<spdlog::sink_ptr> sinks;
                 sinks.push_back(std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
+
+                result.history = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(
+                    recent_message_capacity);
+                sinks.push_back(result.history);
 
                 if (const char* path = std::getenv("VKSHADE_LOG_FILE"))
                     // Function-local static initialization opens and truncates the log
@@ -100,34 +120,39 @@ namespace vkShade
                     sinks.push_back(
                         std::make_shared<spdlog::sinks::basic_file_sink_mt>(path, true));
 
-                auto result = std::make_shared<spdlog::logger>(
+                result.logger = std::make_shared<spdlog::logger>(
                     "vkShade", sinks.begin(), sinks.end());
-                result->flush_on(spdlog::level::trace);
+                result.logger->flush_on(spdlog::level::trace);
 
                 const char* configuredLevel = std::getenv("VKSHADE_LOG_LEVEL");
                 const std::string level = configuredLevel ? configuredLevel : "info";
                 if (level == "trace")
-                    result->set_level(spdlog::level::trace);
+                    result.logger->set_level(spdlog::level::trace);
                 else if (level == "debug")
-                    result->set_level(spdlog::level::debug);
+                    result.logger->set_level(spdlog::level::debug);
                 else if (level == "info")
-                    result->set_level(spdlog::level::info);
+                    result.logger->set_level(spdlog::level::info);
                 else if (level == "warn" || level == "warning")
-                    result->set_level(spdlog::level::warn);
+                    result.logger->set_level(spdlog::level::warn);
                 else if (level == "error")
-                    result->set_level(spdlog::level::err);
+                    result.logger->set_level(spdlog::level::err);
                 else if (level == "critical")
-                    result->set_level(spdlog::level::critical);
+                    result.logger->set_level(spdlog::level::critical);
                 else if (level == "off")
-                    result->set_level(spdlog::level::off);
+                    result.logger->set_level(spdlog::level::off);
                 else
-                    result->set_level(spdlog::level::info);
+                    result.logger->set_level(spdlog::level::info);
 
-                result->debug("vkShade logger initialized");
+                result.logger->debug("vkShade logger initialized");
                 return result;
             }();
 
-            return *logger;
+            return instance;
+        }
+
+        static spdlog::logger& get()
+        {
+            return *state().logger;
         }
     };
 }
