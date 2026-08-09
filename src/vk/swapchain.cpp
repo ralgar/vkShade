@@ -201,14 +201,16 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
 
     // Render effects if enabled
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
-    static bool enabled = true;
     if (input.is_action_just_pressed("ToggleEffects"))
-        enabled = !enabled;
+    {
+        const bool enabled = m_device.effectsState->enabled.load(std::memory_order_relaxed);
+        m_device.effectsState->enabled.store(!enabled, std::memory_order_relaxed);
+    }
 
     VulkanImage* readImage = m_pingPongA.get();
     VulkanImage* writeImage = m_pingPongB.get();
 
-    if (enabled)
+    if (m_device.effectsState->enabled.load(std::memory_order_relaxed))
     {
         for (auto effect : m_effects)
         {

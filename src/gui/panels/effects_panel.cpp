@@ -6,10 +6,11 @@
 #include "../gui_helpers.hpp"
 #include "../gui_style.hpp"
 
-vkShade::EffectsPanel::EffectsPanel()
+vkShade::EffectsPanel::EffectsPanel(std::shared_ptr<EffectsState> effectsState)
     : m_config(vkShade::Locator<ConfigManager>::get().app()),
       m_preset(vkShade::Locator<ConfigManager>::get().preset()),
-      m_eventBus(vkShade::Locator<EventBus>::get())
+      m_eventBus(vkShade::Locator<EventBus>::get()),
+      m_effectsState(std::move(effectsState))
 {}
 
 void vkShade::EffectsPanel::render()
@@ -29,9 +30,14 @@ void vkShade::EffectsPanel::render()
 
 void vkShade::EffectsPanel::render_controls_bar()
 {
+    bool effectsEnabled = m_effectsState->enabled.load(std::memory_order_relaxed);
+    if (ImGui::Checkbox("Effects enabled", &effectsEnabled))
+        m_effectsState->enabled.store(effectsEnabled, std::memory_order_relaxed);
+
     const char* label = "Reload Active Effects";
     float buttonWidth = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
 
+    ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttonWidth);
 
     if (ImGui::Button(label))

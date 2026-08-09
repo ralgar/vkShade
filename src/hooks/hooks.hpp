@@ -1,12 +1,15 @@
 #pragma once
 
 #include <assert.h>
+#include <memory>
 #include <shared_mutex>
 #include <unordered_map>
 
 #include <vk_mem_alloc.h>
 #include <vulkan/utility/vk_dispatch_table.h>
 #include <vulkan/vulkan_core.h>
+
+#include "core/effects_state.hpp"
 
 #undef VK_LAYER_EXPORT
 #if defined(__GNUC__) && __GNUC__ >= 4
@@ -34,6 +37,7 @@ struct VulkanDevice
     VkQueue       queue;
     uint32_t      queueFamilyIndex;
     VkCommandPool commandPool;
+    std::shared_ptr<vkShade::EffectsState> effectsState;
 };
 
 inline void* const dispatch_key_from_handle(const void* handle)
