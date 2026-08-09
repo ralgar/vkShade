@@ -1,6 +1,7 @@
 libvk_source = [
   'buffer.cpp',
   'image.cpp',
+  'image_tracker.cpp',
   'initializers.cpp',
   'reshade_effect.cpp',
   'reshade_uniforms.cpp',

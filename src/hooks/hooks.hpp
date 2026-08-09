@@ -1,12 +1,15 @@
 #pragma once
 
 #include <assert.h>
+#include <memory>
 #include <shared_mutex>
 #include <unordered_map>
 
 #include <vk_mem_alloc.h>
 #include <vulkan/utility/vk_dispatch_table.h>
 #include <vulkan/vulkan_core.h>
+
+#include "vk/image_tracker.hpp"
 
 #undef VK_LAYER_EXPORT
 #if defined(__GNUC__) && __GNUC__ >= 4
@@ -34,6 +37,7 @@ struct VulkanDevice
     VkQueue       queue;
     uint32_t      queueFamilyIndex;
     VkCommandPool commandPool;
+    std::shared_ptr<vkShade::ImageTracker> imageTracker;
 };
 
 inline void* const dispatch_key_from_handle(const void* handle)
@@ -86,3 +90,33 @@ VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKH
 VkResult VKAPI_CALL vkShade_AllocateCommandBuffers(VkDevice                           device,
                                                    const VkCommandBufferAllocateInfo* pAllocateInfo,
                                                    VkCommandBuffer*                   pCommandBuffers);
+
+VkResult VKAPI_CALL vkShade_CreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo,
+                                        const VkAllocationCallbacks* pAllocator, VkImage* pImage);
+void VKAPI_CALL vkShade_DestroyImage(VkDevice device, VkImage image,
+                                     const VkAllocationCallbacks* pAllocator);
+VkResult VKAPI_CALL vkShade_CreateImageView(VkDevice device,
+                                            const VkImageViewCreateInfo* pCreateInfo,
+                                            const VkAllocationCallbacks* pAllocator,
+                                            VkImageView* pView);
+void VKAPI_CALL vkShade_DestroyImageView(VkDevice device, VkImageView imageView,
+                                         const VkAllocationCallbacks* pAllocator);
+VkResult VKAPI_CALL vkShade_CreateFramebuffer(VkDevice device,
+                                              const VkFramebufferCreateInfo* pCreateInfo,
+                                              const VkAllocationCallbacks* pAllocator,
+                                              VkFramebuffer* pFramebuffer);
+void VKAPI_CALL vkShade_DestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer,
+                                           const VkAllocationCallbacks* pAllocator);
+void VKAPI_CALL vkShade_CmdBeginRendering(VkCommandBuffer commandBuffer,
+                                          const VkRenderingInfo* pRenderingInfo);
+void VKAPI_CALL vkShade_CmdBeginRenderingKHR(VkCommandBuffer commandBuffer,
+                                             const VkRenderingInfo* pRenderingInfo);
+void VKAPI_CALL vkShade_CmdBeginRenderPass(VkCommandBuffer commandBuffer,
+                                           const VkRenderPassBeginInfo* pRenderPassBegin,
+                                           VkSubpassContents contents);
+void VKAPI_CALL vkShade_CmdBeginRenderPass2(VkCommandBuffer commandBuffer,
+                                            const VkRenderPassBeginInfo* pRenderPassBegin,
+                                            const VkSubpassBeginInfo* pSubpassBeginInfo);
+void VKAPI_CALL vkShade_CmdBeginRenderPass2KHR(VkCommandBuffer commandBuffer,
+                                               const VkRenderPassBeginInfo* pRenderPassBegin,
+                                               const VkSubpassBeginInfo* pSubpassBeginInfo);

@@ -33,7 +33,9 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     // Create image views
     for (auto& image : images)
     {
-        m_images.push_back(std::make_unique<VulkanImage>(device, image, m_extent, m_format));
+        m_images.push_back(std::make_unique<VulkanImage>(
+            device, image, m_extent, m_format, swapchainInfo.imageUsage,
+            swapchainInfo.imageArrayLayers));
     }
 
 	VkImageUsageFlags drawImageUsages {};
@@ -244,6 +246,15 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
     };
 
     VkRenderingInfo renderingInfo = vkinit::rendering_info(m_extent, colorAttachments, nullptr);
+    try
+    {
+        m_device.imageTracker->observe_view(
+            finalImage->image_view(), ImageObservation::ColorAttachment);
+    }
+    catch (const std::exception& exception)
+    {
+        Logger::warn("Buffer tracking failed: {}", exception.what());
+    }
     m_device.dispatch.CmdBeginRendering(m_commandBuffer, &renderingInfo);
 
     // Render ImGui on top of everything

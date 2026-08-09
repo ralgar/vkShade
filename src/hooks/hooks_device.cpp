@@ -102,6 +102,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     thisDevice.handle = *pDevice;
     thisDevice.physicalDevice = physicalDevice;
     thisDevice.instance = thisInstance.handle;
+    thisDevice.imageTracker = std::make_shared<vkShade::ImageTracker>();
 
     // Initialize dispatch table
     vkuInitDeviceDispatchTable(*pDevice, &thisDevice.dispatch, gdpa);
