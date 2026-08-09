@@ -4,9 +4,9 @@
     "name": "VK_LAYER_VKSHADE_post_processing@arch_suffix@",
     "type": "GLOBAL",
     "library_path": "@ld_lib_dir_vkshade@libvkshade.so",
-    "api_version": "1.0.0",
+    "api_version": "1.3.0",
     "implementation_version": "1",
-    "description": "a post processing layer",
+    "description": "A ReShade-compatible post-processing layer",
     "functions": {
       "vkGetInstanceProcAddr": "vkShade_GetInstanceProcAddr",
       "vkGetDeviceProcAddr":   "vkShade_GetDeviceProcAddr"
