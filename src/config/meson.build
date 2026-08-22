@@ -15,6 +15,7 @@ libconfig_library = static_library(
   dependencies : [
     glm,
     inih,
+    magic_enum,
     spdlog,
   ],
   include_directories : vkShade_include_path

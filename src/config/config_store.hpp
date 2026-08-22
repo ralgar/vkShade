@@ -14,6 +14,15 @@ namespace vkShade
     class ConfigStore
     {
     public:
+        enum class Type
+        {
+            Config,
+            Internal,
+            Preset,
+        };
+
+        explicit ConfigStore(Type type);
+
         void clear();
         bool load(std::filesystem::path filePath);
         bool save(std::filesystem::path filePath);  // Save As
@@ -72,6 +81,9 @@ namespace vkShade
         }
 
     private:
+        Type m_type;
+        std::string m_typeString;
+
         ConfigParser   m_parser;
         ConfigObserver m_observer;
 
