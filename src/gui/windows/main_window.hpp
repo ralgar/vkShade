@@ -21,6 +21,7 @@ namespace vkShade
 
     private:
         ConfigStore& m_config;
+        ConfigStore& m_preset;
         EventBus&    m_eventBus;
 
         // Sub-windows

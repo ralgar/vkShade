@@ -80,13 +80,13 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     //  own hook, not the dispatch table, to ensure the dispatch pointer fixup runs.
     VK_CHECK(vkShade_AllocateCommandBuffers(m_device.handle, &allocInfo, &m_commandBuffer));
 
-    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
 
     // Subscribe to config changes
-    config.on_changed("vkShade", "Effects").connect<&VulkanSwapchain::on_effects_changed>(this);
+    preset.on_changed("", "Effects").connect<&VulkanSwapchain::on_effects_changed>(this);
 
     // Load the current effects list
-    if (auto effects = config.get<std::vector<std::string>>("vkShade", "Effects"))
+    if (auto effects = preset.get<std::vector<std::string>>("", "Effects"))
     {
         this->on_effects_changed(effects.value());
     }
@@ -110,8 +110,8 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
     eventBus.sink<Events::ReloadEffects>().disconnect<&VulkanSwapchain::on_reload_effects>(this);
 
     // Unsubscribe from config changes
-    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-    config.on_changed("vkShade", "Effects").disconnect<&VulkanSwapchain::on_effects_changed>(this);
+    auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
+    preset.on_changed("", "Effects").disconnect<&VulkanSwapchain::on_effects_changed>(this);
 }
 
 void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effects)
@@ -160,8 +160,8 @@ void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effec
 
 void vkShade::VulkanSwapchain::on_reload_effects(const Events::ReloadEffects& event)
 {
-    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-    auto effects = config.get<std::vector<std::string>>("vkShade", "Effects");
+    auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
+    auto effects = preset.get<std::vector<std::string>>("", "Effects");
     this->on_effects_changed(effects.value_or(std::vector<std::string>{}));
 }
 

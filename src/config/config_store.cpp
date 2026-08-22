@@ -4,6 +4,8 @@
 #include <map>
 
 #include <ini.h>
+#include <magic_enum/magic_enum.hpp>
+
 #include "core/logger.hpp"
 
 // Static callback function for inih parser
@@ -18,6 +20,13 @@ static int config_ini_handler(void* user, const char* section, const char* name,
     vkShade::Logger::trace("Parsed configuration option: {}::{} ({})", section, name, value);
 
     return 1;  // Success
+}
+
+vkShade::ConfigStore::ConfigStore(Type type)
+    : m_type(type)
+{
+    m_typeString = std::string(magic_enum::enum_name(m_type));
+    std::transform(m_typeString.begin(), m_typeString.end(), m_typeString.begin(), ::tolower);
 }
 
 void vkShade::ConfigStore::clear()
@@ -47,6 +56,8 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
         return false;
     }
 
+    Logger::info("Loaded {} file: {}", m_typeString, filePath.string());
+
     m_currentFile = filePath;
     return true;
 }
@@ -56,7 +67,7 @@ bool vkShade::ConfigStore::save(std::filesystem::path filePath)
     std::ofstream file(filePath);
     if (!file.is_open())
     {
-        Logger::error("Failed to open config file for writing: {}", filePath.string());
+        Logger::error("Failed to open {} file for writing: {}", m_typeString, filePath.string());
         return false;
     }
 
@@ -108,7 +119,7 @@ bool vkShade::ConfigStore::save(std::filesystem::path filePath)
     }
 
     m_currentFile = filePath;
-    Logger::trace("Saved configuration to: {}", filePath.string());
+    Logger::info("Saved {} file: {}", m_typeString, filePath.string());
     return true;
 }
 

@@ -8,6 +8,7 @@
 
 vkShade::MainWindow::MainWindow()
     : m_config(vkShade::Locator<ConfigManager>::get().app()),
+      m_preset(vkShade::Locator<ConfigManager>::get().preset()),
       m_eventBus(vkShade::Locator<EventBus>::get())
 {}
 
@@ -67,20 +68,23 @@ void vkShade::MainWindow::render_menu_bar()
         {
             if (ImGui::MenuItem("New"))
             {
-                m_config.clear();
+                m_preset.clear();
             }
 
             if (ImGui::MenuItem("Open"))
             {
                 // TODO: Open file browser and select file
-                m_config.load("vkShade.ini");  // From CWD
+                m_preset.load("ReShade.ini");  // From CWD
             }
 
             ImGui::Separator();
 
-            if (ImGui::MenuItem("Save", nullptr, nullptr, m_config.has_file()))
+            if (ImGui::MenuItem("Save", nullptr, nullptr, true))
             {
-                m_config.save();
+                if (m_preset.has_file())
+                    m_preset.save();
+                else
+                    m_preset.save("ReShade.ini");  // In CWD
             }
 
             ImGui::Separator();
@@ -120,7 +124,7 @@ void vkShade::MainWindow::render_effect_lists()
 
     // Get configured/requested effects (what the user wants active)
     std::vector<std::string> activeEffects;
-    auto activeEffectsOpt = m_config.get<std::vector<std::string>>("vkShade", "Effects");
+    auto activeEffectsOpt = m_preset.get<std::vector<std::string>>("", "Effects");
     activeEffects = activeEffectsOpt.value_or(std::vector<std::string>{});
 
     // Build a set of loaded effect names for fast lookup
@@ -219,7 +223,7 @@ void vkShade::MainWindow::render_effect_lists()
             std::string effect = availableEffects[m_selectedAvailable];
             // Add to active list
             activeEffects.push_back(effect);
-            m_config.set("vkShade", "Effects", activeEffects);
+            m_preset.set("", "Effects", activeEffects);
             m_selectedAvailable = -1;
         }
 
@@ -230,7 +234,7 @@ void vkShade::MainWindow::render_effect_lists()
         {
             // Remove from active list
             activeEffects.erase(activeEffects.begin() + m_selectedActive);
-            m_config.set("vkShade", "Effects", activeEffects);
+            m_preset.set("", "Effects", activeEffects);
             m_selectedActive = -1;
         }
 
@@ -279,7 +283,7 @@ void vkShade::MainWindow::render_effect_lists()
         if (UI::Button("Move Up", ImVec2(btnWidth, 0), canMoveUp))
         {
             std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive - 1]);
-            m_config.set("vkShade", "Effects", activeEffects);
+            m_preset.set("", "Effects", activeEffects);
             m_selectedActive--;
         }
 
@@ -288,7 +292,7 @@ void vkShade::MainWindow::render_effect_lists()
         if (UI::Button("Move Down", ImVec2(btnWidth, 0), canMoveDown))
         {
             std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive + 1]);
-            m_config.set("vkShade", "Effects", activeEffects);
+            m_preset.set("", "Effects", activeEffects);
             m_selectedActive++;
         }
 

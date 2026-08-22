@@ -17,5 +17,8 @@ namespace vkShade
         ConfigStore m_config;
         ConfigStore m_internal;
         ConfigStore m_preset;
+
+        void load_config_file();
+        void load_preset_file();
     };
 } // namespace vkShade
