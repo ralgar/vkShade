@@ -43,10 +43,11 @@ This project is still in the **PRE-ALPHA** phase of development - meaning
 
 ### Limitations
 
-Some ReShade effects do not work properly yet. For example:
+Some ReShade effects and preset features do not work properly yet. For example:
 
 - Effects relying on the depth buffer
 - Effects with multiple techniques
+- ReShade's `Techniques` and `TechniqueSorting` preset parameters
 - Possibly more...
 
 ### Roadmap
@@ -55,9 +56,13 @@ Some ReShade effects do not work properly yet. For example:
 
 - [x] Chain together multiple effects
 - [x] Configuration system
-    - [x] Application-level (global) options
-    - [ ] Per-game presets using ReShade's INI format
-- [x] Basic GUI overlay (browse/apply effects and save/load config)
+    - [x] Application-level config file
+    - [x] Per-game effect presets using ReShade's INI format
+    - [ ] Hot-reload config/preset files on changes (in-progress)
+- [x] GUI overlay
+    - [x] Browse, apply, and re-order effects
+    - [x] Save and reload preset
+    - [ ] Uniform enumeration and adjustment (in-progress)
 - [x] ReShade FX integration
     - [x] Basic ReShade FX support
     - [x] Full support for ReShade's time-based runtime uniforms
@@ -173,7 +178,8 @@ ENABLE_VKSHADE=1 %command%
 
 ## Configuration
 
-The configuration file is searched for in the following locations (in order):
+The `vkShade.ini` configuration file is searched for in the following
+ locations, in order of precedence:
 
 - A file set with the environment variable
   `VKSHADE_CONFIG_FILE=/path/to/vkShade.ini`
@@ -192,13 +198,31 @@ The configuration file is searched for in the following locations (in order):
 
 ### ReShade FX
 
-To use ReShade effects, you need to configure the search paths. For example:
+To use ReShade effects, you need to configure the search paths in
+ `vkShade.ini`. For example:
 
 ```ini
 [ReShade]
 EffectSearchPaths = /opt/reshade/shaders,/opt/reshade/shaders/SweetFX
 TextureSearchPaths = /opt/reshade/textures,/opt/reshade/textures/SweetFX
 ```
+
+### ReShade Presets
+
+vkShade supports ReShade preset files (`ReShade.ini`).
+
+The preset file is searched for in the same locations as `vkShade.ini`, or a
+custom file can be specified with the `VKSHADE_PRESET_FILE` environment
+variable.
+
+Uniform values are loaded from the preset and applied to effects at runtime.
+
+> [!NOTE]
+> ReShade preset support is functional, but currently partial.
+>
+> Uniforms are fully supported, but the `Techniques` and `TechniqueSorting`
+> parameters are not supported yet. Instead, vkShade uses it's own `Effects`
+> parameter and semantics.
 
 ### Input
 

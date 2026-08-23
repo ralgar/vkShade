@@ -17,7 +17,5 @@ configure_file(
     install_dir : vulkan_layer_dir,
 )
 
-install_data(
-    'vkShade.ini',
-    install_dir: get_option('datadir') / 'vkShade'
-)
+install_data('vkShade.ini', install_dir: get_option('datadir') / 'vkShade')
+install_data('ReShade.ini', install_dir: get_option('datadir') / 'vkShade')
