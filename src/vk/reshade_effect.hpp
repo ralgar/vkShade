@@ -1,12 +1,12 @@
 #pragma once
 
-#include <expected>
 #include <filesystem>
 #include <memory>
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 
+#include "core/logger.hpp"
 #include "core/uniform.hpp"
 #include "hooks/hooks.hpp"
 #include "vk/buffer.hpp"
@@ -21,6 +21,7 @@ namespace reshadefx
     enum class stencil_func : uint8_t;
     enum class stencil_op : uint8_t;
     struct effect_module;
+    struct type;
     struct uniform;
 }
 
@@ -35,64 +36,9 @@ namespace vkShade
         ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath);
         ~ReshadeEffect() override;
 
-        enum class Error
-        {
-            None = 0,
-            BufferNotValid,
-            UniformNotFound,
-            TypeMismatch,
-            WriteError,
-        };
-
         void apply(VkCommandBuffer cmd, VulkanImage& outputImage);
         void bind_input(VulkanImage& colorImage, VulkanImage& depthImage);
         void update(const ReshadeFrameState& frame);
-
-        template <class T>
-        std::expected<T, Error> get_uniform(const std::string& name)
-        {
-            // Search for a binding with the name passed into the func
-            const Uniform* binding = this->find_uniform(name);
-            if (!binding)
-                return std::unexpected(Error::UniformNotFound);
-
-            // Make sure the type is correct
-            if (!matches_type<T>(binding->type))
-                return std::unexpected(Error::TypeMismatch);
-
-            // Make sure the buffer is good
-            if (!m_uniformBuffer)
-                return std::unexpected(Error::BufferNotValid);
-
-            std::byte* dataStartingPoint = static_cast<std::byte*>(m_uniformBuffer->data()) + binding->offset;
-
-            // Important to reinterpret cast using T, because some stuff might be 16byte-aligned and we want to only get
-            // the bytes that correspond to the actual value type
-            return *reinterpret_cast<T*>(dataStartingPoint);
-        }
-
-        template <typename T>
-        Error set_uniform(const std::string& name, T value)
-        {
-            // Search for the uniform by name
-            const Uniform* uniform = this->find_uniform(name);
-            if (!uniform)
-                return Error::UniformNotFound;
-
-            // Make sure the type is correct
-            if (!matches_type<T>(uniform->type))
-                return Error::TypeMismatch;
-
-            // Make sure the buffer is good
-            if (!m_uniformBuffer)
-                return Error::BufferNotValid;
-
-            // Write T into the buffer at the specified offset
-            if (!m_uniformBuffer->write(&value, sizeof(T), uniform->offset))
-                return Error::WriteError;
-
-            return Error::None;
-        }
 
     private:
         struct Pass
@@ -106,8 +52,9 @@ namespace vkShade
             std::shared_ptr<ShaderModule> fragmentShader;
         };
 
-        VkExtent2D m_extent;
-        VkFormat   m_format;
+        VkExtent2D  m_extent;
+        VkFormat    m_format;
+        std::string m_fileName;
 
         std::unique_ptr<reshadefx::effect_module> m_module {nullptr};
         std::unique_ptr<VulkanBuffer> m_uniformBuffer {nullptr};
@@ -140,15 +87,38 @@ namespace vkShade
         }
 
         template<typename T>
-        bool matches_type(const Uniform::Type& type)
+        void on_uniform_changed(const std::string& name, T value)
         {
-            // Float types
-            if constexpr (std::is_same_v<T, float>)        return type == Uniform::Type::Float;
-            if constexpr (std::is_same_v<T, glm::vec2>)    return type == Uniform::Type::Vec2;
-            if constexpr (std::is_same_v<T, glm::vec3>)    return type == Uniform::Type::Vec3;
-            if constexpr (std::is_same_v<T, glm::vec4>)    return type == Uniform::Type::Vec4;
+            // Search for the uniform by name
+            const Uniform* uniform = nullptr;
+            auto it = m_uniformsByName.find(name);
+            if (it == m_uniformsByName.end())
+            {
+                Logger::error("Uniform '{}' not found", name);
+                return;
+            }
+            uniform = &it->second;
 
-            return false;
+            // Make sure the type is correct
+            if (uniform->type != uniform_type_v<T>)
+            {
+                Logger::error("Type mismatch for uniform '{}'", name);
+                return;
+            }
+
+            // Make sure the buffer is good
+            if (!m_uniformBuffer)
+            {
+                Logger::error("Uniform buffer is not valid: {}", m_fileName);
+                return;
+            }
+
+            // Write T into the buffer at the specified offset
+            if (!m_uniformBuffer->write(&value, sizeof(T), uniform->offset))
+            {
+                Logger::error("Failed to write uniform '{}'", name);
+                return;
+            }
         }
 
         void reflect_descriptors();
@@ -162,5 +132,6 @@ namespace vkShade
         static VkPrimitiveTopology convert_primitive_topology(reshadefx::primitive_topology topology);
         static VkCompareOp         convert_stencil_func(reshadefx::stencil_func stencilFunc);
         static VkStencilOp         convert_stencil_op(reshadefx::stencil_op stencilOp);
+        static Uniform::Type       convert_uniform_type(reshadefx::type type);
     };
 } // namespace vkShade
