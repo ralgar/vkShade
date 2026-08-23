@@ -140,46 +140,86 @@ TEST_CASE("ConfigParser: Parse uint32_t - negative value", "[config][parser]")
     REQUIRE(result.error() == ConfigError::ParseError);
 }
 
-TEST_CASE("ConfigParser: Parse vec2", "[config][parser]")
+TEST_CASE("ConfigParser: Parse bool vectors", "[config][parser]")
 {
     ConfigParser parser;
 
-    auto result = parser.parse<glm::vec2>("1.5, 2.5");
-    REQUIRE(result.has_value());
-    REQUIRE_THAT(result->x, Catch::Matchers::WithinRel(1.5f, 0.0001f));
-    REQUIRE_THAT(result->y, Catch::Matchers::WithinRel(2.5f, 0.0001f));
+    auto vec2 = parser.parse<glm::bvec2>("true, false");
+    auto vec3 = parser.parse<glm::bvec3>("true, false, true");
+    auto vec4 = parser.parse<glm::bvec4>("false, true, false, true");
+
+    REQUIRE(vec2.has_value());
+    REQUIRE((*vec2)[0] == true);
+    REQUIRE((*vec2)[1] == false);
+
+    REQUIRE(vec3.has_value());
+    REQUIRE((*vec3)[0] == true);
+    REQUIRE((*vec3)[1] == false);
+    REQUIRE((*vec3)[2] == true);
+
+    REQUIRE(vec4.has_value());
+    REQUIRE((*vec4)[0] == false);
+    REQUIRE((*vec4)[1] == true);
+    REQUIRE((*vec4)[2] == false);
+    REQUIRE((*vec4)[3] == true);
 }
 
-TEST_CASE("ConfigParser: Parse vec2 - invalid component count", "[config][parser]")
+TEST_CASE("ConfigParser: Parse int vectors", "[config][parser]")
 {
     ConfigParser parser;
 
-    auto result = parser.parse<glm::vec2>("1.5, 2.5, 3.5");
-    REQUIRE(!result.has_value());
-    REQUIRE(result.error() == ConfigError::ParseError);
+    auto vec2 = parser.parse<glm::ivec2>("1, -2");
+    auto vec3 = parser.parse<glm::ivec3>("1, -2, 3");
+    auto vec4 = parser.parse<glm::ivec4>("1, -2, 3, -4");
+
+    REQUIRE(vec2.has_value());
+    REQUIRE((*vec2)[0] == 1);
+    REQUIRE((*vec2)[1] == -2);
+
+    REQUIRE(vec3.has_value());
+    REQUIRE((*vec3)[0] == 1);
+    REQUIRE((*vec3)[1] == -2);
+    REQUIRE((*vec3)[2] == 3);
+
+    REQUIRE(vec4.has_value());
+    REQUIRE((*vec4)[0] == 1);
+    REQUIRE((*vec4)[1] == -2);
+    REQUIRE((*vec4)[2] == 3);
+    REQUIRE((*vec4)[3] == -4);
 }
 
-TEST_CASE("ConfigParser: Parse vec3", "[config][parser]")
+TEST_CASE("ConfigParser: Parse uint vectors", "[config][parser]")
 {
     ConfigParser parser;
 
-    auto result = parser.parse<glm::vec3>("1.0, 2.0, 3.0");
-    REQUIRE(result.has_value());
-    REQUIRE_THAT(result->x, Catch::Matchers::WithinRel(1.0f, 0.0001f));
-    REQUIRE_THAT(result->y, Catch::Matchers::WithinRel(2.0f, 0.0001f));
-    REQUIRE_THAT(result->z, Catch::Matchers::WithinRel(3.0f, 0.0001f));
+    auto vec2 = parser.parse<glm::uvec2>("1, 2");
+    auto vec3 = parser.parse<glm::uvec3>("1, 2, 3");
+    auto vec4 = parser.parse<glm::uvec4>("1, 2, 3, 4");
+
+    REQUIRE(vec2.has_value());
+    REQUIRE((*vec2)[0] == 1);
+    REQUIRE((*vec2)[1] == 2);
+
+    REQUIRE(vec3.has_value());
+    REQUIRE((*vec3)[0] == 1);
+    REQUIRE((*vec3)[1] == 2);
+    REQUIRE((*vec3)[2] == 3);
+
+    REQUIRE(vec4.has_value());
+    REQUIRE((*vec4)[0] == 1);
+    REQUIRE((*vec4)[1] == 2);
+    REQUIRE((*vec4)[2] == 3);
+    REQUIRE((*vec4)[3] == 4);
 }
 
-TEST_CASE("ConfigParser: Parse vec4", "[config][parser]")
+TEST_CASE("ConfigParser: Parse vectors - invalid component count", "[config][parser]")
 {
     ConfigParser parser;
 
-    auto result = parser.parse<glm::vec4>("1.0, 2.0, 3.0, 4.0");
-    REQUIRE(result.has_value());
-    REQUIRE_THAT(result->x, Catch::Matchers::WithinRel(1.0f, 0.0001f));
-    REQUIRE_THAT(result->y, Catch::Matchers::WithinRel(2.0f, 0.0001f));
-    REQUIRE_THAT(result->z, Catch::Matchers::WithinRel(3.0f, 0.0001f));
-    REQUIRE_THAT(result->w, Catch::Matchers::WithinRel(4.0f, 0.0001f));
+    REQUIRE(!parser.parse<glm::vec2>("1.0").has_value());
+    REQUIRE(!parser.parse<glm::vec2>("1.0, 2.0, 3.0").has_value());
+    REQUIRE(!parser.parse<glm::ivec3>("1, 2").has_value());
+    REQUIRE(!parser.parse<glm::uvec4>("1, 2, 3").has_value());
 }
 
 TEST_CASE("ConfigParser: Parse string list", "[config][parser]")
@@ -231,12 +271,40 @@ TEST_CASE("ConfigParser: to_string - const char*", "[config][parser]")
     REQUIRE(result == "test");
 }
 
+TEST_CASE("ConfigParser: to_string - float", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result = parser.to_string(3.14159f);
+
+    REQUIRE(result == "3.141590");
+}
+
+TEST_CASE("ConfigParser: to_string - int", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result = parser.to_string(-42);
+
+    REQUIRE(result == "-42");
+}
+
+TEST_CASE("ConfigParser: to_string - uint", "[config][parser]")
+{
+    ConfigParser parser;
+
+    auto result = parser.to_string(42u);
+
+    REQUIRE(result == "42");
+}
+
 TEST_CASE("ConfigParser: to_string - bool", "[config][parser]")
 {
     ConfigParser parser;
 
     auto result1 = parser.to_string(true);
     auto result2 = parser.to_string(false);
+
     REQUIRE(result1 == "true");
     REQUIRE(result2 == "false");
 }
@@ -245,8 +313,9 @@ TEST_CASE("ConfigParser: to_string - vec2", "[config][parser]")
 {
     ConfigParser parser;
 
-    glm::vec2 v{1.5f, 2.5f};
-    auto result = parser.to_string(v);
+    glm::vec2 value {1.5f, 2.5f};
+    auto result = parser.to_string(value);
+
     REQUIRE(result == "1.500000,2.500000");
 }
 
@@ -254,9 +323,110 @@ TEST_CASE("ConfigParser: to_string - vec3", "[config][parser]")
 {
     ConfigParser parser;
 
-    glm::vec3 v{1.0f, 2.0f, 3.0f};
-    auto result = parser.to_string(v);
+    glm::vec3 value {1.0f, 2.0f, 3.0f};
+    auto result = parser.to_string(value);
+
     REQUIRE(result == "1.000000,2.000000,3.000000");
+}
+
+TEST_CASE("ConfigParser: to_string - vec4", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::vec4 value {1.0f, 2.0f, 3.0f, 4.0f};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "1.000000,2.000000,3.000000,4.000000");
+}
+
+TEST_CASE("ConfigParser: to_string - ivec2", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::ivec2 value {10, -20};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "10,-20");
+}
+
+TEST_CASE("ConfigParser: to_string - ivec3", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::ivec3 value {10, -20, 30};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "10,-20,30");
+}
+
+TEST_CASE("ConfigParser: to_string - ivec4", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::ivec4 value {10, -20, 30, -40};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "10,-20,30,-40");
+}
+
+TEST_CASE("ConfigParser: to_string - uvec2", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::uvec2 value {10u, 20u};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "10,20");
+}
+
+TEST_CASE("ConfigParser: to_string - uvec3", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::uvec3 value {10u, 20u, 30u};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "10,20,30");
+}
+
+TEST_CASE("ConfigParser: to_string - uvec4", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::uvec4 value {10u, 20u, 30u, 40u};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "10,20,30,40");
+}
+
+TEST_CASE("ConfigParser: to_string - bvec2", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::bvec2 value {true, false};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "true,false");
+}
+
+TEST_CASE("ConfigParser: to_string - bvec3", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::bvec3 value {true, false, true};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "true,false,true");
+}
+
+TEST_CASE("ConfigParser: to_string - bvec4", "[config][parser]")
+{
+    ConfigParser parser;
+
+    glm::bvec4 value {true, false, true, false};
+    auto result = parser.to_string(value);
+
+    REQUIRE(result == "true,false,true,false");
 }
 
 TEST_CASE("ConfigParser: to_string - string list", "[config][parser]")
