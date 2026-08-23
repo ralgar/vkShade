@@ -12,22 +12,22 @@ using namespace vkShade;
 static std::vector<std::string> g_callbackLog;
 
 // Free function handlers
-void on_string_changed(const std::string& value)
+void on_string_changed(const std::string& key, const std::string& value)
 {
     g_callbackLog.push_back("string:" + value);
 }
 
-void on_float_changed(float value)
+void on_float_changed(const std::string& key, float value)
 {
     g_callbackLog.push_back("float:" + std::to_string(value));
 }
 
-void on_bool_changed(bool value)
+void on_bool_changed(const std::string& key, bool value)
 {
     g_callbackLog.push_back("bool:" + std::string(value ? "true" : "false"));
 }
 
-void on_vec3_changed(const glm::vec3& value)
+void on_vec3_changed(const std::string& key, const glm::vec3& value)
 {
     g_callbackLog.push_back("vec3:" + std::to_string(value.x) + "," +
                            std::to_string(value.y) + "," + std::to_string(value.z));
@@ -37,19 +37,19 @@ void on_vec3_changed(const glm::vec3& value)
 class TestListener
 {
 public:
-    void on_string_value(const std::string& value)
+    void on_string_value(const std::string& key, const std::string& value)
     {
         m_lastString = value;
         m_callCount++;
     }
 
-    void on_float_value(float value)
+    void on_float_value(const std::string& key, float value)
     {
         m_lastFloat = value;
         m_callCount++;
     }
 
-    void on_int_value(int32_t value)
+    void on_int_value(const std::string& key, int32_t value)
     {
         m_lastInt = value;
         m_callCount++;
