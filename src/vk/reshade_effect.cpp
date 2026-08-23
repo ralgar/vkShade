@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <ranges>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 #include <effect_parser.hpp>
@@ -23,7 +24,7 @@
 #include "vk/sampler.hpp"
 
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
-    : VulkanObject(device), m_extent(extent), m_format(format)
+    : VulkanObject(device), m_extent(extent), m_format(format), m_fileName(effectPath.filename())
 {
     Logger::trace("Creating effect: {}", effectPath.filename().string());
 
@@ -43,6 +44,15 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, V
 
 vkShade::ReshadeEffect::~ReshadeEffect()
 {
+    for (const auto& [name, uniform] : m_uniformsByName)
+    {
+        auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
+        Uniform::dispatch_type(uniform.type, [&]<typename T>(std::type_identity<T>)
+        {
+            preset.on_changed(m_fileName, name).disconnect<&ReshadeEffect::on_uniform_changed<T>>(this);
+        });
+    }
+
     for (const auto& pass : m_passes)
     {
         m_device.dispatch.DestroyPipeline(m_device.handle, pass.pipeline, nullptr);
@@ -404,6 +414,37 @@ VkStencilOp vkShade::ReshadeEffect::convert_stencil_op(reshadefx::stencil_op ste
     }
 
     std::unreachable();
+}
+
+vkShade::Uniform::Type vkShade::ReshadeEffect::convert_uniform_type(reshadefx::type type)
+{
+    using T = reshadefx::type;
+
+    // Float
+    if (type == T{ T::t_float, 1, 1 })  return Uniform::Type::Float;
+    if (type == T{ T::t_float, 2, 1 })  return Uniform::Type::Float2;
+    if (type == T{ T::t_float, 3, 1 })  return Uniform::Type::Float3;
+    if (type == T{ T::t_float, 4, 1 })  return Uniform::Type::Float4;
+
+    // Int
+    if (type == T{ T::t_int, 1, 1 })    return Uniform::Type::Int;
+    if (type == T{ T::t_int, 2, 1 })    return Uniform::Type::Int2;
+    if (type == T{ T::t_int, 3, 1 })    return Uniform::Type::Int3;
+    if (type == T{ T::t_int, 4, 1 })    return Uniform::Type::Int4;
+
+    // Uint
+    if (type == T{ T::t_uint, 1, 1 })   return Uniform::Type::Uint;
+    if (type == T{ T::t_uint, 2, 1 })   return Uniform::Type::Uint2;
+    if (type == T{ T::t_uint, 3, 1 })   return Uniform::Type::Uint3;
+    if (type == T{ T::t_uint, 4, 1 })   return Uniform::Type::Uint4;
+
+    // Bool
+    if (type == T{ T::t_bool, 1, 1 })   return Uniform::Type::Bool;
+    if (type == T{ T::t_bool, 2, 1 })   return Uniform::Type::Bool2;
+    if (type == T{ T::t_bool, 3, 1 })   return Uniform::Type::Bool3;
+    if (type == T{ T::t_bool, 4, 1 })   return Uniform::Type::Bool4;
+
+    throw std::invalid_argument("Unsupported uniform type");;
 }
 
 void vkShade::ReshadeEffect::reflect_descriptors()
@@ -774,20 +815,6 @@ void vkShade::ReshadeEffect::reflect_samplers()
 
 void vkShade::ReshadeEffect::reflect_uniforms()
 {
-    auto reflect_type = [](const reshadefx::type type) -> vkShade::Uniform::Type
-    {
-        if (type.base == reshadefx::type::t_float && type.rows == 1 && type.cols == 1)
-            return Uniform::Type::Float;
-        if (type.base == reshadefx::type::t_float && type.rows == 2 && type.cols == 1)
-            return Uniform::Type::Vec2;
-        if (type.base == reshadefx::type::t_float && type.rows == 3 && type.cols == 1)
-            return Uniform::Type::Vec3;
-        if (type.base == reshadefx::type::t_float && type.rows == 4 && type.cols == 1)
-            return Uniform::Type::Vec4;
-
-        return Uniform::Type::Unknown;
-    };
-
     // Convert the ReShade uniform to our own reflected type
     for (const auto& uniform : m_module->uniforms)
     {
@@ -846,20 +873,50 @@ void vkShade::ReshadeEffect::reflect_uniforms()
             }
         }
 
-        // Generic/GUI uniform
+        // If we've reached here then it's a generic/GUI uniform
+
+        // Store uniform data
         m_uniformsByName[uniform.name] = {
             .name = uniform.name,
             .size = uniform.size,
             .offset = uniform.offset,
-            .type = reflect_type(uniform.type)
+            .type = convert_uniform_type(uniform.type)
         };
 
-        // Set the default value if there is one
-        if (uniform.has_initializer_value)
+        // Subscribe to changes and set the initial value.
+        auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
+        Uniform::dispatch_type(convert_uniform_type(uniform.type), [&]<typename T>(std::type_identity<T>)
         {
-            // NOTE: The initializer value is a union, so we just cast it to a pointer.
-            m_uniformBuffer->write(&uniform.initializer_value.as_uint[0], uniform.size, uniform.offset);
-        }
+            // Write the uniform value. Either from the preset, the initializer, or by zero-filling.
+            if (auto result = preset.get<T>(m_fileName, uniform.name))
+            {
+                std::string stringValue = preset.get<std::string>(m_fileName, uniform.name).value_or("");
+                Logger::trace("[{}] Loading uniform '{}' from preset: {}", m_fileName, uniform.name, stringValue);
+
+                m_uniformBuffer->write(&result.value(), uniform.size, uniform.offset);
+            }
+            else if (uniform.has_initializer_value)
+            {
+                Logger::trace("[{}] Initializing uniform '{}' from shader initializer", m_fileName, uniform.name);
+
+                T value;
+
+                // NOTE: The initializer value is a union, so we just cast it to a pointer.
+                std::memcpy(&value, &uniform.initializer_value.as_uint[0], sizeof(T));
+
+                m_uniformBuffer->write(&value, uniform.size, uniform.offset);
+                preset.set(m_fileName, uniform.name, value);
+            }
+            else
+            {
+                Logger::trace("[{}] Initializing uniform '{}' to zero", m_fileName, uniform.name);
+                std::vector<std::byte> zero(uniform.size);
+                m_uniformBuffer->write(zero.data(), zero.size(), uniform.offset);
+            }
+
+            // Subscribe to uniform changes
+            preset.on_changed(m_fileName, uniform.name).connect<&ReshadeEffect::on_uniform_changed<T>>(this);
+        });
     }
 }
 
