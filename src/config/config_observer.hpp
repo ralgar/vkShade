@@ -53,7 +53,7 @@ namespace vkShade
             {
                 for (const auto& [ptr, pInstance, callback, reset] : it->second)
                 {
-                    callback(&value, pInstance);
+                    callback(&value, pInstance, key);
                 }
             }
         }
@@ -61,14 +61,20 @@ namespace vkShade
         // Reset each callback with a default value. Called when clearing ConfigStore.
         void notify_all_defaults()
         {
-            for (const auto& [key, handlers] : m_subscribers)
+            for (const auto& [mapKey, handlers] : m_subscribers)
+            {
+                // mapKey is "section::key" - the reset path only needs key, not section
+                size_t pos = mapKey.find("::");
+                std::string key = mapKey.substr(pos + 2);
+
                 for (const auto& [ptr, pInstance, callback, reset] : handlers)
-                    reset();
+                    reset(key);
+            }
         }
 
     private:
-        using Callback = std::function<void(const void*, void*)>;
-        using ResetCallback = std::function<void()>;
+        using Callback = std::function<void(const void*, void*, const std::string&)>;
+        using ResetCallback = std::function<void(const std::string&)>;
 
         // Map: "Section::Key" -> [(function pointer, instance pointer, callback, reset callback)]
         std::unordered_map<std::string, std::vector<std::tuple<void*, void*, Callback, ResetCallback>>> m_subscribers;
@@ -78,7 +84,7 @@ namespace vkShade
         struct function_arg;
 
         template<typename Ret, typename Arg>
-        struct function_arg<Ret(*)(Arg)>
+        struct function_arg<Ret(*)(const std::string&, Arg)>
         {
             using type = Arg;
         };
@@ -87,7 +93,7 @@ namespace vkShade
         struct method_arg;
 
         template<typename Class, typename Ret, typename Arg>
-        struct method_arg<Ret(Class::*)(Arg)>
+        struct method_arg<Ret(Class::*)(const std::string&, Arg)>
         {
             using type = Arg;
         };
@@ -110,14 +116,14 @@ namespace vkShade
                     return;  // Already connected
             }
 
-            handlers.emplace_back(pFunction, nullptr, [](const void* pValue, void*)
+            handlers.emplace_back(pFunction, nullptr, [](const void* pValue, void*, const std::string& k)
             {
-                Func(*static_cast<const ArgType*>(pValue));
+                Func(k, *static_cast<const ArgType*>(pValue));
             },
-            []()  // Reset callback - notifies with default value for the type
+            [](const std::string& k)  // Reset callback - notifies with default value for the type
             {
                 ArgType defaultValue{};
-                Func(defaultValue);
+                Func(k, defaultValue);
             });
         }
 
@@ -145,16 +151,16 @@ namespace vkShade
                     return;  // Already connected
             }
 
-            handlers.emplace_back(pMethod, instance, [](const void* pValue, void* pInstance)
+            handlers.emplace_back(pMethod, instance, [](const void* pValue, void* pInstance, const std::string& k)
             {
                 Class* obj = static_cast<Class*>(pInstance);
-                (obj->*Method)(*static_cast<const ArgType*>(pValue));
+                (obj->*Method)(k, *static_cast<const ArgType*>(pValue));
             },
-            [instance]()  // Reset callback - notifies with default value for the type
+            [instance](const std::string& k)  // Reset callback - notifies with default value for the type
             {
                 ArgType defaultValue{};
                 Class* obj = static_cast<Class*>(instance);
-                (obj->*Method)(defaultValue);
+                (obj->*Method)(k, defaultValue);
             });
         }
 

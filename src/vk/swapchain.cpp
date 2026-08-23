@@ -3,6 +3,7 @@
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <magic_enum/magic_enum.hpp>
+#include <string_view>
 
 #include "config/config_manager.hpp"
 #include "core/event_bus.hpp"
@@ -88,7 +89,7 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     // Load the current effects list
     if (auto effects = preset.get<std::vector<std::string>>("", "Effects"))
     {
-        this->on_effects_changed(effects.value());
+        this->on_effects_changed("Effects", effects.value());
     }
 
     // Subscribe to events
@@ -114,7 +115,7 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
     preset.on_changed("", "Effects").disconnect<&VulkanSwapchain::on_effects_changed>(this);
 }
 
-void vkShade::VulkanSwapchain::on_effects_changed(std::vector<std::string> effects)
+void vkShade::VulkanSwapchain::on_effects_changed(const std::string& key, std::vector<std::string> effects)
 {
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
     auto searchPaths = config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
@@ -162,7 +163,7 @@ void vkShade::VulkanSwapchain::on_reload_effects(const Events::ReloadEffects& ev
 {
     auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
     auto effects = preset.get<std::vector<std::string>>("", "Effects");
-    this->on_effects_changed(effects.value_or(std::vector<std::string>{}));
+    this->on_effects_changed("Effects", effects.value_or(std::vector<std::string>{}));
 }
 
 void vkShade::VulkanSwapchain::render(uint32_t imageIndex)

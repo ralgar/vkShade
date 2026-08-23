@@ -46,7 +46,7 @@ private:
 
 TEST_CASE("ConfigStore: Set and get string", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("app", "name", std::string("MyApp"));
     auto result = config.get<std::string>("app", "name");
@@ -57,7 +57,7 @@ TEST_CASE("ConfigStore: Set and get string", "[config][manager]")
 
 TEST_CASE("ConfigStore: Set and get with string literal", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("app", "title", "Hello World");
     auto result = config.get<std::string>("app", "title");
@@ -68,7 +68,7 @@ TEST_CASE("ConfigStore: Set and get with string literal", "[config][manager]")
 
 TEST_CASE("ConfigStore: Set and get float", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("audio", "volume", 0.75f);
     auto result = config.get<float>("audio", "volume");
@@ -79,7 +79,7 @@ TEST_CASE("ConfigStore: Set and get float", "[config][manager]")
 
 TEST_CASE("ConfigStore: Set and get bool", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("graphics", "vsync", true);
     auto result = config.get<bool>("graphics", "vsync");
@@ -90,7 +90,7 @@ TEST_CASE("ConfigStore: Set and get bool", "[config][manager]")
 
 TEST_CASE("ConfigStore: Set and get int32_t", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("graphics", "width", 1920);
     auto result = config.get<int32_t>("graphics", "width");
@@ -101,7 +101,7 @@ TEST_CASE("ConfigStore: Set and get int32_t", "[config][manager]")
 
 TEST_CASE("ConfigStore: Set and get uint32_t", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("graphics", "samples", 4u);
     auto result = config.get<uint32_t>("graphics", "samples");
@@ -112,7 +112,7 @@ TEST_CASE("ConfigStore: Set and get uint32_t", "[config][manager]")
 
 TEST_CASE("ConfigStore: Set and get vec3", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     glm::vec3 color{0.5f, 0.75f, 1.0f};
     config.set("graphics", "skyColor", color);
@@ -126,7 +126,7 @@ TEST_CASE("ConfigStore: Set and get vec3", "[config][manager]")
 
 TEST_CASE("ConfigStore: Set and get string list", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     std::vector<std::string> maps = {"map1", "map2", "map3"};
     config.set("game", "maps", maps);
@@ -141,7 +141,7 @@ TEST_CASE("ConfigStore: Set and get string list", "[config][manager]")
 
 TEST_CASE("ConfigStore: Get non-existent key", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     auto result = config.get<std::string>("nonexistent", "key");
 
@@ -151,7 +151,7 @@ TEST_CASE("ConfigStore: Get non-existent key", "[config][manager]")
 
 TEST_CASE("ConfigStore: Get with wrong type", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("test", "value", std::string("not a number"));
     auto result = config.get<float>("test", "value");
@@ -162,7 +162,7 @@ TEST_CASE("ConfigStore: Get with wrong type", "[config][manager]")
 
 TEST_CASE("ConfigStore: Update existing value", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("test", "counter", 1);
     config.set("test", "counter", 2);
@@ -176,7 +176,7 @@ TEST_CASE("ConfigStore: Update existing value", "[config][manager]")
 TEST_CASE("ConfigStore: Save to file", "[config][manager]")
 {
     TempConfigFile tempFile("test_save.ini");
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("graphics", "width", 1920);
     config.set("graphics", "height", 1080);
@@ -205,7 +205,7 @@ TEST_CASE("ConfigStore: Load from file", "[config][manager]")
         "volume = 0.75\n"
     );
 
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.load(tempFile.path());
 
     auto width = config.get<int32_t>("graphics", "width");
@@ -225,7 +225,7 @@ TEST_CASE("ConfigStore: Load from file", "[config][manager]")
 
 TEST_CASE("ConfigStore: Load non-existent file does nothing", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.set("test", "value", std::string("original"));
 
     config.load("/nonexistent/path/config.ini");
@@ -240,7 +240,7 @@ TEST_CASE("ConfigStore: Save and load round-trip", "[config][manager]")
     TempConfigFile tempFile("test_roundtrip.ini");
 
     {
-        ConfigStore config;
+        ConfigStore config(ConfigStore::Type::Internal);
         config.set("graphics", "width", 2560);
         config.set("graphics", "height", 1440);
         config.set("graphics", "vsync", false);
@@ -251,7 +251,7 @@ TEST_CASE("ConfigStore: Save and load round-trip", "[config][manager]")
     }
 
     {
-        ConfigStore config;
+        ConfigStore config(ConfigStore::Type::Internal);
         config.load(tempFile.path());
 
         REQUIRE(*config.get<int32_t>("graphics", "width") == 2560);
@@ -266,7 +266,7 @@ TEST_CASE("ConfigStore: Save and load round-trip", "[config][manager]")
 TEST_CASE("ConfigStore: Section ordering - unnamed first, vkShade second, then alphabetical", "[config][manager]")
 {
     TempConfigFile tempFile("test_ordering.ini");
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("", "global", std::string("value"));
     config.set("zebra", "last", std::string("z"));
@@ -293,7 +293,7 @@ TEST_CASE("ConfigStore: Section ordering - unnamed first, vkShade second, then a
 TEST_CASE("ConfigStore: No trailing newline after last section", "[config][manager]")
 {
     TempConfigFile tempFile("test_no_trailing.ini");
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("section1", "key", std::string("value"));
     config.set("section2", "key", std::string("value"));
@@ -317,7 +317,7 @@ TEST_CASE("ConfigStore: No trailing newline after last section", "[config][manag
 TEST_CASE("ConfigStore: Unnamed section appears first", "[config][manager]")
 {
     TempConfigFile tempFile("test_unnamed.ini");
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
 
     config.set("", "global_key", std::string("global_value"));
     config.set("vkShade", "app_key", std::string("app_value"));
@@ -343,7 +343,7 @@ TEST_CASE("ConfigStore: Load with vec3", "[config][manager]")
         "color = 1.0, 0.5, 0.25\n"
     );
 
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.load(tempFile.path());
 
     auto color = config.get<glm::vec3>("graphics", "color");
@@ -361,7 +361,7 @@ TEST_CASE("ConfigStore: Load with string list", "[config][manager]")
         "maps = map1, map2, map3\n"
     );
 
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.load(tempFile.path());
 
     auto maps = config.get<std::vector<std::string>>("game", "maps");
@@ -374,7 +374,7 @@ TEST_CASE("ConfigStore: Load with string list", "[config][manager]")
 
 TEST_CASE("ConfigStore: save() with no current file returns false", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.set("test", "key", std::string("value"));
 
     REQUIRE(config.save() == false);
@@ -388,13 +388,13 @@ TEST_CASE("ConfigStore: load sets current file for subsequent save()", "[config]
         "width = 1920\n"
     );
 
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     REQUIRE(config.load(tempFile.path()) == true);
 
     config.set("graphics", "width", 2560);
     REQUIRE(config.save() == true);
 
-    ConfigStore config2;
+    ConfigStore config2(ConfigStore::Type::Internal);
     config2.load(tempFile.path());
     REQUIRE(*config2.get<int32_t>("graphics", "width") == 2560);
 }
@@ -402,7 +402,7 @@ TEST_CASE("ConfigStore: load sets current file for subsequent save()", "[config]
 TEST_CASE("ConfigStore: explicit save() path sets current file", "[config][manager]")
 {
     TempConfigFile tempFile("test_setcurrentfile.ini");
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.set("test", "key", std::string("value"));
 
     REQUIRE(config.save(tempFile.path()) == true);
@@ -410,14 +410,14 @@ TEST_CASE("ConfigStore: explicit save() path sets current file", "[config][manag
     config.set("test", "key", std::string("updated"));
     REQUIRE(config.save() == true);
 
-    ConfigStore config2;
+    ConfigStore config2(ConfigStore::Type::Internal);
     config2.load(tempFile.path());
     REQUIRE(*config2.get<std::string>("test", "key") == "updated");
 }
 
 TEST_CASE("ConfigStore: has_file() returns false by default", "[config][manager]")
 {
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     REQUIRE(config.has_file() == false);
 }
 
@@ -426,7 +426,7 @@ TEST_CASE("ConfigStore: has_file() returns true after load", "[config][manager]"
     TempConfigFile tempFile("test_haspath_load.ini");
     tempFile.write("[test]\nkey = value\n");
 
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.load(tempFile.path());
     REQUIRE(config.has_file() == true);
 }
@@ -434,7 +434,7 @@ TEST_CASE("ConfigStore: has_file() returns true after load", "[config][manager]"
 TEST_CASE("ConfigStore: has_file() returns true after save with path", "[config][manager]")
 {
     TempConfigFile tempFile("test_haspath_save.ini");
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.set("test", "key", std::string("value"));
     config.save(tempFile.path());
     REQUIRE(config.has_file() == true);
@@ -445,7 +445,7 @@ TEST_CASE("ConfigStore: clear() resets config and current file", "[config][manag
     TempConfigFile tempFile("test_clear.ini");
     tempFile.write("[test]\nkey = value\n");
 
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.load(tempFile.path());
     config.clear();
 
@@ -458,7 +458,7 @@ TEST_CASE("ConfigStore: save() returns false after clear()", "[config][manager]"
     TempConfigFile tempFile("test_clear_save.ini");
     tempFile.write("[test]\nkey = value\n");
 
-    ConfigStore config;
+    ConfigStore config(ConfigStore::Type::Internal);
     config.load(tempFile.path());
     config.clear();
 
