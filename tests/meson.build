@@ -1,5 +1,7 @@
 catch2 = dependency('catch2-with-main', version : '>=3.0.0')
 
+subdir('platform')
+
 config_observer_tests = executable('config_observer_tests',
   'config_observer_tests.cpp',
   dependencies : [

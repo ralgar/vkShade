@@ -20,6 +20,7 @@ xkbcommon = dependency('xkbcommon')
 xcb = dependency('xcb', required: false)
 x11 = dependency('x11')
 
+subdir('platform')
 subdir('config')
 subdir('gui')
 subdir('input')
