@@ -5,6 +5,8 @@
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vulkan_core.h>
+
+#include "config/config_manager.hpp"
 #include "core/logger.hpp"
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
@@ -79,11 +81,13 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         vkShade::Locator<vkShade::GuiManager>::emplace(thisDevice, swapchainData->format());
 
     // Get manager handles
+    auto& configManager = vkShade::Locator<vkShade::ConfigManager>::get();
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
     auto& gui = vkShade::Locator<vkShade::GuiManager>::get();
     auto& eventBus = vkShade::Locator<vkShade::EventBus>::get();
 
     // Update managers
+    configManager.update();
     eventBus.update();
     input.update();
 

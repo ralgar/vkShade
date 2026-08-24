@@ -15,6 +15,7 @@ libconfig_library = static_library(
   dependencies : [
     glm,
     inih,
+    libplatform,
     magic_enum,
     spdlog,
   ],

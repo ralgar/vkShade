@@ -54,16 +54,18 @@ vkShade::InputManager::InputManager()
         auto toggleEffects = config.get<std::string>("Input", "ToggleEffects");
         vkShade::KeyCode keyEnum;
         std::string keyString = toggleEffects.value_or("");
-        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_INSERT);
+        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(DEFAULT_KEY_EFFECTS_TOGGLE);
         bind_action("ToggleEffects", keyEnum);
+        config.on_changed("Input", "ToggleEffects").connect<&InputManager::on_keybind_changed>(this);
     }
 
     {
         auto toggleGui = config.get<std::string>("Input", "ToggleGui");
         vkShade::KeyCode keyEnum;
         std::string keyString = toggleGui.value_or("");
-        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(vkShade::KeyCode::KEY_HOME);
+        keyEnum = magic_enum::enum_cast<vkShade::KeyCode>(keyString).value_or(DEFAULT_KEY_GUI_TOGGLE);
         bind_action("ToggleGui", keyEnum);
+        config.on_changed("Input", "ToggleGui").connect<&InputManager::on_keybind_changed>(this);
     }
 }
 
@@ -254,6 +256,19 @@ vkShade::KeyCode vkShade::InputManager::map_key(xkb_keysym_t keysym)
         case XKB_KEY_F12:          return KeyCode::KEY_F12;
         default:                   return KeyCode::KEY_UNKNOWN;
     }
+}
+
+void vkShade::InputManager::on_keybind_changed(const std::string& configKey, std::string enumString)
+{
+    auto enumResult = magic_enum::enum_cast<KeyCode>(enumString);
+
+    vkShade::KeyCode keyEnum;
+    if (configKey == "ToggleEffects")
+        keyEnum = enumResult.value_or(DEFAULT_KEY_EFFECTS_TOGGLE);
+    if (configKey == "ToggleGui")
+        keyEnum = enumResult.value_or(DEFAULT_KEY_GUI_TOGGLE);
+
+    bind_action(configKey, keyEnum);
 }
 
 void vkShade::InputManager::update()

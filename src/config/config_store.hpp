@@ -29,6 +29,7 @@ namespace vkShade
         bool save();  // Save currently open file
 
         bool has_file() const { return !m_currentFile.empty(); }
+        std::filesystem::path get_path() const { return m_currentFile; }
 
         // Typed getter
         template<typename T>

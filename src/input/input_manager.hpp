@@ -15,6 +15,9 @@ typedef uint32_t xkb_keysym_t;
 
 namespace vkShade
 {
+    constexpr KeyCode DEFAULT_KEY_EFFECTS_TOGGLE = KeyCode::KEY_INSERT;
+    constexpr KeyCode DEFAULT_KEY_GUI_TOGGLE = KeyCode::KEY_HOME;
+
     class InputManager
     {
     public:
@@ -48,6 +51,8 @@ namespace vkShade
         void handle_keyboard_event(const xkb_keysym_t& keysym, bool pressed);
         void handle_mouse_button_event(MouseButton button, bool pressed);
         void handle_mouse_motion_event(float x, float y);
+
+        void on_keybind_changed(const std::string& configKey, std::string enumString);
 
     private:
         struct ActionBinding
