@@ -8,6 +8,8 @@
 
 namespace vkShade
 {
+    class ConfigStore;
+
     class ConfigObserver
     {
     public:
@@ -51,33 +53,37 @@ namespace vkShade
             auto it = m_subscribers.find(mapKey);
             if (it != m_subscribers.end())
             {
-                for (const auto& [ptr, pInstance, callback, reset] : it->second)
+                for (const auto& subscription : it->second)
                 {
-                    callback(&value, pInstance, key);
+                    subscription.callback(&value, subscription.instance, key);
                 }
             }
         }
 
-        // Reset each callback with a default value. Called when clearing ConfigStore.
-        void notify_all_defaults()
+        void notify_all(ConfigStore& store)
         {
-            for (const auto& [mapKey, handlers] : m_subscribers)
-            {
-                // mapKey is "section::key" - the reset path only needs key, not section
-                size_t pos = mapKey.find("::");
-                std::string key = mapKey.substr(pos + 2);
-
-                for (const auto& [ptr, pInstance, callback, reset] : handlers)
-                    reset(key);
-            }
+            for (auto& [_, subscriptions] : m_subscribers)
+                for (auto& subscription : subscriptions)
+                    subscription.reload(store);
         }
 
     private:
         using Callback = std::function<void(const void*, void*, const std::string&)>;
-        using ResetCallback = std::function<void(const std::string&)>;
 
-        // Map: "Section::Key" -> [(function pointer, instance pointer, callback, reset callback)]
-        std::unordered_map<std::string, std::vector<std::tuple<void*, void*, Callback, ResetCallback>>> m_subscribers;
+        struct Subscription
+        {
+            std::string section;
+            std::string key;
+
+            void* function;
+            void* instance;
+
+            Callback callback;
+            std::function<void(ConfigStore&)> reload;
+        };
+
+        // Map: "Section::Key" -> [Subscription]
+        std::unordered_map<std::string, std::vector<Subscription>> m_subscribers;
 
         // Helper traits
         template<typename T>
@@ -100,128 +106,18 @@ namespace vkShade
 
         // Connect free function
         template<auto Func>
-        void connect_impl(const std::string& section, const std::string& key)
-        {
-            using FuncType = decltype(Func);
-            using ArgType = std::decay_t<typename function_arg<FuncType>::type>;
-
-            std::string mapKey = section + "::" + key;
-            void* pFunction = reinterpret_cast<void*>(Func);
-
-            // Check if already connected
-            auto& handlers = m_subscribers[mapKey];
-            for (const auto& [ptr, pInstance, callback, reset] : handlers)
-            {
-                if (ptr == pFunction && pInstance == nullptr)
-                    return;  // Already connected
-            }
-
-            handlers.emplace_back(pFunction, nullptr, [](const void* pValue, void*, const std::string& k)
-            {
-                Func(k, *static_cast<const ArgType*>(pValue));
-            },
-            [](const std::string& k)  // Reset callback - notifies with default value for the type
-            {
-                ArgType defaultValue{};
-                Func(k, defaultValue);
-            });
-        }
+        void connect_impl(const std::string& section, const std::string& key);
 
         // Connect member function
         template<auto Method, typename Class>
-        void connect_impl(const std::string& section, const std::string& key, Class* instance)
-        {
-            using MethodType = decltype(Method);
-            using ArgType = std::decay_t<typename method_arg<MethodType>::type>;
-
-            std::string mapKey = section + "::" + key;
-
-            union {
-                MethodType method;
-                void* ptr;
-            } converter;
-            converter.method = Method;
-            void* pMethod = converter.ptr;
-
-            // Check if already connected
-            auto& handlers = m_subscribers[mapKey];
-            for (const auto& [ptr, pInstance, callback, reset] : handlers)
-            {
-                if (ptr == pMethod && pInstance == instance)
-                    return;  // Already connected
-            }
-
-            handlers.emplace_back(pMethod, instance, [](const void* pValue, void* pInstance, const std::string& k)
-            {
-                Class* obj = static_cast<Class*>(pInstance);
-                (obj->*Method)(k, *static_cast<const ArgType*>(pValue));
-            },
-            [instance](const std::string& k)  // Reset callback - notifies with default value for the type
-            {
-                ArgType defaultValue{};
-                Class* obj = static_cast<Class*>(instance);
-                (obj->*Method)(k, defaultValue);
-            });
-        }
+        void connect_impl(const std::string& section, const std::string& key, Class* instance);
 
         // Disconnect free function
         template<auto Func>
-        void disconnect_impl(const std::string& section, const std::string& key)
-        {
-            std::string mapKey = section + "::" + key;
-            void* pFunction = reinterpret_cast<void*>(Func);
-
-            auto it = m_subscribers.find(mapKey);
-            if (it != m_subscribers.end())
-            {
-                auto& handlers = it->second;
-                handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
-                    [pFunction](const auto& tuple)
-                    {
-                        return std::get<0>(tuple) == pFunction && std::get<1>(tuple) == nullptr;
-                    }),
-                    handlers.end()
-                );
-
-                // Clean up empty entries
-                if (handlers.empty())
-                {
-                    m_subscribers.erase(it);
-                }
-            }
-        }
+        void disconnect_impl(const std::string& section, const std::string& key);
 
         // Disconnect member function
         template<auto Method, typename Class>
-        void disconnect_impl(const std::string& section, const std::string& key, Class* instance)
-        {
-            std::string mapKey = section + "::" + key;
-
-            union {
-                decltype(Method) method;
-                void* ptr;
-            } converter;
-            converter.method = Method;
-            void* pMethod = converter.ptr;
-
-            auto it = m_subscribers.find(mapKey);
-            if (it != m_subscribers.end())
-            {
-                auto& handlers = it->second;
-                handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
-                    [pMethod, instance](const auto& tuple)
-                    {
-                        return std::get<0>(tuple) == pMethod && std::get<1>(tuple) == instance;
-                    }),
-                    handlers.end()
-                );
-
-                // Clean up empty entries
-                if (handlers.empty())
-                {
-                    m_subscribers.erase(it);
-                }
-            }
-        }
+        void disconnect_impl(const std::string& section, const std::string& key, Class* instance);
     };
 } // namespace vkShade
