@@ -31,9 +31,9 @@ vkShade::ConfigStore::ConfigStore(Type type)
 
 void vkShade::ConfigStore::clear()
 {
-    m_observer.notify_all_defaults();
     m_currentFile = std::filesystem::path{};
     m_config.clear();
+    m_observer.notify_all(*this);
 }
 
 bool vkShade::ConfigStore::load(std::filesystem::path filePath)
@@ -48,6 +48,9 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
     if ((perms & std::filesystem::perms::owner_read) == std::filesystem::perms::none)
         return false;
 
+    // Clear existing state if there is any
+    this->clear();
+
     // Parse the INI file
     int result = ini_parse(filePath.string().c_str(), config_ini_handler, &m_config);
     if (result != 0)
@@ -55,6 +58,8 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
         Logger::error("Failed to load or parse config file: {}", filePath.c_str());
         return false;
     }
+
+    m_observer.notify_all(*this);
 
     Logger::info("Loaded {} file: {}", m_typeString, filePath.string());
 

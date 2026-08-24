@@ -1,4 +1,5 @@
 #include "config/config_observer.hpp"
+#include "config/config_store.hpp"
 
 #include <string>
 #include <vector>
@@ -326,46 +327,4 @@ TEST_CASE("ConfigObserver: Reconnect after disconnect", "[config][observer]")
     REQUIRE(g_callbackLog.size() == 2);
     REQUIRE(g_callbackLog[0] == "string:first");
     REQUIRE(g_callbackLog[1] == "string:third");
-}
-
-TEST_CASE("ConfigObserver: notify_all_defaults() calls free function with default value", "[config][observer]")
-{
-    g_callbackLog.clear();
-    ConfigObserver observer;
-
-    observer.on_changed("test", "value").connect<&on_string_changed>();
-    observer.notify_all_defaults();
-
-    REQUIRE(g_callbackLog.size() == 1);
-    REQUIRE(g_callbackLog[0] == "string:");  // empty string default
-}
-
-TEST_CASE("ConfigObserver: notify_all_defaults() calls member function with default value", "[config][observer]")
-{
-    TestListener listener;
-    ConfigObserver observer;
-
-    observer.on_changed("test", "value").connect<&TestListener::on_float_value>(&listener);
-    observer.notify_all_defaults();
-
-    REQUIRE(listener.get_call_count() == 1);
-    REQUIRE(listener.get_last_float() == 0.0f);
-}
-
-TEST_CASE("ConfigObserver: notify_all_defaults() calls all keys", "[config][observer]")
-{
-    g_callbackLog.clear();
-    ConfigObserver observer;
-
-    observer.on_changed("test", "string").connect<&on_string_changed>();
-    observer.on_changed("test", "float").connect<&on_float_changed>();
-    observer.notify_all_defaults();
-
-    REQUIRE(g_callbackLog.size() == 2);
-}
-
-TEST_CASE("ConfigObserver: notify_all_defaults() with no subscribers does nothing", "[config][observer]")
-{
-    ConfigObserver observer;
-    REQUIRE_NOTHROW(observer.notify_all_defaults());
 }
