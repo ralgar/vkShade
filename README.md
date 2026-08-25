@@ -20,10 +20,11 @@ vkShade is a ReShade-compatible Vulkan post-processing layer, written from the
 
 ## Project Status
 
-This project is still in the **PRE-ALPHA** phase of development - meaning
- it works, but it's really just a proof-of-concept right now. Over time, I
- intend to bring it up to speed as the de facto post-processing layer for
- Vulkan applications on Linux.
+This project is currently in the **PRE-ALPHA** phase of development. The
+ core shader runtime and preset system are functional and increasingly
+ feature-complete, while the GUI and other user-facing components are still
+ under active development. There may be breaking changes as the project
+ continues to mature.
 
 ### Current Features
 
