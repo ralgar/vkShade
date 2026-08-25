@@ -60,7 +60,17 @@ uninstall-lib32:
 test: install
 	ENABLE_VKSHADE=1 VKSHADE_LOG_LEVEL=trace vkcube
 
+.PHONY: docs
+docs: venv
+	doxygen docs/Doxyfile
+	source venv/bin/activate && mkdocs serve --config-file docs/mkdocs.yml
+
+venv:
+	python -m venv venv
+	source venv/bin/activate && pip install mkdocs mkdocs-material
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf $(BUILD32_DIR)
+	rm -rf docs/content/reference/generated/csharp venv
