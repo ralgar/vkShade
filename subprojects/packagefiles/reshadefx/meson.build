@@ -18,7 +18,7 @@ reshadefx_sources = files(
   'source/effect_symbol_table.cpp',
 )
 
-reshadefx_inc = include_directories('source')
+reshadefx_inc = include_directories('source', is_system: true)
 
 spirv_headers_dep = subproject('spirv-headers').get_variable('spirv_headers_dep')
 
@@ -26,7 +26,7 @@ reshadefx_lib = static_library('reshadefx',
   reshadefx_sources,
   dependencies : spirv_headers_dep,
   include_directories : reshadefx_inc,
-  cpp_args : ['-DNDEBUG'],
+  cpp_args : ['-DNDEBUG', '-w'],
   install : false,
 )
 
