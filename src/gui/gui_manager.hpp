@@ -24,5 +24,7 @@ namespace vkShade
         VkDescriptorPool m_descriptorPool;
 
         MainWindow m_mainWindow;
+
+        void draw_cursor();
     };
 } // namespace vkShade

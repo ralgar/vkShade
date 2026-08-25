@@ -108,6 +108,17 @@ vkShade::GuiManager::~GuiManager()
     thisDevice.dispatch.DestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
 }
 
+void vkShade::GuiManager::draw_cursor()
+{
+    // Draw a small, circular cursor. Highly visible.
+    // Black, with white outline, and a red center dot.
+    ImDrawList* drawList = ImGui::GetForegroundDrawList();
+    ImVec2 pos = ImGui::GetMousePos();
+    drawList->AddCircleFilled(pos, 4.0f, IM_COL32(0, 0, 0, 255));
+    drawList->AddCircle(pos, 5.0f, IM_COL32(255, 255, 255, 255), 0, 1.0f);
+    drawList->AddCircleFilled(pos, 1.5f, IM_COL32(255, 0, 0, 255));
+}
+
 void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
 {
     auto& input = vkShade::Locator<InputManager>::get();
@@ -124,19 +135,15 @@ void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
     io.DisplaySize = ImVec2((float)swapchainExtent.width, (float)swapchainExtent.height);
     io.DeltaTime = deltaTime;
 
+    // Draw the GUI
     ImGui::NewFrame();
 
-    // Test window
     if (m_mainWindow.visible())
     {
         m_mainWindow.render();
 
-        // Last: Draw a black cursor with white outline and red center dot
-        ImDrawList* draw_list = ImGui::GetForegroundDrawList();
-        ImVec2 pos(mousePos.x, mousePos.y);
-        draw_list->AddCircleFilled(pos, 4.0f, IM_COL32(0, 0, 0, 255));
-        draw_list->AddCircle(pos, 5.0f, IM_COL32(255, 255, 255, 255), 0, 1.0f);
-        draw_list->AddCircleFilled(pos, 1.5f, IM_COL32(255, 0, 0, 255));
+        // Last: Draw the cursor on top of everything
+        this->draw_cursor();
     }
 
     ImGui::Render();
