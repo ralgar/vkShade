@@ -49,6 +49,7 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
         return false;
 
     // Clear existing state if there is any
+    m_watcher.reset();
     this->clear();
 
     // Parse the INI file
@@ -60,6 +61,9 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
     }
 
     m_observer.notify_all(*this);
+
+    m_watcher = Platform::FileWatcher::create();
+    m_watcher->watch(filePath);
 
     Logger::info("Loaded {} file: {}", m_typeString, filePath.string());
 

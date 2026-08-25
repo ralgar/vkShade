@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "platform/file_watcher.hpp"
 #include "config_observer.hpp"
 #include "config_parser.hpp"
 #include "config_types.hpp"
@@ -81,6 +82,12 @@ namespace vkShade
             return m_observer.on_changed(section, key);
         }
 
+        void update()
+        {
+            if (m_watcher && m_watcher->changed())
+                this->load(m_currentFile);
+        }
+
     private:
         Type m_type;
         std::string m_typeString;
@@ -90,6 +97,8 @@ namespace vkShade
 
         std::filesystem::path m_currentFile;
         std::unordered_map<std::string, std::string> m_config;
+
+        std::unique_ptr<Platform::FileWatcher> m_watcher;
     };
 } // namespace vkShade
 

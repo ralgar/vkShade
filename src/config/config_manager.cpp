@@ -45,8 +45,6 @@ void vkShade::ConfigManager::load_config_file()
         if (m_config.load(filePath))
         {
             // Successfully loaded candidate
-            m_configWatcher = Platform::FileWatcher::create();
-            m_configWatcher->watch(filePath);
             return;
         }
     }
@@ -85,8 +83,6 @@ void vkShade::ConfigManager::load_preset_file()
         if (m_preset.load(filePath))
         {
             // Successfully loaded candidate
-            m_presetWatcher = Platform::FileWatcher::create();
-            m_presetWatcher->watch(filePath);
             return;
         }
     }
@@ -96,17 +92,6 @@ void vkShade::ConfigManager::load_preset_file()
 
 void vkShade::ConfigManager::update()
 {
-    if (m_configWatcher && m_configWatcher->changed())
-    {
-        auto filePath = m_config.get_path();
-        if (!filePath.empty())
-            m_config.load(filePath);
-    }
-
-    if (m_presetWatcher && m_presetWatcher->changed())
-    {
-        auto filePath = m_preset.get_path();
-        if (!filePath.empty())
-            m_preset.load(filePath);
-    }
+    m_config.update();
+    m_preset.update();
 }
