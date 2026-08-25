@@ -262,7 +262,7 @@ void vkShade::InputManager::on_keybind_changed(const std::string& configKey, std
 {
     auto enumResult = magic_enum::enum_cast<KeyCode>(enumString);
 
-    vkShade::KeyCode keyEnum;
+    vkShade::KeyCode keyEnum = KeyCode::KEY_UNKNOWN;
     if (configKey == "ToggleEffects")
         keyEnum = enumResult.value_or(DEFAULT_KEY_EFFECTS_TOGGLE);
     if (configKey == "ToggleGui")
