@@ -62,12 +62,10 @@ void vkShade::InputBackendWayland::on_pointer_enter(wl_surface* surface, wl_fixe
     float fx = wl_fixed_to_double(x);
     float fy = wl_fixed_to_double(y);
     handle_mouse_motion_event(fx, fy);
-    Logger::trace("Pointer entered at ({}, {})", fx, fy);
 }
 
 void vkShade::InputBackendWayland::on_pointer_leave(wl_surface* surface)
 {
-    Logger::trace("Pointer left surface");
 }
 
 void vkShade::InputBackendWayland::on_pointer_motion(uint32_t time, wl_fixed_t x, wl_fixed_t y)

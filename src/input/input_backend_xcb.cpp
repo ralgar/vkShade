@@ -129,9 +129,6 @@ void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
     }
 
     handle_mouse_button_event(mouseButton, pressed);
-
-    Logger::debug("[InputBackendXcb] Mouse button {} {}",
-                  (int)mouseButton, pressed ? "pressed" : "released");
 }
 
 void vkShade::InputBackendXcb::on_mouse_motion(int16_t x, int16_t y)
