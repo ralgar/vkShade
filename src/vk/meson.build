@@ -1,5 +1,6 @@
 libvk_source = [
   'buffer.cpp',
+  'gpu_timing.cpp',
   'image.cpp',
   'image_tracker.cpp',
   'initializers.cpp',

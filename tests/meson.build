@@ -47,8 +47,17 @@ reshade_uniform_tests = executable('reshade_uniform_tests',
   include_directories : include_directories('../src')
 )
 
+gpu_timing_tests = executable('gpu_timing_tests',
+  'gpu_timing_tests.cpp',
+  dependencies : [
+    catch2,
+  ],
+  include_directories : include_directories('../src')
+)
+
 test('ConfigObserver', config_observer_tests)
 test('ConfigParser', config_parser_tests)
 test('ConfigStore', config_store_tests)
 test('EventBus', event_bus_tests)
 test('ReshadeUniforms', reshade_uniform_tests)
+test('GpuTiming', gpu_timing_tests)

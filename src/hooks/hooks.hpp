@@ -9,6 +9,7 @@
 #include <vulkan/utility/vk_dispatch_table.h>
 #include <vulkan/vulkan_core.h>
 
+#include "core/diagnostics_state.hpp"
 #include "vk/image_tracker.hpp"
 
 #undef VK_LAYER_EXPORT
@@ -36,7 +37,10 @@ struct VulkanDevice
 
     VkQueue       queue;
     uint32_t      queueFamilyIndex;
+    uint32_t      timestampValidBits {0};
+    float         timestampPeriod {0.0f};
     VkCommandPool commandPool;
+    std::shared_ptr<vkShade::DiagnosticsState> diagnosticsState;
     std::shared_ptr<vkShade::ImageTracker> imageTracker;
 };
 

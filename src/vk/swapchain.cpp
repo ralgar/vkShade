@@ -17,7 +17,8 @@
 #include "reshade_uniforms.hpp"
 
 vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
-    : VulkanObject(device)
+    : VulkanObject(device),
+      m_gpuTiming(device, device.diagnosticsState)
 {
     // Store the swapchain info
     m_swapchain = swapchain;
@@ -176,6 +177,7 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
 
     // Wait until the previous command buffer has finished executing. Timeout of 1 second.
 	VK_CHECK(m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000));
+	m_gpuTiming.collect_results();
 	VK_CHECK(m_device.dispatch.ResetFences(m_device.handle, 1, &m_fence));
 
     // Reset the command buffer
@@ -187,6 +189,7 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
     m_device.dispatch.BeginCommandBuffer(m_commandBuffer, &beginInfo);
+    m_gpuTiming.begin_frame(m_commandBuffer);
 
     // Blit swapchain image to ping-pong and transition to COLOR_ATTACHMENT
     swapchainImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -211,6 +214,8 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
     VulkanImage* readImage = m_pingPongA.get();
     VulkanImage* writeImage = m_pingPongB.get();
 
+    m_gpuTiming.begin_effects(m_commandBuffer);
+
     if (enabled)
     {
         for (auto effect : m_effects)
@@ -234,6 +239,8 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
             std::swap(readImage, writeImage);
         }
     }
+
+    m_gpuTiming.end_effects(m_commandBuffer);
 
     VulkanImage* finalImage = readImage;
 
@@ -269,6 +276,8 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
     swapchainImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     readImage->blit_to(m_commandBuffer, swapchainImage->image());
     swapchainImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+    m_gpuTiming.end_frame(m_commandBuffer);
 
     // End and submit
     m_device.dispatch.EndCommandBuffer(m_commandBuffer);
