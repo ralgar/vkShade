@@ -7,6 +7,26 @@ namespace vkShade
     // Centralized style configuration for consistent UI appearance
     namespace UIStyle
     {
+        namespace Palette
+        {
+            constexpr ImVec4 rgb(int r, int g, int b)
+            {
+                return {r / 255.0f, g / 255.0f, b / 255.0f, 1.0f};
+            }
+
+            constexpr ImVec4 BLACK   = rgb(0x5C, 0x63, 0x70);
+            constexpr ImVec4 RED     = rgb(0xE0, 0x6C, 0x75);
+            constexpr ImVec4 GREEN   = rgb(0x98, 0xC3, 0x79);
+            constexpr ImVec4 YELLOW  = rgb(0xE5, 0xC0, 0x7B);
+            constexpr ImVec4 BLUE    = rgb(0x61, 0xAF, 0xEF);
+            constexpr ImVec4 MAGENTA = rgb(0xC6, 0x78, 0xDD);
+            constexpr ImVec4 CYAN    = rgb(0x56, 0xB6, 0xC2);
+            constexpr ImVec4 WHITE   = rgb(0xAB, 0xB2, 0xBF);
+
+            constexpr ImVec4 BACKGROUND = rgb(0x1E, 0x21, 0x27);
+            constexpr ImVec4 FOREGROUND = WHITE;
+        }
+
         // Padding and spacing
         constexpr float WINDOW_PADDING = 12.0f;
         constexpr float ITEM_SPACING_X = 8.0f;
