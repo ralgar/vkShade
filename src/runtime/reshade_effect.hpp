@@ -100,7 +100,8 @@ namespace vkShade
             uniform = &it->second;
 
             // Make sure the type is correct
-            if (uniform->type != uniform_type_v<T>)
+            if (uniform->baseType != UniformTraits<T>::base ||
+                uniform->components != UniformTraits<T>::components)
             {
                 Logger::error("Type mismatch for uniform '{}'", name);
                 return;
@@ -132,7 +133,8 @@ namespace vkShade
         static VkPrimitiveTopology convert_primitive_topology(reshadefx::primitive_topology topology);
         static VkCompareOp         convert_stencil_func(reshadefx::stencil_func stencilFunc);
         static VkStencilOp         convert_stencil_op(reshadefx::stencil_op stencilOp);
-        static Uniform::Type       convert_uniform_type(reshadefx::type type);
+        static Uniform::BaseType   convert_uniform_type(reshadefx::type type);
+        static Uniform::UiType     convert_uniform_ui_type(const std::string& type);
 
         static uint32_t convert_color_space(VkColorSpaceKHR colorSpace);
         static uint32_t format_bit_depth(VkFormat format);

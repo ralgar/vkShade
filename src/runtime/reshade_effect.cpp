@@ -47,7 +47,7 @@ vkShade::ReshadeEffect::~ReshadeEffect()
     for (const auto& [name, uniform] : m_uniformsByName)
     {
         auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
-        Uniform::dispatch_type(uniform.type, [&]<typename T>(std::type_identity<T>)
+        Uniform::dispatch_type(uniform.baseType, uniform.components, [&]<typename T>(std::type_identity<T>)
         {
             preset.on_changed(m_fileName, name).disconnect<&ReshadeEffect::on_uniform_changed<T>>(this);
         });
@@ -418,33 +418,14 @@ VkStencilOp vkShade::ReshadeEffect::convert_stencil_op(reshadefx::stencil_op ste
     std::unreachable();
 }
 
-vkShade::Uniform::Type vkShade::ReshadeEffect::convert_uniform_type(reshadefx::type type)
+vkShade::Uniform::BaseType vkShade::ReshadeEffect::convert_uniform_type(reshadefx::type type)
 {
     using T = reshadefx::type;
 
-    // Float
-    if (type == T{ T::t_float, 1, 1 })  return Uniform::Type::Float;
-    if (type == T{ T::t_float, 2, 1 })  return Uniform::Type::Float2;
-    if (type == T{ T::t_float, 3, 1 })  return Uniform::Type::Float3;
-    if (type == T{ T::t_float, 4, 1 })  return Uniform::Type::Float4;
-
-    // Int
-    if (type == T{ T::t_int, 1, 1 })    return Uniform::Type::Int;
-    if (type == T{ T::t_int, 2, 1 })    return Uniform::Type::Int2;
-    if (type == T{ T::t_int, 3, 1 })    return Uniform::Type::Int3;
-    if (type == T{ T::t_int, 4, 1 })    return Uniform::Type::Int4;
-
-    // Uint
-    if (type == T{ T::t_uint, 1, 1 })   return Uniform::Type::Uint;
-    if (type == T{ T::t_uint, 2, 1 })   return Uniform::Type::Uint2;
-    if (type == T{ T::t_uint, 3, 1 })   return Uniform::Type::Uint3;
-    if (type == T{ T::t_uint, 4, 1 })   return Uniform::Type::Uint4;
-
-    // Bool
-    if (type == T{ T::t_bool, 1, 1 })   return Uniform::Type::Bool;
-    if (type == T{ T::t_bool, 2, 1 })   return Uniform::Type::Bool2;
-    if (type == T{ T::t_bool, 3, 1 })   return Uniform::Type::Bool3;
-    if (type == T{ T::t_bool, 4, 1 })   return Uniform::Type::Bool4;
+    if (type.base == T::t_float)    return Uniform::BaseType::Float;
+    if (type.base == T::t_int)      return Uniform::BaseType::Int;
+    if (type.base == T::t_uint)     return Uniform::BaseType::Uint;
+    if (type.base == T::t_bool)     return Uniform::BaseType::Bool;
 
     throw std::invalid_argument("Unsupported uniform type");;
 }
@@ -483,6 +464,19 @@ uint32_t vkShade::ReshadeEffect::format_bit_depth(VkFormat format)
             Logger::warn("Unhandled swapchain format. Please report this issue.");
             return 8;
     }
+}
+
+vkShade::Uniform::UiType vkShade::ReshadeEffect::convert_uniform_ui_type(const std::string& type)
+{
+    if (type == "input")    return Uniform::UiType::Input;
+    if (type == "drag")     return Uniform::UiType::Drag;
+    if (type == "slider")   return Uniform::UiType::Slider;
+    if (type == "combo")    return Uniform::UiType::Combo;
+    if (type == "radio")    return Uniform::UiType::Radio;
+    if (type == "color")    return Uniform::UiType::Color;
+    if (type == "button")   return Uniform::UiType::Button;
+
+    throw std::invalid_argument("Unsupported uniform UI type: " + type);
 }
 
 void vkShade::ReshadeEffect::reflect_descriptors()
@@ -913,17 +907,163 @@ void vkShade::ReshadeEffect::reflect_uniforms()
 
         // If we've reached here then it's a generic/GUI uniform
 
-        // Store uniform data
-        m_uniformsByName[uniform.name] = {
+        std::optional<Uniform::UiType> uiType;
+        std::optional<float> uiMin;
+        std::optional<float> uiMax;
+        std::optional<float> uiStep;
+        std::vector<std::string> uiItems;
+        std::string uiLabel = uniform.name;
+        std::string uiTooltip;
+        std::string uiCategory;
+        bool        uiCategoryClosed {false};
+        std::string uiUnits;
+        bool hidden   {false};
+        bool disabled {false};
+        bool noReset  {false};
+
+        const auto getNumericValue = [](const auto& annotation) -> std::optional<float>
+        {
+            switch (annotation.type.base)
+            {
+                case reshadefx::type::t_float:
+                    return annotation.value.as_float[0];
+                case reshadefx::type::t_int:
+                    return static_cast<float>(annotation.value.as_int[0]);
+                case reshadefx::type::t_uint:
+                    return static_cast<float>(annotation.value.as_uint[0]);
+                default:
+                    return std::nullopt;
+            }
+        };
+
+        const auto getComponentDefault = [](const auto& uniform, uint32_t component) -> Uniform::Scalar
+        {
+            switch (uniform.type.base)
+            {
+                case reshadefx::type::t_float:
+                    return uniform.has_initializer_value ?
+                        uniform.initializer_value.as_float[component] : 0.0f;
+                case reshadefx::type::t_int:
+                    return uniform.has_initializer_value ?
+                        uniform.initializer_value.as_int[component] : int32_t{0};
+                case reshadefx::type::t_uint:
+                    return uniform.has_initializer_value ?
+                        uniform.initializer_value.as_uint[component] : uint32_t{0};
+                case reshadefx::type::t_bool:
+                    return uniform.has_initializer_value ?
+                        uniform.initializer_value.as_uint[component] != 0 : false;
+                default:
+                    throw std::runtime_error("Unsupported uniform type");
+            }
+        };
+
+        for (const auto& annotation : uniform.annotations)
+        {
+            if (annotation.name == "ui_type" &&
+                annotation.type.base == reshadefx::type::t_string)
+            {
+                if (!annotation.value.string_data.empty())
+                    uiType = convert_uniform_ui_type(annotation.value.string_data);
+            }
+            else if (annotation.name == "ui_min")
+            {
+                uiMin = getNumericValue(annotation);
+            }
+            else if (annotation.name == "ui_max")
+            {
+                uiMax = getNumericValue(annotation);
+            }
+            else if (annotation.name == "ui_step")
+            {
+                uiStep = getNumericValue(annotation);
+            }
+            else if (annotation.name == "ui_items" &&
+                annotation.type.base == reshadefx::type::t_string)
+            {
+                for (size_t pos = 0, end; pos < annotation.value.string_data.size(); pos = end + 1)
+                {
+                    end = annotation.value.string_data.find('\0', pos);
+                    if (end == std::string::npos)
+                        end = annotation.value.string_data.size();
+                    if (end > pos)
+                        uiItems.emplace_back(annotation.value.string_data, pos, end - pos);
+                }
+            }
+            else if (annotation.name == "ui_label" &&
+                annotation.type.base == reshadefx::type::t_string)
+            {
+                // Don't overwrite default value with an empty string
+                if (!annotation.value.string_data.empty())
+                    uiLabel = annotation.value.string_data;
+            }
+            else if (annotation.name == "ui_tooltip" &&
+                annotation.type.base == reshadefx::type::t_string)
+            {
+                uiTooltip = annotation.value.string_data;
+            }
+            else if (annotation.name == "ui_category" &&
+                annotation.type.base == reshadefx::type::t_string)
+            {
+                uiCategory = annotation.value.string_data;
+            }
+            else if (annotation.name == "ui_category_closed" &&
+                annotation.type.base == reshadefx::type::t_bool)
+            {
+                uiCategoryClosed = annotation.value.as_uint[0] != 0;
+            }
+            else if (annotation.name == "ui_units" &&
+                annotation.type.base == reshadefx::type::t_string)
+            {
+                uiUnits = annotation.value.string_data;
+            }
+            else if (annotation.name == "hidden" &&
+                annotation.type.base == reshadefx::type::t_bool)
+            {
+                hidden = annotation.value.as_uint[0] != 0;
+            }
+            else if (annotation.name == "noedit" &&
+                annotation.type.base == reshadefx::type::t_bool)
+            {
+                disabled = annotation.value.as_uint[0] != 0;
+            }
+            else if (annotation.name == "noreset" &&
+                annotation.type.base == reshadefx::type::t_bool)
+            {
+                noReset = annotation.value.as_uint[0] != 0;
+            }
+        }
+
+        // Store uniform metadata
+        Uniform metadata = {
             .name = uniform.name,
             .size = uniform.size,
             .offset = uniform.offset,
-            .type = convert_uniform_type(uniform.type)
+            .baseType = convert_uniform_type(uniform.type),
+            .components = uniform.type.components(),
+            .uiType = uiType,
+            .uiMin = uiMin,
+            .uiMax = uiMax,
+            .uiStep = uiStep,
+            .uiItems = uiItems,
+            .uiLabel = uiLabel,
+            .uiTooltip = uiTooltip,
+            .uiCategory = uiCategory,
+            .uiCategoryClosed = uiCategoryClosed,
+            .uiUnits = uiUnits,
+            .hidden = hidden,
+            .disabled = disabled,
+            .noReset = noReset,
         };
+
+        // Extract default component values
+        for (uint32_t i = 0; i < metadata.components; i++)
+            metadata.defaultValues[i] = getComponentDefault(uniform, i);
+
+        m_uniformsByName[uniform.name] = metadata;
 
         // Subscribe to changes and set the initial value.
         auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
-        Uniform::dispatch_type(convert_uniform_type(uniform.type), [&]<typename T>(std::type_identity<T>)
+        Uniform::dispatch_type(metadata.baseType, metadata.components, [&]<typename T>(std::type_identity<T>)
         {
             // Write the uniform value. Either from the preset, the initializer, or by zero-filling.
             if (auto result = preset.get<T>(m_fileName, uniform.name))
