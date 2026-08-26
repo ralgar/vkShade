@@ -1,4 +1,5 @@
 libgui_source = [
+  'panels/effects_panel.cpp',
   'windows/about_window.cpp',
   'windows/main_window.cpp',
   'gui_manager.cpp',

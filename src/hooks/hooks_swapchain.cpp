@@ -7,6 +7,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "config/config_manager.hpp"
+#include "core/event_bus.hpp"
 #include "core/logger.hpp"
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
