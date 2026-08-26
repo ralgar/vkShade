@@ -1,5 +1,7 @@
 libplatform_source = [
+  'clipboard.cpp',
   'file_watcher.cpp',
+  'linux/xcb_clipboard.cpp',
 ]
 
 libplatform_library = static_library(
@@ -7,6 +9,7 @@ libplatform_library = static_library(
   libplatform_source,
   dependencies : [
     spdlog,
+    xcb,
   ],
   include_directories : vkShade_include_path
 )

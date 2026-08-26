@@ -13,6 +13,7 @@
 #include "gui_style.hpp"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
+    : m_clipboard(Platform::Clipboard::create())
 {
     m_device = deviceContext.handle;
 
@@ -44,6 +45,20 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 	// This initializes the core structures of ImGui.
 	ImGui::CreateContext();
     ImGui::StyleColorsDark();
+
+    if (m_clipboard)
+    {
+        ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
+        platformIO.Platform_ClipboardUserData = m_clipboard.get();
+        platformIO.Platform_SetClipboardTextFn =
+            [](ImGuiContext*, const char* text)
+            {
+                auto* clipboard = static_cast<Platform::Clipboard*>(
+                    ImGui::GetPlatformIO().Platform_ClipboardUserData);
+                if (clipboard && !clipboard->set_text(text))
+                    Logger::warn("Failed to set system clipboard text");
+            };
+    }
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
@@ -103,6 +118,10 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
 vkShade::GuiManager::~GuiManager()
 {
+    ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
+    platformIO.Platform_SetClipboardTextFn = nullptr;
+    platformIO.Platform_ClipboardUserData = nullptr;
+
     ImGui_ImplVulkan_Shutdown();
     auto& thisDevice = get_device_from_handle(m_device);
     thisDevice.dispatch.DestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
