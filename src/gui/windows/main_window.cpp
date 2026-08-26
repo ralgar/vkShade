@@ -27,6 +27,12 @@ void vkShade::MainWindow::render()
                 ImGui::EndTabItem();
             }
 
+            if (ImGui::BeginTabItem("Logs###logs"))
+            {
+                m_logPanel.render();
+                ImGui::EndTabItem();
+            }
+
             ImGui::EndTabBar();
         }
     }
