@@ -33,7 +33,7 @@ This project is currently in the **PRE-ALPHA** phase of development. The
 
 - [x] ReShade FX shader support
 - [x] Configuration system with ReShade-like presets and hot-reloading
-- [x] Interactive GUI overlay with mouse support
+- [x] Interactive GUI overlay with keyboard and mouse support
 - [x] Cross-platform input (Wayland, Xlib, XCB)
 - [x] Modern C++ RAII wrappers around the Vulkan C API
 
@@ -251,9 +251,6 @@ ToggleGui = KEY_HOME
 >
 > - `INSERT` to toggle the effects
 > - `HOME` to toggle the in-game GUI overlay
-
-> [!NOTE]
-> When interacting with the in-game GUI, only the mouse is supported currently.
 
 ### Log Output
 
