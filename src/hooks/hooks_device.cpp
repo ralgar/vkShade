@@ -8,14 +8,9 @@
 
 #include <vulkan/vk_layer.h>
 
-#include "config/config_manager.hpp"
-#include "core/event_bus.hpp"
 #include "core/logger.hpp"
 #include "core/service_locator.hpp"
-#include "core/resource_cache.hpp"
 #include "gui/gui_manager.hpp"
-#include "vk/reshade_effect.hpp"
-#include "vk/shader_module.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     VkPhysicalDevice                            physicalDevice,
@@ -203,10 +198,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         std::unique_lock lock(g_globalLock);
         g_vulkanDevices.emplace(dispatch_key_from_handle(*pDevice), thisDevice);
     }
-
-    // Initialize vkShade subsystems here
-    vkShade::Locator<vkShade::EventBus>::emplace();
-    vkShade::Locator<vkShade::ResourceCache<vkShade::ShaderModule>>::emplace();
 
     vkShade::Logger::info("Layer initialization complete");
     return VK_SUCCESS;

@@ -24,7 +24,7 @@ namespace vkShade
         class Sink
         {
         public:
-            Sink(EventBus& bus) : m_bus(bus) {}
+            explicit Sink(EventBus& bus) : m_bus(bus) {}
 
             // Connect a free function
             template<void (*Func)(const EventType&)>
@@ -209,6 +209,5 @@ namespace vkShade
                 );
             }
         }
-
     };
 } // namespace vkShade

@@ -3,7 +3,11 @@
 #include <magic_enum/magic_enum.hpp>
 #include <vulkan/vk_layer.h>
 
+#include "core/event_bus.hpp"
 #include "core/logger.hpp"
+#include "core/resource_cache.hpp"
+#include "core/service_locator.hpp"
+#include "vk/shader_module.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     const VkInstanceCreateInfo*                 pCreateInfo,
@@ -72,6 +76,9 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
         // Acquire a writer lock
         std::unique_lock lock(g_globalLock);
         g_vulkanInstances.emplace(dispatch_key_from_handle(*pInstance), thisInstance);
+
+        // Initialize instance-level subsystems
+        vkShade::Locator<vkShade::EventBus>::emplace();
     }
 
     return VK_SUCCESS;
