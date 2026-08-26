@@ -20,6 +20,24 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
 
     // Initialize previous key states
     std::memset(m_previousKeymap, 0, sizeof(m_previousKeymap));
+
+    // Observe wheel button events without consuming the application's queue.
+    m_wheelDisplay = XOpenDisplay(DisplayString(m_display));
+    if (m_wheelDisplay)
+    {
+        XSelectInput(m_wheelDisplay, m_window, ButtonPressMask | ButtonReleaseMask);
+        XFlush(m_wheelDisplay);
+    }
+    else
+    {
+        Logger::warn("[Xlib] Could not open a display connection for mouse wheel input");
+    }
+}
+
+vkShade::InputBackendXlib::~InputBackendXlib()
+{
+    if (m_wheelDisplay)
+        XCloseDisplay(m_wheelDisplay);
 }
 
 void vkShade::InputBackendXlib::process_events()
@@ -49,6 +67,20 @@ void vkShade::InputBackendXlib::process_events()
     // Update previous state
     std::memcpy(m_previousKeymap, keymap, sizeof(keymap));
 
+    if (m_wheelDisplay)
+    {
+        while (XPending(m_wheelDisplay))
+        {
+            XEvent event {};
+            XNextEvent(m_wheelDisplay, &event);
+            if (event.type == ButtonPress
+                && (event.xbutton.button == Button4 || event.xbutton.button == Button5))
+            {
+                handle_mouse_wheel_event(0.0f, event.xbutton.button == Button4 ? 1.0f : -1.0f);
+            }
+        }
+    }
+
     // Query mouse state
     query_mouse_state();
 }
@@ -58,21 +90,14 @@ void vkShade::InputBackendXlib::handle_key_event(uint32_t keyCode, bool pressed)
     if (!m_xkbState)
         return;
 
-    // Get keysym from XKB
-    xkb_keysym_t keysym = xkb_state_key_get_one_sym(m_xkbState, keyCode);
-
     // Update XKB state with this key event
     if (pressed)
-    {
         xkb_state_update_key(m_xkbState, keyCode, XKB_KEY_DOWN);
-    }
     else
-    {
         xkb_state_update_key(m_xkbState, keyCode, XKB_KEY_UP);
-    }
 
     // Call base class to update key state map
-    this->handle_keyboard_event(keysym, pressed);
+    this->handle_keyboard_event(keyCode, pressed);
 }
 
 
