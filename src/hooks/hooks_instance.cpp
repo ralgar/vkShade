@@ -3,11 +3,10 @@
 #include <magic_enum/magic_enum.hpp>
 #include <vulkan/vk_layer.h>
 
+#include "config/config_manager.hpp"
 #include "core/event_bus.hpp"
 #include "core/logger.hpp"
-#include "core/resource_cache.hpp"
 #include "core/service_locator.hpp"
-#include "vk/shader_module.hpp"
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     const VkInstanceCreateInfo*                 pCreateInfo,
@@ -78,6 +77,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
         g_vulkanInstances.emplace(dispatch_key_from_handle(*pInstance), thisInstance);
 
         // Initialize instance-level subsystems
+        vkShade::Locator<vkShade::ConfigManager>::emplace();
         vkShade::Locator<vkShade::EventBus>::emplace();
     }
 
