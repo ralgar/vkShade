@@ -4,6 +4,7 @@
 
 #include "config/config_store.hpp"
 #include "../panels/effects_panel.hpp"
+#include "../panels/log_panel.hpp"
 #include "../window.hpp"
 #include "about_window.hpp"
 
@@ -15,13 +16,14 @@ namespace vkShade
     public:
         MainWindow();
 
-        void render();
+        void render() override;
 
     private:
         ConfigStore& m_preset;
 
         // Panels
         EffectsPanel m_effectsPanel;
+        LogPanel     m_logPanel;
 
         // Sub-windows
         AboutWindow m_aboutWindow;

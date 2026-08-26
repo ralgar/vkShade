@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <spdlog/details/log_msg.h>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -9,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/ringbuffer_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace vkShade
@@ -19,6 +21,11 @@ namespace vkShade
     class Logger
     {
     public:
+        static std::vector<spdlog::details::log_msg_buffer> get_history()
+        {
+            return state().history->last_raw(m_historySize);
+        }
+
         static void trace(std::string_view msg)
         {
             get().trace(msg);
@@ -86,48 +93,84 @@ namespace vkShade
         }
 
     private:
+        static constexpr size_t m_historySize = 2000;
+
+        struct State
+        {
+            std::shared_ptr<spdlog::sinks::ringbuffer_sink_mt> history;
+            std::shared_ptr<spdlog::logger> logger;
+        };
+
         static spdlog::logger& get()
         {
-            // Keep the logger independent from spdlog's process-wide registry.
-            static auto logger = []
-            {
-                std::vector<spdlog::sink_ptr> sinks;
-                sinks.push_back(std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
+            return *state().logger;
+        }
 
+        static State& state()
+        {
+            // Keep the logger independent from spdlog's process-wide registry.
+            static State instance = []
+            {
+                State state;
+
+                std::vector<spdlog::sink_ptr> sinks;
+
+                auto stderrSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+                sinks.push_back(stderrSink);
+
+                state.history = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(m_historySize);
+                state.history->set_level(spdlog::level::trace);
+                sinks.push_back(state.history);
+
+                spdlog::sink_ptr fileSink;
                 if (const char* path = std::getenv("VKSHADE_LOG_FILE"))
+                {
                     // Function-local static initialization opens and truncates the log
                     // exactly once, even when accessed concurrently from multiple threads.
-                    sinks.push_back(
-                        std::make_shared<spdlog::sinks::basic_file_sink_mt>(path, true));
+                    fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path, true);
+                    sinks.push_back(fileSink);
+                }
 
-                auto result = std::make_shared<spdlog::logger>(
-                    "vkShade", sinks.begin(), sinks.end());
-                result->flush_on(spdlog::level::trace);
+                state.logger = std::make_shared<spdlog::logger>("vkShade", sinks.begin(), sinks.end());
 
                 const char* configuredLevel = std::getenv("VKSHADE_LOG_LEVEL");
                 const std::string level = configuredLevel ? configuredLevel : "info";
-                if (level == "trace")
-                    result->set_level(spdlog::level::trace);
-                else if (level == "debug")
-                    result->set_level(spdlog::level::debug);
-                else if (level == "info")
-                    result->set_level(spdlog::level::info);
-                else if (level == "warn" || level == "warning")
-                    result->set_level(spdlog::level::warn);
-                else if (level == "error")
-                    result->set_level(spdlog::level::err);
-                else if (level == "critical")
-                    result->set_level(spdlog::level::critical);
-                else if (level == "off")
-                    result->set_level(spdlog::level::off);
-                else
-                    result->set_level(spdlog::level::info);
 
-                result->debug("vkShade logger initialized");
-                return result;
+                spdlog::level::level_enum configuredLogLevel;
+
+                if (level == "trace")
+                    configuredLogLevel = spdlog::level::trace;
+                else if (level == "debug")
+                    configuredLogLevel = spdlog::level::debug;
+                else if (level == "info")
+                    configuredLogLevel = spdlog::level::info;
+                else if (level == "warn" || level == "warning")
+                    configuredLogLevel = spdlog::level::warn;
+                else if (level == "error")
+                    configuredLogLevel = spdlog::level::err;
+                else if (level == "critical")
+                    configuredLogLevel = spdlog::level::critical;
+                else if (level == "off")
+                    configuredLogLevel = spdlog::level::off;
+                else
+                    configuredLogLevel = spdlog::level::info;
+
+                // The logger must accept everything so the history sink
+                //  always receives trace messages.
+                state.logger->set_level(spdlog::level::trace);
+
+                // Apply the configured verbosity only to the external sinks.
+                stderrSink->set_level(configuredLogLevel);
+                state.logger->flush_on(configuredLogLevel);
+
+                if (fileSink)
+                    fileSink->set_level(configuredLogLevel);
+
+                state.logger->debug("vkShade logger initialized");
+                return state;
             }();
 
-            return *logger;
+            return instance;
         }
     };
 }

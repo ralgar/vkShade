@@ -16,7 +16,7 @@ namespace vkShade
     public:
         EffectsPanel();
 
-        void render();
+        void render() override;
 
     private:
         ConfigStore& m_config;
