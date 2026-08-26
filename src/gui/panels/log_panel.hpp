@@ -14,7 +14,7 @@ namespace vkShade
     public:
         LogPanel() = default;
 
-        void render();
+        void render() override;
 
     private:
         using LogMessage = spdlog::details::log_msg_buffer;
