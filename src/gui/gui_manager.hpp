@@ -7,6 +7,9 @@
 
 namespace vkShade
 {
+    struct MouseButtonEvent;
+    struct MouseMotionEvent;
+
     class GuiManager
     {
     public:
@@ -26,5 +29,8 @@ namespace vkShade
         MainWindow m_mainWindow;
 
         void draw_cursor();
+
+        void on_mouse_button_event(const MouseButtonEvent& event);
+        void on_mouse_motion_event(const MouseMotionEvent& event);
     };
 } // namespace vkShade

@@ -7,8 +7,10 @@
 
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
+#include "input_events.hpp"
 
 vkShade::InputManager::InputManager()
+    : m_eventBus(vkShade::Locator<EventBus>::get())
 {
     Logger::debug("Initializing InputManager");
 
@@ -103,14 +105,12 @@ void vkShade::InputManager::handle_keyboard_event(const xkb_keysym_t& keysym, bo
 
 void vkShade::InputManager::handle_mouse_button_event(MouseButton button, bool pressed)
 {
-    m_currentMouseStates[button] = pressed;
+    m_eventBus.enqueue(MouseButtonEvent{button, pressed});
 }
 
 void vkShade::InputManager::handle_mouse_motion_event(float x, float y)
 {
-    m_previousMousePosition = m_currentMousePosition;
-    m_currentMousePosition = glm::vec2(x, y);
-    m_mouseDelta = m_currentMousePosition - m_previousMousePosition;
+    m_eventBus.enqueue(MouseMotionEvent{x, y});
 }
 
 bool vkShade::InputManager::is_action_pressed(const std::string& actionName) const
@@ -129,28 +129,6 @@ bool vkShade::InputManager::is_action_just_released(const std::string& actionNam
 {
     auto it = m_actionBindings.find(actionName);
     return it != m_actionBindings.end() ? it->second.justReleased : false;
-}
-
-bool vkShade::InputManager::is_mouse_button_pressed(MouseButton button) const
-{
-    auto it = m_currentMouseStates.find(button);
-    return it != m_currentMouseStates.end() && it->second;
-}
-
-bool vkShade::InputManager::is_mouse_button_just_pressed(MouseButton button) const
-{
-    bool current = is_mouse_button_pressed(button);
-    auto it = m_previousMouseStates.find(button);
-    bool previous = it != m_previousMouseStates.end() && it->second;
-    return current && !previous;
-}
-
-bool vkShade::InputManager::is_mouse_button_just_released(MouseButton button) const
-{
-    bool current = is_mouse_button_pressed(button);
-    auto it = m_previousMouseStates.find(button);
-    bool previous = it != m_previousMouseStates.end() && it->second;
-    return !current && previous;
 }
 
 vkShade::KeyCode vkShade::InputManager::map_key(xkb_keysym_t keysym)

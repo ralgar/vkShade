@@ -7,7 +7,7 @@
 #include "core/service_locator.hpp"
 #include "core/logger.hpp"
 #include "hooks/hooks.hpp"
-#include "input/input_manager.hpp"
+#include "input/input_events.hpp"
 #include "windows/main_window.hpp"
 #include "vk/macros.hpp"
 #include "gui_style.hpp"
@@ -99,6 +99,11 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
     // Apply custom style
     UIStyle::ApplyStyle();
+
+    // Subscribe to input events
+    auto& eventBus = Locator<EventBus>::get();
+    eventBus.sink<MouseButtonEvent>().connect<&GuiManager::on_mouse_button_event>(this);
+    eventBus.sink<MouseMotionEvent>().connect<&GuiManager::on_mouse_motion_event>(this);
 }
 
 vkShade::GuiManager::~GuiManager()
@@ -119,19 +124,21 @@ void vkShade::GuiManager::draw_cursor()
     drawList->AddCircleFilled(pos, 1.5f, IM_COL32(255, 0, 0, 255));
 }
 
+void vkShade::GuiManager::on_mouse_button_event(const MouseButtonEvent& event)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMouseButtonEvent(static_cast<int32_t>(event.button), event.pressed);
+}
+
+void vkShade::GuiManager::on_mouse_motion_event(const MouseMotionEvent& event)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMousePosEvent(event.x, event.y);
+}
+
 void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
 {
-    auto& input = vkShade::Locator<InputManager>::get();
-
     ImGuiIO& io = ImGui::GetIO();
-
-    // Update mouse state
-    glm::vec2 mousePos = input.mouse_position();
-    io.AddMousePosEvent(mousePos.x, mousePos.y);
-    io.AddMouseButtonEvent(0, input.is_mouse_button_pressed(MouseButton::LEFT));
-    io.AddMouseButtonEvent(1, input.is_mouse_button_pressed(MouseButton::RIGHT));
-    io.AddMouseButtonEvent(2, input.is_mouse_button_pressed(MouseButton::MIDDLE));
-
     io.DisplaySize = ImVec2((float)swapchainExtent.width, (float)swapchainExtent.height);
     io.DeltaTime = deltaTime;
 
