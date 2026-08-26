@@ -26,6 +26,7 @@ namespace vkShade
         void on_pointer_motion(uint32_t time, wl_fixed_t x, wl_fixed_t y);
         void on_pointer_button(uint32_t serial, uint32_t time, uint32_t button, uint32_t state);
         void on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value);
+        void on_pointer_axis_discrete(uint32_t axis, int32_t discrete);
 
         void process_events() override;
 

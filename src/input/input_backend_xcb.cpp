@@ -116,10 +116,16 @@ void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
         case 1: mouseButton = MouseButton::LEFT; break;
         case 2: mouseButton = MouseButton::MIDDLE; break;
         case 3: mouseButton = MouseButton::RIGHT; break;
-        case 4:  // Scroll up
-        case 5:  // Scroll down
-            return;  // Ignore scroll for now
-        default: return;
+        case 4:
+            if (pressed)
+                this->handle_mouse_wheel_event(0.0f, 1.0f);
+            return;
+
+        case 5:
+            if (pressed)
+                this->handle_mouse_wheel_event(0.0f, -1.0f);
+        default:
+            return;
     }
 
     handle_mouse_button_event(mouseButton, pressed);

@@ -95,16 +95,28 @@ void vkShade::InputBackendWayland::on_pointer_button(uint32_t serial, uint32_t t
 
 void vkShade::InputBackendWayland::on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value)
 {
-    // Handle scroll wheel
-    float scroll = wl_fixed_to_double(value);
-    Logger::trace("Scroll axis {} value {}", axis, scroll);
+}
+
+void vkShade::InputBackendWayland::on_pointer_axis_discrete(uint32_t axis, int32_t discrete)
+{
+    switch (axis)
+    {
+        case WL_POINTER_AXIS_VERTICAL_SCROLL:
+            handle_mouse_wheel_event(0.0f, -static_cast<float>(discrete));
+            break;
+
+        case WL_POINTER_AXIS_HORIZONTAL_SCROLL:
+            handle_mouse_wheel_event(-static_cast<float>(discrete), 0.0f);
+            break;
+    }
 }
 
 void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
 {
     if (strcmp(interface, wl_seat_interface.name) == 0)
     {
-        wl_seat* seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, 1));
+        uint32_t seatVersion = std::min(version, 5u);
+        wl_seat* seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, seatVersion));
         wl_seat_add_listener(seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_seat");
     }

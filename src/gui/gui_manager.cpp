@@ -107,6 +107,7 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
     eventBus.sink<TextInputEvent>().connect<&GuiManager::on_text_input_event>(this);
     eventBus.sink<MouseButtonEvent>().connect<&GuiManager::on_mouse_button_event>(this);
     eventBus.sink<MouseMotionEvent>().connect<&GuiManager::on_mouse_motion_event>(this);
+    eventBus.sink<MouseWheelEvent>().connect<&GuiManager::on_mouse_wheel_event>(this);
 }
 
 vkShade::GuiManager::~GuiManager()
@@ -140,6 +141,11 @@ void vkShade::GuiManager::on_mouse_button_event(const MouseButtonEvent& event)
 void vkShade::GuiManager::on_mouse_motion_event(const MouseMotionEvent& event)
 {
     ImGui::GetIO().AddMousePosEvent(event.x, event.y);
+}
+
+void vkShade::GuiManager::on_mouse_wheel_event(const MouseWheelEvent& event)
+{
+    ImGui::GetIO().AddMouseWheelEvent(event.x, event.y);
 }
 
 void vkShade::GuiManager::on_text_input_event(const TextInputEvent& event)

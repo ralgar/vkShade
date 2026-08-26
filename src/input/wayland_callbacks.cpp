@@ -31,19 +31,32 @@ static void kb_modifiers(void* data, wl_keyboard* kbd, uint32_t serial,
     static_cast<vkShade::InputBackendWayland*>(data)->on_keyboard_modifiers(mods_depressed, mods_latched, mods_locked, group);
 }
 
+void kb_repeat_info_handler(void* data, wl_keyboard* keyboard, int32_t rate, int32_t delay)
+{
+}
+
 // Seat callback
 static void seat_capabilities(void* data, wl_seat* seat, uint32_t caps)
 {
     static_cast<vkShade::InputBackendWayland*>(data)->on_seat_capabilities(seat, caps);
 }
 
+static void seat_name_handler(void* data, wl_seat* seat, const char* name)
+{
+}
+
 // Listener structs
 const wl_keyboard_listener kb_listener = {
-    kb_keymap, kb_enter, kb_leave, kb_key, kb_modifiers
+    .keymap = kb_keymap,
+    .enter = kb_enter,
+    .leave = kb_leave,
+    .key = kb_key,
+    .modifiers = kb_modifiers,
+    .repeat_info = kb_repeat_info_handler,
 };
 
 const wl_seat_listener seat_listener = {
-    seat_capabilities, NULL
+    seat_capabilities, seat_name_handler,
 };
 
 // Registry callback
@@ -87,6 +100,13 @@ void pointer_axis_handler(void* data, wl_pointer* pointer, uint32_t time,
     manager->on_pointer_axis(time, axis, value);
 }
 
+void pointer_axis_discrete_handler(void* data, wl_pointer* pointer,
+                                   uint32_t axis, int32_t discrete)
+{
+    auto* manager = static_cast<vkShade::InputBackendWayland*>(data);
+    manager->on_pointer_axis_discrete(axis, discrete);
+}
+
 void pointer_frame_handler(void* data, wl_pointer* pointer) {
     // Frame event - commits pointer events
 }
@@ -100,5 +120,5 @@ const wl_pointer_listener pointer_listener = {
     .frame = pointer_frame_handler,
     .axis_source = [](void*, wl_pointer*, uint32_t){},
     .axis_stop = [](void*, wl_pointer*, uint32_t, uint32_t){},
-    .axis_discrete = [](void*, wl_pointer*, uint32_t, int32_t){},
+    .axis_discrete = pointer_axis_discrete_handler,
 };

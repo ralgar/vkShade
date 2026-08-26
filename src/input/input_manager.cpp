@@ -126,6 +126,11 @@ void vkShade::InputManager::handle_mouse_motion_event(float x, float y)
     m_eventBus.enqueue(MouseMotionEvent{x, y});
 }
 
+void vkShade::InputManager::handle_mouse_wheel_event(float x, float y)
+{
+    m_eventBus.enqueue(MouseWheelEvent{x, y});
+}
+
 bool vkShade::InputManager::is_action_pressed(const std::string& actionName) const
 {
     auto it = m_actionBindings.find(actionName);

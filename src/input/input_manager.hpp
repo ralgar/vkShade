@@ -45,6 +45,7 @@ namespace vkShade
         void handle_keyboard_event(const xkb_keycode_t& keycode, bool pressed);
         void handle_mouse_button_event(MouseButton button, bool pressed);
         void handle_mouse_motion_event(float x, float y);
+        void handle_mouse_wheel_event(float x, float y);
 
         void on_keybind_changed(const std::string& configKey, std::string enumString);
 
