@@ -62,7 +62,6 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
         vkShade::Locator<vkShade::InputManager>::reset();
         vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendXcb>(connection, window);
         vkShade::Logger::debug("X11 (XCB) surface created");
-        vkShade::Logger::warn("XCB input is currently unsupported");
     }
 
     return result;
