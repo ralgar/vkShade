@@ -11,6 +11,7 @@
 #include "windows/main_window.hpp"
 #include "vk/macros.hpp"
 #include "gui_style.hpp"
+#include "input_helpers.hpp"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
 {
@@ -102,6 +103,8 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
     // Subscribe to input events
     auto& eventBus = Locator<EventBus>::get();
+    eventBus.sink<KeyboardEvent>().connect<&GuiManager::on_keyboard_event>(this);
+    eventBus.sink<TextInputEvent>().connect<&GuiManager::on_text_input_event>(this);
     eventBus.sink<MouseButtonEvent>().connect<&GuiManager::on_mouse_button_event>(this);
     eventBus.sink<MouseMotionEvent>().connect<&GuiManager::on_mouse_motion_event>(this);
 }
@@ -124,16 +127,24 @@ void vkShade::GuiManager::draw_cursor()
     drawList->AddCircleFilled(pos, 1.5f, IM_COL32(255, 0, 0, 255));
 }
 
+void vkShade::GuiManager::on_keyboard_event(const KeyboardEvent& event)
+{
+    ImGui::GetIO().AddKeyEvent(to_imgui_key(event.keyCode), event.pressed);
+}
+
 void vkShade::GuiManager::on_mouse_button_event(const MouseButtonEvent& event)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    io.AddMouseButtonEvent(static_cast<int32_t>(event.button), event.pressed);
+    ImGui::GetIO().AddMouseButtonEvent(static_cast<int32_t>(event.button), event.pressed);
 }
 
 void vkShade::GuiManager::on_mouse_motion_event(const MouseMotionEvent& event)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    io.AddMousePosEvent(event.x, event.y);
+    ImGui::GetIO().AddMousePosEvent(event.x, event.y);
+}
+
+void vkShade::GuiManager::on_text_input_event(const TextInputEvent& event)
+{
+    ImGui::GetIO().AddInputCharactersUTF8(event.text.c_str());
 }
 
 void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)

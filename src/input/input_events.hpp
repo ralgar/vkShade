@@ -1,9 +1,23 @@
 #pragma once
 
+#include <string>
+
+#include "key_codes.hpp"
 #include "mouse_button_codes.hpp"
 
 namespace vkShade
 {
+    struct KeyboardEvent
+    {
+        KeyCode keyCode;
+        bool pressed;
+    };
+
+    struct TextInputEvent
+    {
+        std::string text;
+    };
+
     struct MouseMotionEvent
     {
         float x {0.0f};

@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include <glm/vec2.hpp>
+#include <xkbcommon/xkbcommon.h>
 
 #include "core/event_bus.hpp"
 #include "key_codes.hpp"
@@ -41,7 +42,7 @@ namespace vkShade
         xkb_keymap*  m_xkbKeymap  {nullptr};
         xkb_state*   m_xkbState   {nullptr};
 
-        void handle_keyboard_event(const xkb_keysym_t& keysym, bool pressed);
+        void handle_keyboard_event(const xkb_keycode_t& keycode, bool pressed);
         void handle_mouse_button_event(MouseButton button, bool pressed);
         void handle_mouse_motion_event(float x, float y);
 

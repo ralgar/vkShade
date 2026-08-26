@@ -98,9 +98,6 @@ void vkShade::InputBackendXcb::handle_key_event(uint32_t keyCode, bool pressed)
     if (!m_xkbState)
         return;
 
-    // Get keysym from XKB
-    xkb_keysym_t keysym = xkb_state_key_get_one_sym(m_xkbState, keyCode);
-
     // Update XKB state
     if (pressed)
         xkb_state_update_key(m_xkbState, keyCode, XKB_KEY_DOWN);
@@ -108,7 +105,7 @@ void vkShade::InputBackendXcb::handle_key_event(uint32_t keyCode, bool pressed)
         xkb_state_update_key(m_xkbState, keyCode, XKB_KEY_UP);
 
     // Call base class to update key state map
-    this->handle_keyboard_event(keysym, pressed);
+    this->handle_keyboard_event(keyCode, pressed);
 }
 
 void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)

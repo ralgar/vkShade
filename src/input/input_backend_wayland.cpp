@@ -21,11 +21,10 @@ vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
 
 void vkShade::InputBackendWayland::on_keyboard_key(uint32_t key, uint32_t state)
 {
-    uint32_t keycode = key + 8;  // Wayland uses evdev codes, XKB expects +8
-    xkb_keysym_t sym = xkb_state_key_get_one_sym(m_xkbState, keycode);
+    uint32_t keyCode = key + 8;  // Wayland uses evdev codes, XKB expects +8
     bool pressed = (state == WL_KEYBOARD_KEY_STATE_PRESSED);
 
-    handle_keyboard_event(sym, pressed);
+    handle_keyboard_event(keyCode, pressed);
 }
 
 void vkShade::InputBackendWayland::on_keyboard_keymap(uint32_t format, int32_t fd, uint32_t size)

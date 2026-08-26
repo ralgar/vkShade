@@ -97,10 +97,23 @@ void vkShade::InputManager::bind_action(const std::string& actionName, vkShade::
     Logger::debug("Bound action '{}' to '{}'", actionName, magic_enum::enum_name(keyCode));
 }
 
-void vkShade::InputManager::handle_keyboard_event(const xkb_keysym_t& keysym, bool pressed)
+void vkShade::InputManager::handle_keyboard_event(const xkb_keycode_t& keycode, bool pressed)
 {
+    const xkb_keysym_t keysym = xkb_state_key_get_one_sym(m_xkbState, keycode);
+
     // Update key state map
     m_currentKeyStates[map_key(keysym)] = pressed;
+    m_eventBus.enqueue(KeyboardEvent{map_key(keysym), pressed});
+
+    if (!pressed)
+        return;
+
+    char buffer[64];
+    const int length = xkb_state_key_get_utf8(
+        m_xkbState, keycode, buffer, sizeof(buffer));
+
+    if (length > 0)
+        m_eventBus.enqueue(TextInputEvent{.text = std::string(buffer, length)});
 }
 
 void vkShade::InputManager::handle_mouse_button_event(MouseButton button, bool pressed)
