@@ -4,6 +4,7 @@
 
 #include "hooks/hooks.hpp"
 #include "windows/main_window.hpp"
+#include "windows/diagnostics_overlay.hpp"
 
 namespace vkShade
 {
@@ -30,6 +31,7 @@ namespace vkShade
         VkDescriptorPool m_descriptorPool;
 
         MainWindow m_mainWindow;
+        DiagnosticsOverlay m_diagnosticsOverlay;
 
         void draw_cursor();
 

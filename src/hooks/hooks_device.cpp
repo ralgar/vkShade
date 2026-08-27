@@ -102,6 +102,12 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     thisDevice.handle = *pDevice;
     thisDevice.physicalDevice = physicalDevice;
     thisDevice.instance = thisInstance.handle;
+    thisDevice.diagnosticsState = std::make_shared<vkShade::DiagnosticsState>();
+    thisDevice.imageTracker = std::make_shared<vkShade::ImageTracker>();
+
+    VkPhysicalDeviceProperties physicalDeviceProperties {};
+    thisInstance.dispatch.GetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+    thisDevice.timestampPeriod = physicalDeviceProperties.limits.timestampPeriod;
 
     // Initialize dispatch table
     vkuInitDeviceDispatchTable(*pDevice, &thisDevice.dispatch, gdpa);
@@ -126,6 +132,8 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
 				vkShade::Logger::warn("Selected graphics queue has a low priority: {}", pCreateInfo->pQueueCreateInfos[i].pQueuePriorities[0]);
 
 			thisDevice.queueFamilyIndex = queueInfo.queueFamilyIndex;
+            thisDevice.timestampValidBits =
+                queueProperties[thisDevice.queueFamilyIndex].timestampValidBits;
             thisDevice.dispatch.GetDeviceQueue(thisDevice.handle, thisDevice.queueFamilyIndex, 0, &thisDevice.queue);
 
             VkCommandPoolCreateInfo commandPoolCreateInfo;
@@ -139,6 +147,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
             break;
 		}
 	}
+
+    thisDevice.diagnosticsState->gpuTimingSupported.store(
+        thisDevice.timestampValidBits > 0 && thisDevice.timestampPeriod > 0.0f,
+        std::memory_order_relaxed);
 
     // Initialize the Vulkan Memory Allocator
     {

@@ -7,6 +7,7 @@
 
 #include "core/events/reload_effects.hpp"
 #include "object.hpp"
+#include "gpu_timing.hpp"
 #include "reshade_effect.hpp"
 
 namespace vkShade
@@ -45,6 +46,7 @@ namespace vkShade
         VkFence m_fence {VK_NULL_HANDLE};
         VkCommandPool m_commandPool {VK_NULL_HANDLE};
         VkCommandBuffer m_commandBuffer {VK_NULL_HANDLE};
+        GpuTiming m_gpuTiming;
         std::vector<std::shared_ptr<ReshadeEffect>> m_effects;
         std::shared_ptr<VulkanImage> m_pingPongA;
         std::shared_ptr<VulkanImage> m_pingPongB;
