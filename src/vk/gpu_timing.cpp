@@ -57,6 +57,7 @@ void vkShade::GpuTiming::collect_results()
     m_state->effectsGpuMilliseconds.store(
         milliseconds(results[EffectsBegin].value, results[EffectsEnd].value),
         std::memory_order_relaxed);
+    m_state->gpuTimingSampleSequence.fetch_add(1, std::memory_order_release);
     m_state->gpuTimingValid.store(true, std::memory_order_release);
 }
 

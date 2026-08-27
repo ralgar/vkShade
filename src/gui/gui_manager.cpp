@@ -14,7 +14,8 @@
 #include "input_helpers.hpp"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
-    : m_mainWindow(deviceContext.imageTracker)
+    : m_mainWindow(deviceContext.diagnosticsState, deviceContext.imageTracker)
+    , m_diagnosticsOverlay(deviceContext.diagnosticsState)
 {
     m_device = deviceContext.handle;
 
@@ -178,6 +179,8 @@ void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
         // Last: Draw the cursor on top of everything
         this->draw_cursor();
     }
+
+    m_diagnosticsOverlay.render();
 
     ImGui::Render();
 }

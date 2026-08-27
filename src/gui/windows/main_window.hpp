@@ -5,6 +5,7 @@
 #include <imgui.h>
 
 #include "config/config_store.hpp"
+#include "core/diagnostics_state.hpp"
 #include "../panels/buffer_panel.hpp"
 #include "../panels/effects_panel.hpp"
 #include "../panels/log_panel.hpp"
@@ -17,12 +18,14 @@ namespace vkShade
     class MainWindow : public GuiWindow
     {
     public:
-        explicit MainWindow(std::shared_ptr<ImageTracker> imageTracker);
+        MainWindow(std::shared_ptr<DiagnosticsState> diagnosticsState,
+                   std::shared_ptr<ImageTracker> imageTracker);
 
         void render() override;
 
     private:
         ConfigStore& m_preset;
+        std::shared_ptr<DiagnosticsState> m_diagnosticsState;
 
         // Panels
         EffectsPanel m_effectsPanel;

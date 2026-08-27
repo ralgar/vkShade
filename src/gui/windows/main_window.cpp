@@ -3,8 +3,10 @@
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 
-vkShade::MainWindow::MainWindow(std::shared_ptr<ImageTracker> imageTracker)
+vkShade::MainWindow::MainWindow(std::shared_ptr<DiagnosticsState> diagnosticsState,
+                                std::shared_ptr<ImageTracker> imageTracker)
     : m_preset(vkShade::Locator<ConfigManager>::get().preset()),
+      m_diagnosticsState(std::move(diagnosticsState)),
       m_bufferPanel(std::move(imageTracker))
 {}
 
@@ -85,6 +87,19 @@ void vkShade::MainWindow::render_menu_bar()
             if (ImGui::MenuItem("Close"))
             {
                 m_visible = false;
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            bool showPerformance = m_diagnosticsState->showPerformanceOverlay.load(
+                std::memory_order_relaxed);
+            if (ImGui::MenuItem("Performance overlay", nullptr, &showPerformance))
+            {
+                m_diagnosticsState->showPerformanceOverlay.store(
+                    showPerformance, std::memory_order_relaxed);
             }
 
             ImGui::EndMenu();
