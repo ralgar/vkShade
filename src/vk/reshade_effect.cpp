@@ -23,6 +23,41 @@
 #include "vk/reshade_uniforms.hpp"
 #include "vk/sampler.hpp"
 
+namespace
+{
+    uint32_t format_bit_depth(VkFormat format)
+    {
+        switch (format)
+        {
+            case VK_FORMAT_R5G6B5_UNORM_PACK16:
+            case VK_FORMAT_B5G6R5_UNORM_PACK16:
+            case VK_FORMAT_R5G5B5A1_UNORM_PACK16:
+            case VK_FORMAT_B5G5R5A1_UNORM_PACK16:
+            case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
+                return 5;
+            case VK_FORMAT_R8G8B8A8_UNORM:
+            case VK_FORMAT_R8G8B8A8_SRGB:
+            case VK_FORMAT_B8G8R8A8_UNORM:
+            case VK_FORMAT_B8G8R8A8_SRGB:
+                return 8;
+            case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32:
+                return 9;
+            case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+                return 10;
+            case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
+                return 11;
+            case VK_FORMAT_R16G16B16A16_SFLOAT:
+                return 16;
+            case VK_FORMAT_R32G32B32_SFLOAT:
+            case VK_FORMAT_R32G32B32A32_SFLOAT:
+                return 32;
+            default:
+                return 0;
+        }
+    }
+}
+
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device), m_extent(extent), m_format(format), m_fileName(effectPath.filename())
 {
@@ -68,6 +103,16 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 {
     auto& technique = m_module->techniques[0];
 
+    // ReShade defines newly created effect textures to contain zero. Initialize
+    // all internal resources before any pass can sample temporal history or
+    // load an attachment that has not been written yet.
+    if (!m_imagesInitialized)
+    {
+        for (auto& [name, texture] : m_textures)
+            texture->initialize(cmd);
+        m_imagesInitialized = true;
+    }
+
     // Clear the stencil buffer if we have one.
     if (m_stencilBuffer)
     {
@@ -83,8 +128,6 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
     // Iterate and apply effect passes
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, technique.passes))
     {
-        bool isFinalPass = (&passInfo == &technique.passes.back());
-
         const VkClearValue clearValue = { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } };
         const VkClearValue* clear = passInfo.clear_render_targets ? &clearValue : nullptr;
 
@@ -104,18 +147,19 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
                 attachmentExtent.width = renderTarget->extent().width;
                 attachmentExtent.height = renderTarget->extent().height;
             }
-            renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            colorAttachments.push_back(vkinit::rendering_attachment_info(renderTarget->image_view(),
-                                                                         clear,
-                                                                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
+            renderTarget->transition_render_target_layout(
+                cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            colorAttachments.push_back(vkinit::rendering_attachment_info(
+                renderTarget->render_target_view(passInfo.srgb_write_enable), clear,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
         if (colorAttachments.empty())
         {
             outputImage.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            colorAttachments.push_back(vkinit::rendering_attachment_info(outputImage.image_view(),
-                                                                         clear,
-                                                                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
+            colorAttachments.push_back(vkinit::rendering_attachment_info(
+                outputImage.render_target_view(passInfo.srgb_write_enable), clear,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
 
         VkExtent2D passExtent {
@@ -182,17 +226,19 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
 
         m_device.dispatch.CmdEndRendering(cmd);
 
-        // Transition intermediate render targets to SHADER_READ_ONLY_OPTIMAL for next pass
-        if (!isFinalPass)
+        // Make internal render targets visible to subsequent passes and frames.
+        // ReShade regenerates their mip chain after every writing pass unless
+        // GenerateMipmaps is disabled on that pass.
+        for (const auto& name : passInfo.render_target_names)
         {
-            for (const auto& name : passInfo.render_target_names)
-            {
-                if (name.empty())
-                    break;
+            if (name.empty())
+                break;
 
-                auto* renderTarget = m_textures.at(name).get();
-                renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            }
+            auto* renderTarget = m_textures.at(name).get();
+            renderTarget->transition_render_target_layout(
+                cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            if (passInfo.generate_mipmaps)
+                renderTarget->generate_mipmaps(cmd);
         }
     }
 }
@@ -214,9 +260,9 @@ void vkShade::ReshadeEffect::bind_input(VulkanImage& colorImage, VulkanImage& de
 
             VkImageView imageView;
             if (texIt->semantic == "COLOR")
-                imageView = colorImage.image_view();
+                imageView = colorImage.sampled_view(binding.srgb);
             else if (texIt->semantic == "DEPTH")
-                imageView = depthImage.image_view();
+                imageView = depthImage.sampled_view(binding.srgb);
             else
                 continue;  // Skip other textures (we only bind COLOR and DEPTH here)
 
@@ -256,6 +302,7 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
 	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(extent.height));
 	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
 	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
+	pp.add_macro_definition("BUFFER_COLOR_BIT_DEPTH", std::to_string(format_bit_depth(m_format)));
 
     // Add include paths
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
@@ -590,8 +637,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
             auto& texture = m_textures.at(samplerInfo.texture_name);
             imageInfos.push_back({
                 .sampler = sampler->handle(),
-                //.imageView = binding.srgb ? texture->srgbView() : texture->linearView(),  // TODO: linear/srgb views
-                .imageView = texture->image_view(),
+                .imageView = texture->sampled_view(binding.srgb),
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             });
 
@@ -667,11 +713,13 @@ void vkShade::ReshadeEffect::reflect_pipeline()
 
             auto it = m_textures.find(name);
             if (it != m_textures.end())
-                colorFormats.push_back(it->second->format());
+                colorFormats.push_back(VulkanImage::view_format(it->second->format(),
+                                                                passInfo.srgb_write_enable));
         }
 
         if (colorFormats.empty())
-            colorFormats.push_back(m_format);
+            colorFormats.push_back(VulkanImage::view_format(m_format,
+                                                            passInfo.srgb_write_enable));
 
         // Create pipeline layout
         std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };

@@ -1,5 +1,7 @@
 #include "image.hpp"
 
+#include <cassert>
+#include <optional>
 #include <effect_module.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -22,6 +24,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
     m_extent.width  = info.width;
     m_extent.height = info.height;
     m_extent.depth  = info.depth;
+    m_mipLevels = info.levels;
 
     m_format = convert_format(info.format);
 
@@ -30,6 +33,9 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         m_format = VK_FORMAT_R8G8B8A8_UNORM;
 
     m_usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    if (m_mipLevels > 1)
+        m_usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     if (info.render_target)
         m_usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -42,53 +48,13 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         return a.name == "source";
     });
 
-    // If no explicit size is specified we need to extract it from the image file
-    if (it != info.annotations.end() && m_extent.width == 1 && m_extent.height == 1)
-    {
-        // Find the file and probe dimensions before creating the image
-        auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-        auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
-        std::string fileName = it->value.string_data;
-
-        bool found = false;
-        for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
-        {
-            for (const auto& entry : std::filesystem::directory_iterator(path))
-            {
-                // Do a case insensitive comparison since ReShade is a Windows app
-                auto a = entry.path().filename().string();
-                auto b = fileName;
-                std::transform(a.begin(), a.end(), a.begin(), ::tolower);
-                std::transform(b.begin(), b.end(), b.begin(), ::tolower);
-                if (a == b)
-                {
-                    int w, h, c;
-                    if (stbi_info(entry.path().c_str(), &w, &h, &c))
-                    {
-                        m_extent.width  = w;
-                        m_extent.height = h;
-                    }
-
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        if (!found)
-            throw std::runtime_error("Unable to find texture: " + fileName);
-    }
-
-    this->create_image();
-    this->create_image_view();
-
+    std::optional<std::filesystem::path> sourcePath;
     if (it != info.annotations.end())
     {
         auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
         auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
         std::string fileName = it->value.string_data;
 
-        bool found = false;
         for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
         {
             for (const auto& entry : std::filesystem::directory_iterator(path))
@@ -100,15 +66,48 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
                 std::transform(b.begin(), b.end(), b.begin(), ::tolower);
                 if (a == b)
                 {
-                    this->load_from_file(entry.path());
-                    found = true;
+                    sourcePath = entry.path();
                     break;
                 }
             }
+
+            if (sourcePath)
+                break;
         }
 
-        if (!found)
+        if (!sourcePath)
             throw std::runtime_error("Unable to find texture: " + fileName);
+
+        // If no explicit size is specified, extract it before allocating the image.
+        if (m_extent.width == 1 && m_extent.height == 1)
+        {
+            int w, h, c;
+            if (!stbi_info(sourcePath->c_str(), &w, &h, &c))
+                throw std::runtime_error("Unable to read texture dimensions: " + fileName);
+
+            m_extent.width  = w;
+            m_extent.height = h;
+        }
+    }
+
+    try
+    {
+        this->create_image();
+        this->create_image_view();
+
+        // ReShade effects may sample persistent textures before their first write
+        // (for example, temporal luminance history). Vulkan leaves newly allocated
+        // image contents undefined, while the ReShade runtime initializes effect
+        // textures to zero.
+        m_needsInitialization = !sourcePath;
+
+        if (sourcePath)
+            this->load_from_file(*sourcePath);
+    }
+    catch (...)
+    {
+        this->destroy();
+        throw;
     }
 }
 
@@ -195,6 +194,7 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
     m_extent.depth  = 1;
     m_format = format;
     m_owning = false;  // IMPORTANT! We don't own the image here.
+    m_mipLayouts.assign(m_mipLevels, VK_IMAGE_LAYOUT_UNDEFINED);
 
     // Only create the view (no image since we don't own it)
     this->create_image_view();
@@ -203,9 +203,24 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
 vkShade::VulkanImage::~VulkanImage()
 {
     Logger::trace("Destroying VulkanImage");
+    this->destroy();
+}
 
-    if (m_imageView != VK_NULL_HANDLE)
-        m_device.dispatch.DestroyImageView(m_device.handle, m_imageView, nullptr);
+void vkShade::VulkanImage::destroy()
+{
+    if (m_srgbRenderTargetView != VK_NULL_HANDLE
+        && m_srgbRenderTargetView != m_linearRenderTargetView
+        && m_srgbRenderTargetView != m_srgbImageView
+        && m_srgbRenderTargetView != m_linearImageView)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_srgbRenderTargetView, nullptr);
+    if (m_linearRenderTargetView != VK_NULL_HANDLE
+        && m_linearRenderTargetView != m_srgbImageView
+        && m_linearRenderTargetView != m_linearImageView)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_linearRenderTargetView, nullptr);
+    if (m_srgbImageView != VK_NULL_HANDLE && m_srgbImageView != m_linearImageView)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_srgbImageView, nullptr);
+    if (m_linearImageView != VK_NULL_HANDLE)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_linearImageView, nullptr);
 
     if (m_owning && m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE)
         vmaDestroyImage(m_device.allocator, m_image, m_allocation);
@@ -213,13 +228,19 @@ vkShade::VulkanImage::~VulkanImage()
 
 void vkShade::VulkanImage::create_image()
 {
+    m_mipLayouts.assign(m_mipLevels, VK_IMAGE_LAYOUT_UNDEFINED);
+
+    const bool mutableFormat = view_format(m_format, false) != view_format(m_format, true);
     VkImageCreateInfo imgInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = nullptr,
+        .flags = mutableFormat
+               ? VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT
+               : 0u,
         .imageType = VK_IMAGE_TYPE_2D,
         .format = m_format,
         .extent = VkExtent3D {m_extent.width, m_extent.height, 1},
-        .mipLevels = 1,
+        .mipLevels = m_mipLevels,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,   // 1 sample per pixel = no MSAA
         .tiling = VK_IMAGE_TILING_OPTIMAL,  // Let the GPU move the data as it sees fit
@@ -244,23 +265,107 @@ void vkShade::VulkanImage::create_image_view()
 	if (m_format == VK_FORMAT_S8_UINT)
 		aspectFlags = VK_IMAGE_ASPECT_STENCIL_BIT;
 
-	// Build an image view for the image.
+    // Wrapped application images are not guaranteed to have been created with
+    // MUTABLE_FORMAT. vkShade-owned images opt into compatible UNORM/sRGB
+    // views in create_image().
+    const VkFormat linearFormat = m_owning ? view_format(m_format, false) : m_format;
+    const VkFormat srgbFormat = m_owning ? view_format(m_format, true) : m_format;
+
+    VkImageViewUsageCreateInfo viewUsageInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
+        .usage = m_usageFlags & (VK_IMAGE_USAGE_SAMPLED_BIT
+                               | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT),
+    };
+
+	// Build shader-resource views spanning the full mip chain.
     VkImageViewCreateInfo viewInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .pNext = nullptr,
+        .pNext = viewUsageInfo.usage ? &viewUsageInfo : nullptr,
         .image = m_image,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = m_format,
+        .format = linearFormat,
         .subresourceRange = {
             .aspectMask = aspectFlags,
             .baseMipLevel = 0,
-            .levelCount = 1,
+            .levelCount = m_mipLevels,
             .baseArrayLayer = 0,
             .layerCount = 1,
         },
     };
 
-	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_imageView));
+	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                              &m_linearImageView));
+
+    if (srgbFormat != linearFormat)
+    {
+        viewInfo.format = srgbFormat;
+        VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                                    &m_srgbImageView));
+    }
+    else
+    {
+        m_srgbImageView = m_linearImageView;
+    }
+
+    if (m_mipLevels > 1 && (m_usageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
+    {
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.format = linearFormat;
+        VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                                    &m_linearRenderTargetView));
+        if (srgbFormat != linearFormat)
+        {
+            viewInfo.format = srgbFormat;
+            VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr,
+                                                        &m_srgbRenderTargetView));
+        }
+        else
+        {
+            m_srgbRenderTargetView = m_linearRenderTargetView;
+        }
+    }
+    else
+    {
+        m_linearRenderTargetView = m_linearImageView;
+        m_srgbRenderTargetView = m_srgbImageView;
+    }
+}
+
+const VkImageView& vkShade::VulkanImage::image_view() const
+{
+    return sampled_view(m_format == view_format(m_format, true)
+                        && m_format != view_format(m_format, false));
+}
+
+const VkImageView& vkShade::VulkanImage::sampled_view(bool srgb) const
+{
+    return srgb ? m_srgbImageView : m_linearImageView;
+}
+
+const VkImageView& vkShade::VulkanImage::render_target_view() const
+{
+    return render_target_view(m_format == view_format(m_format, true)
+                              && m_format != view_format(m_format, false));
+}
+
+const VkImageView& vkShade::VulkanImage::render_target_view(bool srgb) const
+{
+    return srgb ? m_srgbRenderTargetView : m_linearRenderTargetView;
+}
+
+VkFormat vkShade::VulkanImage::view_format(VkFormat format, bool srgb)
+{
+    switch (format)
+    {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            return srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            return srgb ? VK_FORMAT_B8G8R8A8_SRGB : VK_FORMAT_B8G8R8A8_UNORM;
+        default:
+            return format;
+    }
 }
 
 void vkShade::VulkanImage::blit_from(VkCommandBuffer cmd, VkImage source)
@@ -339,39 +444,182 @@ VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)
 
 void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout)
 {
+    transition_layout(cmd, newLayout, 0, m_mipLevels);
+}
+
+void vkShade::VulkanImage::transition_render_target_layout(VkCommandBuffer cmd,
+                                                            VkImageLayout newLayout)
+{
+    transition_layout(cmd, newLayout, 0, 1);
+}
+
+void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout,
+                                              uint32_t baseMipLevel, uint32_t levelCount)
+{
     VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     if (m_format == VK_FORMAT_D32_SFLOAT)
         aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     if (m_format == VK_FORMAT_S8_UINT)
         aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
 
-    VkImageMemoryBarrier2 imageBarrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-        .oldLayout = m_currentLayout,  // Track current layout
-        .newLayout = newLayout,
-        .image = m_image,
-        .subresourceRange = {
-            .aspectMask = aspectMask,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        },
+    const uint32_t endMipLevel = std::min(baseMipLevel + levelCount, m_mipLevels);
+    while (baseMipLevel < endMipLevel)
+    {
+        const VkImageLayout oldLayout = m_mipLayouts[baseMipLevel];
+        uint32_t endRange = baseMipLevel + 1;
+        while (endRange < endMipLevel && m_mipLayouts[endRange] == oldLayout)
+            ++endRange;
+
+        VkImageMemoryBarrier2 imageBarrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+            .oldLayout = oldLayout,
+            .newLayout = newLayout,
+            .image = m_image,
+            .subresourceRange = {
+                .aspectMask = aspectMask,
+                .baseMipLevel = baseMipLevel,
+                .levelCount = endRange - baseMipLevel,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        VkDependencyInfo depInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &imageBarrier,
+        };
+
+        m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
+        std::fill(m_mipLayouts.begin() + baseMipLevel,
+                  m_mipLayouts.begin() + endRange, newLayout);
+        baseMipLevel = endRange;
+    }
+}
+
+void vkShade::VulkanImage::generate_mipmaps(VkCommandBuffer cmd)
+{
+    if (m_mipLevels <= 1)
+        return;
+
+    auto barrier = [this, cmd](uint32_t baseMipLevel, uint32_t levelCount,
+                               VkImageLayout newLayout,
+                               VkPipelineStageFlags2 srcStageMask, VkAccessFlags2 srcAccessMask,
+                               VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask)
+    {
+        const VkImageLayout oldLayout = m_mipLayouts[baseMipLevel];
+        assert(std::all_of(m_mipLayouts.begin() + baseMipLevel,
+                           m_mipLayouts.begin() + baseMipLevel + levelCount,
+                           [oldLayout](VkImageLayout layout) { return layout == oldLayout; }));
+
+        VkImageMemoryBarrier2 imageBarrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = srcStageMask,
+            .srcAccessMask = srcAccessMask,
+            .dstStageMask = dstStageMask,
+            .dstAccessMask = dstAccessMask,
+            .oldLayout = oldLayout,
+            .newLayout = newLayout,
+            .image = m_image,
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = baseMipLevel,
+                .levelCount = levelCount,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+
+        VkDependencyInfo dependencyInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &imageBarrier,
+        };
+        m_device.dispatch.CmdPipelineBarrier2(cmd, &dependencyInfo);
+        std::fill(m_mipLayouts.begin() + baseMipLevel,
+                  m_mipLayouts.begin() + baseMipLevel + levelCount, newLayout);
     };
 
-    VkDependencyInfo depInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &imageBarrier,
-    };
+    barrier(0, 1,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
 
-    m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
+    for (uint32_t level = 1; level < m_mipLevels; ++level)
+    {
+        barrier(level, 1,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
-    m_currentLayout = newLayout;  // Update tracked layout
+        VkImageBlit2 blitRegion = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+            .srcSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = level - 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+            .srcOffsets = {
+                {0, 0, 0},
+                {static_cast<int32_t>(std::max(1u, m_extent.width >> (level - 1))),
+                 static_cast<int32_t>(std::max(1u, m_extent.height >> (level - 1))), 1},
+            },
+            .dstSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = level,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+            .dstOffsets = {
+                {0, 0, 0},
+                {static_cast<int32_t>(std::max(1u, m_extent.width >> level)),
+                 static_cast<int32_t>(std::max(1u, m_extent.height >> level)), 1},
+            },
+        };
+
+        VkBlitImageInfo2 blitInfo = {
+            .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+            .srcImage = m_image,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstImage = m_image,
+            .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .regionCount = 1,
+            .pRegions = &blitRegion,
+            .filter = VK_FILTER_LINEAR,
+        };
+        m_device.dispatch.CmdBlitImage2(cmd, &blitInfo);
+
+        barrier(level, 1,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
+    }
+
+    barrier(0, m_mipLevels,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT);
+}
+
+void vkShade::VulkanImage::initialize(VkCommandBuffer cmd)
+{
+    if (!m_needsInitialization)
+        return;
+
+    this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    VkClearColorValue clearValue {};
+    VkImageSubresourceRange range = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+    m_device.dispatch.CmdClearColorImage(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                         &clearValue, 1, &range);
+
+    this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    m_needsInitialization = false;
 }
 
 void vkShade::VulkanImage::upload(const void* data, size_t size)
@@ -417,6 +665,9 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
 
     // Transition TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
     this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    if (m_mipLevels > 1)
+        this->generate_mipmaps(cmd);
 
     m_device.dispatch.EndCommandBuffer(cmd);
 
