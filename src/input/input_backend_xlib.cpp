@@ -74,9 +74,18 @@ void vkShade::InputBackendXlib::process_events()
             XEvent event {};
             XNextEvent(m_wheelDisplay, &event);
             if (event.type == ButtonPress
-                && (event.xbutton.button == Button4 || event.xbutton.button == Button5))
+                && event.xbutton.button >= Button4 && event.xbutton.button <= 7)
             {
-                handle_mouse_wheel_event(0.0f, event.xbutton.button == Button4 ? 1.0f : -1.0f);
+                if (event.xbutton.button <= Button5)
+                {
+                    handle_mouse_wheel_event(
+                        0.0f, event.xbutton.button == Button4 ? 1.0f : -1.0f);
+                }
+                else
+                {
+                    handle_mouse_wheel_event(
+                        event.xbutton.button == 6 ? 1.0f : -1.0f, 0.0f);
+                }
             }
         }
     }
