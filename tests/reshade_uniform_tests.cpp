@@ -1,37 +1,15 @@
-#include <chrono>
 #include <cstdlib>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include "vk/reshade_runtime.hpp"
+#include "vk/reshade_uniforms.hpp"
 
 using namespace std::chrono_literals;
 
 TEST_CASE("ReShade frame time is expressed in milliseconds")
 {
     REQUIRE(vkShade::reshade_frame_time(16ms) == Catch::Approx(16.0f));
-}
-
-TEST_CASE("ReShade runtime values are sampled once per presented frame")
-{
-    using Clock = std::chrono::steady_clock;
-    const Clock::time_point start {};
-    vkShade::ReshadeRuntime runtime(start);
-
-    const auto first = runtime.begin_frame(start + 16ms);
-    REQUIRE(first.frameTime == Catch::Approx(16.0f));
-    REQUIRE(first.frameCount == 0);
-    REQUIRE(first.timer == Catch::Approx(16.0f));
-
-    // Every effect rendered in this presentation observes one shared sample.
-    REQUIRE(runtime.current_frame().frameCount == first.frameCount);
-    REQUIRE(runtime.current_frame().frameTime == first.frameTime);
-
-    const auto second = runtime.begin_frame(start + 36ms);
-    REQUIRE(second.frameTime == Catch::Approx(20.0f));
-    REQUIRE(second.frameCount == 1);
-    REQUIRE(second.timer == Catch::Approx(36.0f));
 }
 
 TEST_CASE("ReShade generated uniforms use the reference defaults")

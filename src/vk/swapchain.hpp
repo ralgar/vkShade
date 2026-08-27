@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -7,7 +8,6 @@
 #include "core/events/reload_effects.hpp"
 #include "object.hpp"
 #include "reshade_effect.hpp"
-#include "reshade_runtime.hpp"
 
 namespace vkShade
 {
@@ -32,20 +32,29 @@ namespace vkShade
         void render(uint32_t imageIndex);
 
     private:
-        // Core swapchain resources
+        using Clock = std::chrono::steady_clock;
+
+        // Swapchain resources
         VkSwapchainKHR m_swapchain;
         VkFormat m_format;
         VkExtent2D m_extent;
         std::vector<std::unique_ptr<VulkanImage>> m_images;
         std::unique_ptr<VulkanImage> m_depthDummy;
 
-        // Layer resources
+        // Rendering resources
         VkFence m_fence {VK_NULL_HANDLE};
         VkCommandPool m_commandPool {VK_NULL_HANDLE};
         VkCommandBuffer m_commandBuffer {VK_NULL_HANDLE};
         std::vector<std::shared_ptr<ReshadeEffect>> m_effects;
         std::shared_ptr<VulkanImage> m_pingPongA;
         std::shared_ptr<VulkanImage> m_pingPongB;
-        ReshadeRuntime m_reshadeRuntime;
+
+        // ReShade runtime uniform state
+        Clock::time_point m_start = Clock::now();
+        Clock::time_point m_lastFrame = m_start;
+        uint64_t m_frameCount {0};
+
+        [[nodiscard]]
+        ReshadeFrameState update_time();
     };
 }  // namespace vkShade
