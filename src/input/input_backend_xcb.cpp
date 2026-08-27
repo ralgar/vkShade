@@ -110,7 +110,8 @@ void vkShade::InputBackendXcb::handle_key_event(uint32_t keyCode, bool pressed)
 
 void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
 {
-    // XCB button codes: 1=left, 2=middle, 3=right, 4=scroll up, 5=scroll down
+    // X11 button codes: 1=left, 2=middle, 3=right, 4/5=vertical
+    // wheel (up/down), 6/7=horizontal wheel (left/right).
     MouseButton mouseButton;
     switch (button) {
         case 1: mouseButton = MouseButton::LEFT; break;
@@ -124,6 +125,18 @@ void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
         case 5:
             if (pressed)
                 this->handle_mouse_wheel_event(0.0f, -1.0f);
+            return;
+
+        case 6:
+            if (pressed)
+                this->handle_mouse_wheel_event(1.0f, 0.0f);
+            return;
+
+        case 7:
+            if (pressed)
+                this->handle_mouse_wheel_event(-1.0f, 0.0f);
+            return;
+
         default:
             return;
     }
