@@ -1,11 +1,13 @@
 #pragma once
 #include "panel.hpp"
 
+#include <memory>
 #include <unordered_set>
 
 #include <imgui.h>
 
 #include "config/config_store.hpp"
+#include "core/effects_state.hpp"
 #include "core/event_bus.hpp"
 
 namespace vkShade
@@ -14,7 +16,7 @@ namespace vkShade
     class EffectsPanel : public GuiPanel
     {
     public:
-        EffectsPanel();
+        explicit EffectsPanel(std::shared_ptr<EffectsState> effectsState);
 
         void render() override;
 
@@ -22,6 +24,7 @@ namespace vkShade
         ConfigStore& m_config;
         ConfigStore& m_preset;
         EventBus&    m_eventBus;
+        std::shared_ptr<EffectsState> m_effectsState;
 
         // UI-only state (widget selections, window position)
         int32_t m_selectedAvailable = -1;

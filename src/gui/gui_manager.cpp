@@ -14,6 +14,7 @@
 #include "input_helpers.hpp"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
+    : m_mainWindow(deviceContext.effectsState)
 {
     m_device = deviceContext.handle;
 

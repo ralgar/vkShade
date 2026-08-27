@@ -3,8 +3,9 @@
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 
-vkShade::MainWindow::MainWindow()
-    : m_preset(vkShade::Locator<ConfigManager>::get().preset())
+vkShade::MainWindow::MainWindow(std::shared_ptr<EffectsState> effectsState)
+    : m_preset(vkShade::Locator<ConfigManager>::get().preset()),
+      m_effectsPanel(std::move(effectsState))
 {}
 
 void vkShade::MainWindow::render()
