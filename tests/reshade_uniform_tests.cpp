@@ -3,7 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include "vk/reshade_uniforms.hpp"
+#include "runtime/reshade_uniforms.hpp"
 
 using namespace std::chrono_literals;
 

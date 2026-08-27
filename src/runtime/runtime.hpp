@@ -6,18 +6,18 @@
 #include <vulkan/vulkan_core.h>
 
 #include "core/events/reload_effects.hpp"
-#include "object.hpp"
+#include "vk/object.hpp"
 #include "reshade_effect.hpp"
 
 namespace vkShade
 {
     class VulkanImage;
 
-    class VulkanSwapchain : public VulkanObject
+    class Runtime : public VulkanObject
     {
     public:
-        VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo);
-        ~VulkanSwapchain();
+        Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo);
+        ~Runtime();
 
         VkExtent2D extent() const { return m_extent; }
         VkFormat format() const { return m_format; }

@@ -10,8 +10,8 @@
 #include "core/uniform.hpp"
 #include "hooks/hooks.hpp"
 #include "vk/buffer.hpp"
-#include "vk/reshade_uniforms.hpp"
 #include "vk/shader_module.hpp"
+#include "reshade_uniforms.hpp"
 
 namespace reshadefx
 {

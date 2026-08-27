@@ -1,4 +1,4 @@
-#include "swapchain.hpp"
+#include "runtime.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
@@ -11,12 +11,12 @@
 #include "core/service_locator.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_manager.hpp"
-#include "image.hpp"
-#include "initializers.hpp"
-#include "macros.hpp"
+#include "vk/image.hpp"
+#include "vk/initializers.hpp"
+#include "vk/macros.hpp"
 #include "reshade_uniforms.hpp"
 
-vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
+vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
     : VulkanObject(device)
 {
     // Store the swapchain info
@@ -85,7 +85,7 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
     auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
 
     // Subscribe to config changes
-    preset.on_changed("", "Effects").connect<&VulkanSwapchain::on_effects_changed>(this);
+    preset.on_changed("", "Effects").connect<&Runtime::on_effects_changed>(this);
 
     // Load the current effects list
     if (auto effects = preset.get<std::vector<std::string>>("", "Effects"))
@@ -95,10 +95,10 @@ vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR s
 
     // Subscribe to events
     auto& eventBus = Locator<EventBus>::get();
-    eventBus.sink<Events::ReloadEffects>().connect<&VulkanSwapchain::on_reload_effects>(this);
+    eventBus.sink<Events::ReloadEffects>().connect<&Runtime::on_reload_effects>(this);
 }
 
-vkShade::VulkanSwapchain::~VulkanSwapchain()
+vkShade::Runtime::~Runtime()
 {
     // Wait for the command buffer to finish executing
     m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000);
@@ -109,14 +109,14 @@ vkShade::VulkanSwapchain::~VulkanSwapchain()
 
     // Unsubscribe from events
     auto& eventBus = Locator<EventBus>::get();
-    eventBus.sink<Events::ReloadEffects>().disconnect<&VulkanSwapchain::on_reload_effects>(this);
+    eventBus.sink<Events::ReloadEffects>().disconnect<&Runtime::on_reload_effects>(this);
 
     // Unsubscribe from config changes
     auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
-    preset.on_changed("", "Effects").disconnect<&VulkanSwapchain::on_effects_changed>(this);
+    preset.on_changed("", "Effects").disconnect<&Runtime::on_effects_changed>(this);
 }
 
-void vkShade::VulkanSwapchain::on_effects_changed(const std::string& key, std::vector<std::string> effects)
+void vkShade::Runtime::on_effects_changed(const std::string& key, std::vector<std::string> effects)
 {
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
     auto searchPaths = config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
@@ -160,14 +160,14 @@ void vkShade::VulkanSwapchain::on_effects_changed(const std::string& key, std::v
     internalCfg.set("__INTERNAL__", "LoadedEffects", loadedEffects);
 }
 
-void vkShade::VulkanSwapchain::on_reload_effects(const Events::ReloadEffects& event)
+void vkShade::Runtime::on_reload_effects(const Events::ReloadEffects& event)
 {
     auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
     auto effects = preset.get<std::vector<std::string>>("", "Effects");
     this->on_effects_changed("Effects", effects.value_or(std::vector<std::string>{}));
 }
 
-void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
+void vkShade::Runtime::render(uint32_t imageIndex)
 {
     VulkanImage* swapchainImage = m_images.at(imageIndex).get();
     const auto reshadeFrameState = this->update_time();
@@ -272,13 +272,13 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
     m_frameCount++;
 }
 
-vkShade::VulkanImage& vkShade::VulkanSwapchain::image(size_t index) const
+vkShade::VulkanImage& vkShade::Runtime::image(size_t index) const
 {
     assert(index < m_images.size());
     return *m_images[index];
 }
 
-vkShade::ReshadeFrameState vkShade::VulkanSwapchain::update_time()
+vkShade::ReshadeFrameState vkShade::Runtime::update_time()
 {
     ReshadeFrameState state {};
 

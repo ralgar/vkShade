@@ -2,11 +2,8 @@ libvk_source = [
   'buffer.cpp',
   'image.cpp',
   'initializers.cpp',
-  'reshade_effect.cpp',
-  'reshade_uniforms.cpp',
   'sampler.cpp',
   'shader_module.cpp',
-  'swapchain.cpp',
 ]
 
 libvk_library = static_library(
@@ -14,7 +11,6 @@ libvk_library = static_library(
   libvk_source,
   dependencies : [
     glm,
-    imgui,
     magic_enum,
     reshadefx,
     spdlog,

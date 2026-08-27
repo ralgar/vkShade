@@ -1,6 +1,6 @@
 #include "gui/gui_manager.hpp"
+#include "runtime/runtime.hpp"
 #include "hooks.hpp"
-#include "vk/swapchain.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
@@ -12,8 +12,8 @@
 #include "core/service_locator.hpp"
 #include "input/input_manager.hpp"
 
-std::unordered_map<VkSwapchainKHR, std::unique_ptr<vkShade::VulkanSwapchain>> g_swapchains;
-std::mutex g_swapchainMutex;
+std::unordered_map<VkSwapchainKHR, vkShade::Runtime> g_runtimes;
+std::mutex g_runtimeMutex;
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice                        device,
                                                                const VkSwapchainCreateInfoKHR* pCreateInfo,
@@ -35,8 +35,8 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice         
 
     // Create and store swapchain object
     {
-        std::lock_guard<std::mutex> lock(g_swapchainMutex);
-        g_swapchains[*pSwapchain] = std::make_unique<vkShade::VulkanSwapchain>(thisDevice, *pSwapchain, *pCreateInfo);
+        std::lock_guard<std::mutex> lock(g_runtimeMutex);
+        g_runtimes.try_emplace(*pSwapchain, thisDevice, *pSwapchain, *pCreateInfo);
     }
 
     vkShade::Logger::debug("Swapchain created");
@@ -51,8 +51,8 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
 
     // Clean up our bookkeeping data
     {
-        std::lock_guard<std::mutex> lock(g_swapchainMutex);
-        g_swapchains.erase(swapchain);
+        std::lock_guard<std::mutex> lock(g_runtimeMutex);
+        g_runtimes.erase(swapchain);
     }
 
     // Call through
@@ -68,18 +68,18 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(queue)];
 
     // Get swapchain data
-    auto it = g_swapchains.find(pPresentInfo->pSwapchains[0]);
-    if (it == g_swapchains.end())
+    auto it = g_runtimes.find(pPresentInfo->pSwapchains[0]);
+    if (it == g_runtimes.end())
     {
         vkShade::Logger::error("Swapchain not found in present");
         return thisDevice.dispatch.QueuePresentKHR(queue, pPresentInfo);
     }
 
-    auto& swapchainData = it->second;
+    auto& runtime = it->second;
 
     // Create the GUI Manager if it doesn't exist yet
     if (!vkShade::Locator<vkShade::GuiManager>::has())
-        vkShade::Locator<vkShade::GuiManager>::emplace(thisDevice, swapchainData->format());
+        vkShade::Locator<vkShade::GuiManager>::emplace(thisDevice, runtime.format());
 
     // Get manager handles
     auto& configManager = vkShade::Locator<vkShade::ConfigManager>::get();
@@ -98,7 +98,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         gui.visible(!gui.visible());
     }
 
-    gui.update(1.f/60.f, it->second->extent());
+    gui.update(1.f/60.f, it->second.extent());
 
     // For each swapchain being presented
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++)
@@ -106,17 +106,17 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         VkSwapchainKHR swapchain = pPresentInfo->pSwapchains[i];
         uint32_t imageIndex = pPresentInfo->pImageIndices[i];
 
-        auto it = g_swapchains.find(swapchain);
-        if (it == g_swapchains.end())
+        auto it = g_runtimes.find(swapchain);
+        if (it == g_runtimes.end())
         {
             vkShade::Logger::error("Swapchain not found in present");
             return thisDevice.dispatch.QueuePresentKHR(queue, pPresentInfo);
         }
 
-        auto& swapchainData = it->second;
+        auto& runtime = it->second;
 
         // Render layer
-        swapchainData->render(imageIndex);
+        runtime.render(imageIndex);
     }
 
     // Call down the chain to present
