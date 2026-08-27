@@ -111,7 +111,7 @@ void vkShade::InputBackendXcb::handle_key_event(uint32_t keyCode, bool pressed)
 void vkShade::InputBackendXcb::on_mouse_button(uint8_t button, bool pressed)
 {
     // X11 button codes: 1=left, 2=middle, 3=right, 4/5=vertical
-    // wheel, 6/7=horizontal wheel (left/right).
+    // wheel (up/down), 6/7=horizontal wheel (left/right).
     MouseButton mouseButton;
     switch (button) {
         case 1: mouseButton = MouseButton::LEFT; break;
