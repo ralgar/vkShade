@@ -112,6 +112,14 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
 vkShade::GuiManager::~GuiManager()
 {
+    // Unsubscribe from input events
+    auto& eventBus = Locator<EventBus>::get();
+    eventBus.sink<KeyboardEvent>().disconnect<&GuiManager::on_keyboard_event>(this);
+    eventBus.sink<TextInputEvent>().disconnect<&GuiManager::on_text_input_event>(this);
+    eventBus.sink<MouseButtonEvent>().disconnect<&GuiManager::on_mouse_button_event>(this);
+    eventBus.sink<MouseMotionEvent>().disconnect<&GuiManager::on_mouse_motion_event>(this);
+    eventBus.sink<MouseWheelEvent>().disconnect<&GuiManager::on_mouse_wheel_event>(this);
+
     ImGui_ImplVulkan_Shutdown();
     auto& thisDevice = get_device_from_handle(m_device);
     thisDevice.dispatch.DestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
