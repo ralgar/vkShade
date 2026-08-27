@@ -31,8 +31,10 @@ namespace vkShade
         void process_events() override;
 
     private:
-        wl_display*  m_display;
-        wl_keyboard* m_keyboard;
-        wl_pointer*  m_pointer;
+        wl_seat*        m_seat = nullptr;
+        wl_display*     m_display = nullptr;
+        wl_keyboard*    m_keyboard = nullptr;
+        wl_pointer*     m_pointer = nullptr;
+        wl_event_queue* m_queue = nullptr;
     };
 }// namespace vkShade

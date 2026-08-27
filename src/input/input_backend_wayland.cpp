@@ -12,11 +12,17 @@
 
 vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
 {
-    // Set up input
     m_display = waylandDisplay;
+
+    m_queue = wl_display_create_queue(m_display);
+
     wl_registry* reg = wl_display_get_registry(m_display);
+
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(reg), m_queue);
     wl_registry_add_listener(reg, &reg_listener, this);     // Pass 'this' as void* in callbacks
-    wl_display_roundtrip(m_display);  // Get globals
+    wl_display_roundtrip_queue(m_display, m_queue);
+
+    wl_registry_destroy(reg);
 }
 
 void vkShade::InputBackendWayland::on_keyboard_key(uint32_t key, uint32_t state)
@@ -114,8 +120,9 @@ void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t
     if (strcmp(interface, wl_seat_interface.name) == 0)
     {
         uint32_t seatVersion = std::min(version, 5u);
-        wl_seat* seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, seatVersion));
-        wl_seat_add_listener(seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
+        m_seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, seatVersion));
+        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_seat), m_queue);
+        wl_seat_add_listener(m_seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_seat");
     }
 }
@@ -126,6 +133,7 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     if (caps & WL_SEAT_CAPABILITY_KEYBOARD)
     {
         m_keyboard = wl_seat_get_keyboard(seat);
+        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_keyboard), m_queue);
         wl_keyboard_add_listener(m_keyboard, &kb_listener, this);  // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_keyboard");
     }
@@ -134,6 +142,7 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     if (caps & WL_SEAT_CAPABILITY_POINTER)
     {
         m_pointer = wl_seat_get_pointer(seat);
+        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_pointer), m_queue);
         wl_pointer_add_listener(m_pointer, &pointer_listener, this);
         Logger::trace("Bound to wl_pointer");
     }
@@ -141,9 +150,7 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
 
 void vkShade::InputBackendWayland::process_events()
 {
-    // Process Wayland events on default queue (non-blocking)
-    if (m_display)
-    {
-        wl_display_dispatch_pending(m_display);  // No queue parameter
-    }
+    // Process Wayland events on our own queue
+    if (m_display && m_queue)
+        wl_display_dispatch_queue_pending(m_display, m_queue);
 }
