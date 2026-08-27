@@ -1,10 +1,11 @@
 #include "reshade_uniforms.hpp"
 
 #include <chrono>
+
 #include <effect_module.hpp>
 #include <glm/vec2.hpp>
+
 #include "vk/buffer.hpp"
-#include "vk/reshade_runtime.hpp"
 
 static bool uniform_has_source(const reshadefx::uniform& uniform, const std::string& source)
 {

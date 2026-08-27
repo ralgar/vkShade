@@ -14,6 +14,7 @@
 #include "image.hpp"
 #include "initializers.hpp"
 #include "macros.hpp"
+#include "reshade_uniforms.hpp"
 
 vkShade::VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
     : VulkanObject(device)
@@ -169,7 +170,7 @@ void vkShade::VulkanSwapchain::on_reload_effects(const Events::ReloadEffects& ev
 void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
 {
     VulkanImage* swapchainImage = m_images.at(imageIndex).get();
-    const ReshadeFrameState& reshadeFrame = m_reshadeRuntime.begin_frame();
+    const auto reshadeFrameState = this->update_time();
 
     // Wait until the previous command buffer has finished executing. Timeout of 1 second.
 	VK_CHECK(m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000));
@@ -216,7 +217,7 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
                 continue;
 
             // Update the effect uniforms
-            effect->update(reshadeFrame);
+            effect->update(reshadeFrameState);
 
             // Barrier: Ensure read image is ready to sample
             readImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -268,10 +269,26 @@ void vkShade::VulkanSwapchain::render(uint32_t imageIndex)
     };
 
     m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, m_fence);
+    m_frameCount++;
 }
 
 vkShade::VulkanImage& vkShade::VulkanSwapchain::image(size_t index) const
 {
     assert(index < m_images.size());
     return *m_images[index];
+}
+
+vkShade::ReshadeFrameState vkShade::VulkanSwapchain::update_time()
+{
+    ReshadeFrameState state {};
+
+    Clock::time_point now = Clock::now();
+
+    state.frameTime = reshade_frame_time(now - m_lastFrame);
+    state.frameCount = static_cast<uint32_t>(m_frameCount % std::numeric_limits<uint32_t>::max());
+    state.timer = reshade_frame_time(now - m_start);
+
+    m_lastFrame = now;
+
+    return state;
 }
