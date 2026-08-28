@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -17,6 +18,10 @@ typedef uint32_t xkb_keysym_t;
 
 namespace vkShade
 {
+    class MouseCaptureBackend;
+    class MouseCaptureController;
+    class MouseInputInhibitor;
+
     constexpr KeyCode DEFAULT_KEY_EFFECTS_TOGGLE = KeyCode::KEY_INSERT;
     constexpr KeyCode DEFAULT_KEY_GUI_TOGGLE = KeyCode::KEY_HOME;
 
@@ -33,6 +38,8 @@ namespace vkShade
 
         virtual void process_events() = 0;
 
+        void capture_mouse(bool capture);
+
         void update();
 
     protected:
@@ -47,10 +54,15 @@ namespace vkShade
         void handle_mouse_motion_event(float x, float y);
         void handle_mouse_wheel_event(float x, float y);
 
+        void initialize_mouse_capture(MouseCaptureBackend& backend);
+        void shutdown_mouse_capture();
+
         void on_keybind_changed(const std::string& configKey, std::string enumString);
 
     private:
         EventBus& m_eventBus;
+        std::unique_ptr<MouseInputInhibitor> m_mouseInputInhibitor;
+        std::unique_ptr<MouseCaptureController> m_mouseCaptureController;
 
         struct ActionBinding
         {
