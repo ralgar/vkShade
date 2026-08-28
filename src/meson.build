@@ -22,6 +22,7 @@ wayland_client = dependency('wayland-client')
 xkbcommon = dependency('xkbcommon')
 xcb = dependency('xcb', required: false)
 x11 = dependency('x11')
+xi = dependency('xi')
 
 subdir('platform')
 subdir('config')

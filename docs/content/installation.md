@@ -22,7 +22,7 @@ vkShade provides a full-featured and easy to use build system, which will
 Before building, you will need:
 
 - GCC >= 12
-- X11 development files (`libx11`, `libxcb`)
+- X11 development files (`libx11`, `libxcb`, `libxi`)
 - Wayland development files (`wayland-client`)
 - xkbcommon development files (`libxkbcommon`)
 - SPIR-V Headers
