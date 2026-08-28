@@ -4,6 +4,7 @@ libinput_source = [
   'input_backend_xlib.cpp',
   'input_manager.cpp',
   'mouse_capture_controller.cpp',
+  'mouse_input_inhibitor_group.cpp',
   'virtual_mouse_cursor.cpp',
   'wayland_callbacks.cpp',
 ]
