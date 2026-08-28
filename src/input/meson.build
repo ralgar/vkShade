@@ -3,6 +3,7 @@ libinput_source = [
   'input_backend_xcb.cpp',
   'input_backend_xlib.cpp',
   'input_manager.cpp',
+  'mouse_capture_controller.cpp',
   'wayland_callbacks.cpp',
 ]
 
