@@ -51,6 +51,10 @@ namespace vkShade
             m_inhibitionAttempted = true;
             m_applicationInhibited = m_inhibitor.inhibit();
         }
+        else if (m_applicationInhibited)
+        {
+            m_inhibitor.reconcile();
+        }
 
         m_status = m_backend.get_status();
         if (m_status != MouseCaptureStatus::Inactive)

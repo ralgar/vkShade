@@ -13,6 +13,7 @@ namespace vkShade
         void add(std::unique_ptr<MouseInputInhibitor> inhibitor);
 
         bool inhibit() override;
+        void reconcile() override;
         void restore() override;
 
     private:

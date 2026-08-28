@@ -36,6 +36,11 @@ namespace
             m_calls.push_back("restore " + m_name);
         }
 
+        void reconcile() override
+        {
+            m_calls.push_back("reconcile " + m_name);
+        }
+
     private:
         std::string m_name;
         bool m_available;

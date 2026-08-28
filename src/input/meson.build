@@ -1,4 +1,5 @@
 libinput_source = [
+  'application_mouse_inhibitors.cpp',
   'input_backend_wayland.cpp',
   'input_backend_xcb.cpp',
   'input_backend_xlib.cpp',

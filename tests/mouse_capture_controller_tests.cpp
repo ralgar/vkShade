@@ -60,9 +60,15 @@ namespace
             ++restoreCalls;
         }
 
+        void reconcile() override
+        {
+            ++reconcileCalls;
+        }
+
         bool available {true};
         int inhibitCalls {0};
         int restoreCalls {0};
+        int reconcileCalls {0};
     };
 }
 

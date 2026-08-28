@@ -35,6 +35,7 @@ namespace vkShade
         virtual ~MouseInputInhibitor() = default;
 
         virtual bool inhibit() = 0;
+        virtual void reconcile() = 0;
         virtual void restore() = 0;
     };
 

@@ -23,6 +23,12 @@ namespace vkShade
         return !m_activeInhibitors.empty();
     }
 
+    void MouseInputInhibitorGroup::reconcile()
+    {
+        for (MouseInputInhibitor* inhibitor : m_activeInhibitors)
+            inhibitor->reconcile();
+    }
+
     void MouseInputInhibitorGroup::restore()
     {
         // Unwind in reverse activation order so overlapping adapters restore
