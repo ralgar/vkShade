@@ -44,12 +44,12 @@ vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, SwapchainInfo swapch
 
 vkShade::ReshadeEffect::~ReshadeEffect()
 {
-    for (const auto& [name, uniform] : m_uniformsByName)
+    for (const auto& uniform : m_uniforms)
     {
         auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
         Uniform::dispatch_type(uniform.baseType, uniform.components, [&]<typename T>(std::type_identity<T>)
         {
-            preset.on_changed(m_fileName, name).disconnect<&ReshadeEffect::on_uniform_changed<T>>(this);
+            preset.on_changed(m_fileName, uniform.name).disconnect<&ReshadeEffect::on_uniform_changed<T>>(this);
         });
     }
 
@@ -1059,7 +1059,7 @@ void vkShade::ReshadeEffect::reflect_uniforms()
         for (uint32_t i = 0; i < metadata.components; i++)
             metadata.defaultValues[i] = getComponentDefault(uniform, i);
 
-        m_uniformsByName[uniform.name] = metadata;
+        m_uniforms.push_back(metadata);
 
         // Subscribe to changes and set the initial value.
         auto& preset = vkShade::Locator<vkShade::ConfigManager>::get().preset();
