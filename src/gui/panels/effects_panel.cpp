@@ -5,6 +5,7 @@
 #include "core/service_locator.hpp"
 #include "../gui_helpers.hpp"
 #include "../gui_style.hpp"
+#include "imgui.h"
 
 vkShade::EffectsPanel::EffectsPanel()
     : m_config(vkShade::Locator<ConfigManager>::get().app()),
@@ -14,31 +15,20 @@ vkShade::EffectsPanel::EffectsPanel()
 
 void vkShade::EffectsPanel::render()
 {
-    render_controls_bar();
+    ImVec2 contentSize = ImGui::GetContentRegionAvail();
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    float uniformHeight = contentSize.y * 0.5f;
+    float effectsHeight = contentSize.y - uniformHeight - ImGui::GetStyle().ItemSpacing.y * 2;
 
+    // Effects section
+    ImGui::BeginChild("EffectsSection", ImVec2(0, effectsHeight), false);
     render_effect_lists();
+    ImGui::EndChild();
 
-    ImGui::Spacing();
-
+    // Uniforms section
+    ImGui::BeginChild("UniformsSection", ImVec2(0, uniformHeight), false);
     render_uniform_controls();
-}
-
-void vkShade::EffectsPanel::render_controls_bar()
-{
-    const char* label = "Reload Active Effects";
-    float buttonWidth = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttonWidth);
-
-    if (ImGui::Button(label))
-    {
-        Events::ReloadEffects event {};
-        m_eventBus.enqueue(event);
-    }
+    ImGui::EndChild();
 }
 
 void vkShade::EffectsPanel::render_effect_lists()
@@ -88,146 +78,146 @@ void vkShade::EffectsPanel::render_effect_lists()
         }
     }
 
-    // Calculate available space for list boxes
-    float availableWidth = ImGui::GetContentRegionAvail().x;
-    float availableHeight = ImGui::GetContentRegionAvail().y;
-
-    // Reserve space for control buttons section (separator + spacing + buttons + spacing + info text)
-    float controlButtonsHeight = UIStyle::ITEM_SPACING_Y * 3 + UIStyle::BUTTON_HEIGHT + 20.0f; // adjust as needed
-    float listHeight = availableHeight - controlButtonsHeight;
-
-    if (listHeight < UIStyle::LISTBOX_MIN_HEIGHT)
-        listHeight = UIStyle::LISTBOX_MIN_HEIGHT;
-
-    float listWidth = (availableWidth - UIStyle::ITEM_SPACING_X * 2 - 80.0f) * 0.5f;
-
-    float moveButtonsHeight = UIStyle::BUTTON_HEIGHT + ImGui::GetStyle().ItemSpacing.y * 2;
-
-    ImGui::BeginGroup();
-
-    // Available Effects column
+    // Draw the widget
+    // We use a table to keep the layout aligned
+    if (ImGui::BeginTable("EffectsLayout", 3, ImGuiTableFlags_SizingStretchSame))
     {
-        ImGui::BeginChild("AvailableColumn", ImVec2(listWidth, listHeight), false);
-        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Available Effects");
-        ImGui::Spacing();
+        ImGui::TableSetupColumn("Available", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+        ImGui::TableSetupColumn("Active", ImGuiTableColumnFlags_WidthStretch);
 
-        // Content section (scrollable)
+        // Row 0: Header
         {
-            float headerHeight = ImGui::GetCursorPosY();
-            ImGui::BeginChild("AvailableScrollRegion",
-                              ImVec2(0, listHeight - headerHeight - moveButtonsHeight),
-                              false,
-                              ImGuiWindowFlags_None);
+            ImGui::TableNextRow();
 
-            if (render_effect_listbox("##AvailableEffects", availableEffects, m_selectedAvailable, ImVec2(-FLT_MIN, -FLT_MIN)))
-                m_selectedActive = -1;  // When we select in this listbox, deselect in the other.
+            ImGui::TableSetColumnIndex(0);
 
-            ImGui::EndChild();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("Available Effects");
+
+            // Nothing in column 1
+
+            ImGui::TableSetColumnIndex(2);
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("Active Effects");
+
+            ImGui::SameLine();
+            float buttonWidth = ImGui::CalcTextSize("Reload").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttonWidth);
+
+            if (ImGui::Button("Reload"))
+            {
+                Events::ReloadEffects event {};
+                m_eventBus.enqueue(event);
+            }
         }
 
-        ImGui::EndChild();
+        // Row 1: Effect Lists
+        {
+            ImGui::TableNextRow();
+
+            // We subtract the button height from the listbox Y, to reserve space for row 2 buttons.
+            float buttonHeight = UIStyle::BUTTON_HEIGHT + ImGui::GetStyle().FramePadding.y * 2;
+
+            // Available Effects Cell
+            ImGui::TableSetColumnIndex(0);
+            {
+                if (render_effect_listbox("##AvailableEffects", availableEffects, m_selectedAvailable,
+                                          ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - buttonHeight)))
+                    m_selectedActive = -1;  // When we select in this listbox, deselect in the other.
+            }
+
+            // Center Buttons Cell
+            ImGui::TableSetColumnIndex(1);
+            {
+                // Add vertical centering
+                float buttonRegionHeight = UIStyle::BUTTON_HEIGHT * 2 + UIStyle::ITEM_SPACING_Y;
+                float verticalOffset = (ImGui::GetContentRegionAvail().y - buttonRegionHeight) * 0.5f;
+                if (verticalOffset > 0) {
+                    ImGui::Dummy(ImVec2(0, verticalOffset));
+                }
+
+                bool canActivate = m_selectedAvailable >= 0 &&
+                                   m_selectedAvailable < (int32_t)availableEffects.size();
+
+                ImVec2 btnSize(-FLT_MIN, UIStyle::BUTTON_HEIGHT);
+
+                if (UI::Button(">>##Activate", btnSize, canActivate, "Activate selected effect"))
+                {
+                    std::string effect = availableEffects[m_selectedAvailable];
+                    // Add to active list
+                    activeEffects.push_back(effect);
+                    m_preset.set("", "Effects", activeEffects);
+                    m_selectedAvailable = -1;
+                }
+
+                bool canDeactivate = m_selectedActive >= 0 &&
+                                     m_selectedActive < (int32_t)activeEffects.size();
+
+                if (UI::Button("<<##Deactivate", btnSize, canDeactivate, "Deactivate selected effect"))
+                {
+                    // Remove from active list
+                    activeEffects.erase(activeEffects.begin() + m_selectedActive);
+                    m_preset.set("", "Effects", activeEffects);
+                    m_selectedActive = -1;
+                }
+            }
+
+            // Active Effects column
+            ImGui::TableSetColumnIndex(2);
+            {
+                std::unordered_set<std::string> flaggedEffects;
+                for (const auto& effect : activeEffects)
+                    if (!loadedSet.count(effect))
+                        flaggedEffects.insert(effect);
+
+                if (render_effect_listbox("##ActiveEffects", activeEffects, m_selectedActive,
+                                          ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - buttonHeight), flaggedEffects))
+                    m_selectedAvailable = -1;   // When we select in this listbox, deselect in the other.
+            }
+        }
+
+        // Row 2: Footer
+        {
+            ImGui::TableNextRow();
+
+            // Nothing in column 0
+
+            // Nothing in column 1
+
+            // Move Up/Down buttons, centered under the active list
+            ImGui::TableSetColumnIndex(2);
+
+            ImGui::Spacing();
+            bool canMoveUp   = m_selectedActive > 0;
+            bool canMoveDown = m_selectedActive >= 0 &&
+                               m_selectedActive < (int32_t)activeEffects.size() - 1;
+
+            float btnWidth   = 80.0f;
+            float totalWidth = btnWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
+            float indent     = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
+            if (indent > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+
+            if (UI::Button("Move Up", ImVec2(btnWidth, 0), canMoveUp))
+            {
+                std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive - 1]);
+                m_preset.set("", "Effects", activeEffects);
+                m_selectedActive--;
+            }
+
+            ImGui::SameLine();
+
+            if (UI::Button("Move Down", ImVec2(btnWidth, 0), canMoveDown))
+            {
+                std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive + 1]);
+                m_preset.set("", "Effects", activeEffects);
+                m_selectedActive++;
+            }
+
+            ImGui::EndTable();
+        }
     }
-
-    ImGui::SameLine();
-
-    // Center buttons column
-    {
-        ImGui::BeginChild("ButtonsColumn", ImVec2(80.0f, listHeight), false);
-
-        // Add vertical centering
-        float buttonRegionHeight = UIStyle::BUTTON_HEIGHT * 2 + UIStyle::ITEM_SPACING_Y;
-        float verticalOffset = (listHeight - moveButtonsHeight - buttonRegionHeight) * 0.5f;
-        if (verticalOffset > 0) {
-            ImGui::Dummy(ImVec2(0, verticalOffset));
-        }
-
-        bool canActivate = m_selectedAvailable >= 0 &&
-                           m_selectedAvailable < (int32_t)availableEffects.size();
-
-        ImVec2 btnSize(-FLT_MIN, UIStyle::BUTTON_HEIGHT);
-
-        if (UI::Button(">>##Activate", btnSize, canActivate, "Activate selected effect"))
-        {
-            std::string effect = availableEffects[m_selectedAvailable];
-            // Add to active list
-            activeEffects.push_back(effect);
-            m_preset.set("", "Effects", activeEffects);
-            m_selectedAvailable = -1;
-        }
-
-        bool canDeactivate = m_selectedActive >= 0 &&
-                             m_selectedActive < (int32_t)activeEffects.size();
-
-        if (UI::Button("<<##Deactivate", btnSize, canDeactivate, "Deactivate selected effect"))
-        {
-            // Remove from active list
-            activeEffects.erase(activeEffects.begin() + m_selectedActive);
-            m_preset.set("", "Effects", activeEffects);
-            m_selectedActive = -1;
-        }
-
-        ImGui::EndChild();
-    }
-
-    ImGui::SameLine();
-
-    // Active Effects column
-    {
-        ImGui::BeginChild("ActiveColumn", ImVec2(listWidth, listHeight), false);
-        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Active Effects (Ordered)");
-        ImGui::Spacing();
-
-        std::unordered_set<std::string> flaggedEffects;
-        for (const auto& effect : activeEffects)
-            if (!loadedSet.count(effect))
-                flaggedEffects.insert(effect);
-
-        // Content section (scrollable)
-        {
-            float headerHeight = ImGui::GetCursorPosY();
-            ImGui::BeginChild("ActiveScrollRegion",
-                              ImVec2(0, listHeight - headerHeight - moveButtonsHeight),
-                              false,
-                              ImGuiWindowFlags_None);
-
-            if (render_effect_listbox("##ActiveEffects", activeEffects, m_selectedActive,
-                                      ImVec2(-FLT_MIN, -FLT_MIN), flaggedEffects))
-                m_selectedAvailable = -1;   // When we select in this listbox, deselect in the other.
-
-            ImGui::EndChild();
-        }
-
-        // Move Up/Down buttons, centered under the active list
-        ImGui::Spacing();
-        bool canMoveUp   = m_selectedActive > 0;
-        bool canMoveDown = m_selectedActive >= 0 &&
-                           m_selectedActive < (int32_t)activeEffects.size() - 1;
-
-        float btnWidth   = 80.0f;
-        float totalWidth = btnWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
-        float indent     = (listWidth - totalWidth) * 0.5f;
-        if (indent > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
-
-        if (UI::Button("Move Up", ImVec2(btnWidth, 0), canMoveUp))
-        {
-            std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive - 1]);
-            m_preset.set("", "Effects", activeEffects);
-            m_selectedActive--;
-        }
-
-        ImGui::SameLine();
-
-        if (UI::Button("Move Down", ImVec2(btnWidth, 0), canMoveDown))
-        {
-            std::swap(activeEffects[m_selectedActive], activeEffects[m_selectedActive + 1]);
-            m_preset.set("", "Effects", activeEffects);
-            m_selectedActive++;
-        }
-
-        ImGui::EndChild();
-    }
-
-    ImGui::EndGroup();
 }
 
 void vkShade::EffectsPanel::render_uniform_controls()
