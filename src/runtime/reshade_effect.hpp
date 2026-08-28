@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <glm/glm.hpp>
+#include <unordered_map>
 #include <vulkan/vulkan_core.h>
 
 #include "core/logger.hpp"
@@ -41,6 +42,9 @@ namespace vkShade
         void bind_input(VulkanImage& colorImage, VulkanImage& depthImage);
         void update(const ReshadeFrameState& frame);
 
+        std::string name() { return m_fileName; }
+        std::vector<Uniform> uniforms() const { return m_uniforms; }
+
     private:
         struct Pass
         {
@@ -58,7 +62,7 @@ namespace vkShade
 
         std::unique_ptr<reshadefx::effect_module> m_module {nullptr};
         std::unique_ptr<VulkanBuffer> m_uniformBuffer {nullptr};
-        std::unordered_map<std::string, Uniform> m_uniformsByName;
+        std::vector<Uniform> m_uniforms;
         std::vector<std::unique_ptr<ReshadeUniform>> m_builtinUniforms;
 
         VkDescriptorPool m_descriptorPool;
@@ -75,15 +79,13 @@ namespace vkShade
 
         Uniform* find_uniform(const std::string& name)
         {
-            auto it = m_uniformsByName.find(name);
-            if (it != m_uniformsByName.end())
+            for (auto& uniform : m_uniforms)
             {
-                return &it->second;
+                if (uniform.name == name)
+                    return &uniform;
             }
-            else
-            {
-                return nullptr;
-            }
+
+            return nullptr;
         }
 
         template<typename T>
@@ -91,13 +93,11 @@ namespace vkShade
         {
             // Search for the uniform by name
             const Uniform* uniform = nullptr;
-            auto it = m_uniformsByName.find(name);
-            if (it == m_uniformsByName.end())
+            for (auto& u : m_uniforms)
             {
-                Logger::error("Uniform '{}' not found", name);
-                return;
+                if (u.name == name)
+                    uniform = &u;
             }
-            uniform = &it->second;
 
             // Make sure the type is correct
             if (uniform->baseType != UniformTraits<T>::base ||
