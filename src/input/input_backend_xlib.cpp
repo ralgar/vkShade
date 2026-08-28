@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "core/logger.hpp"
+#include "xinput_raw_motion.hpp"
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -41,41 +42,43 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
     // Initialize previous key states
     std::memset(m_previousKeymap, 0, sizeof(m_previousKeymap));
 
-    // Observe raw wheel button events without selecting exclusive core button
-    // events from the application's window.
-    m_wheelDisplay = XOpenDisplay(DisplayString(m_display));
-    if (m_wheelDisplay)
+    // A private XI2 subscription avoids exclusive core-event selection and
+    // remains observable when a different X client owns the core pointer grab.
+    m_xiObserverDisplay = XOpenDisplay(DisplayString(m_display));
+    if (m_xiObserverDisplay)
     {
-        m_topLevelWindow = get_top_level_window(m_wheelDisplay, m_window);
+        m_topLevelWindow = get_top_level_window(m_xiObserverDisplay, m_window);
         int event = 0;
         int error = 0;
         int major = 2;
         int minor = 0;
-        const bool xi2Available = XQueryExtension(m_wheelDisplay, "XInputExtension",
-            &m_wheelXiOpcode, &event, &error) && XIQueryVersion(m_wheelDisplay, &major, &minor) == Success;
+        const bool xi2Available = XQueryExtension(m_xiObserverDisplay, "XInputExtension",
+            &m_xiObserverOpcode, &event, &error) && XIQueryVersion(m_xiObserverDisplay, &major, &minor) == Success;
 
         if (xi2Available)
         {
-            unsigned char mask[XIMaskLen(XI_RawButtonPress)] {};
+            unsigned char mask[XIMaskLen(XI_LASTEVENT)] {};
+            XISetMask(mask, XI_RawMotion);
             XISetMask(mask, XI_RawButtonPress);
+            XISetMask(mask, XI_RawButtonRelease);
             XIEventMask eventMask {
-                .deviceid = XIAllMasterDevices,
+                .deviceid = XIAllDevices,
                 .mask_len = static_cast<int>(sizeof(mask)),
                 .mask = mask,
             };
-            XISelectEvents(m_wheelDisplay, DefaultRootWindow(m_wheelDisplay), &eventMask, 1);
-            XFlush(m_wheelDisplay);
+            XISelectEvents(m_xiObserverDisplay, DefaultRootWindow(m_xiObserverDisplay), &eventMask, 1);
+            XFlush(m_xiObserverDisplay);
         }
         else
         {
-            Logger::warn("[Xlib] XInput2 is unavailable for mouse wheel input");
-            XCloseDisplay(m_wheelDisplay);
-            m_wheelDisplay = nullptr;
+            Logger::warn("[Xlib] XInput2 is unavailable for mouse input observation");
+            XCloseDisplay(m_xiObserverDisplay);
+            m_xiObserverDisplay = nullptr;
         }
     }
     else
     {
-        Logger::warn("[Xlib] Could not open a display connection for mouse wheel input");
+        Logger::warn("[Xlib] Could not open a display connection for mouse input observation");
     }
 
     initialize_mouse_capture(*this);
@@ -84,8 +87,8 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
 vkShade::InputBackendXlib::~InputBackendXlib()
 {
     shutdown_mouse_capture();
-    if (m_wheelDisplay)
-        XCloseDisplay(m_wheelDisplay);
+    if (m_xiObserverDisplay)
+        XCloseDisplay(m_xiObserverDisplay);
 }
 
 void vkShade::InputBackendXlib::prepare_for_surface_replacement(
@@ -130,6 +133,12 @@ vkShade::MouseCaptureAttempt vkShade::InputBackendXlib::acquire()
     if (m_mouseCaptured)
         return {get_status(), false};
 
+    if (!m_captureRequested)
+    {
+        m_captureRequested = true;
+        initialize_virtual_cursor();
+    }
+
     m_mouseCaptured = begin_mouse_capture();
     if (!m_mouseCaptured)
         return {MouseCaptureStatus::Inactive, true};
@@ -140,12 +149,76 @@ vkShade::MouseCaptureAttempt vkShade::InputBackendXlib::acquire()
 
 void vkShade::InputBackendXlib::release()
 {
+    m_captureRequested = false;
+    m_lastGrabFailure.reset();
     if (!m_mouseCaptured && !m_captureDisplay)
         return;
 
     end_mouse_capture();
     m_mouseCaptured = false;
     Logger::debug("[Xlib] Mouse input returned to application");
+}
+
+void vkShade::InputBackendXlib::initialize_virtual_cursor()
+{
+    XWindowAttributes attributes {};
+    m_applicationPointerEventMask = 0;
+    if (!XGetWindowAttributes(m_display, m_window, &attributes))
+        return;
+
+    m_applicationPointerEventMask =
+        static_cast<unsigned int>(attributes.your_event_mask)
+        & ALL_POINTER_EVENT_MASKS;
+
+    Window child = None;
+    int rootX = 0;
+    int rootY = 0;
+    XTranslateCoordinates(m_display, m_window, DefaultRootWindow(m_display),
+                          0, 0, &rootX, &rootY, &child);
+
+    m_windowSize = {
+        static_cast<float>(attributes.width),
+        static_cast<float>(attributes.height),
+    };
+    const glm::vec2 bounds {
+        std::max(0.0f, m_windowSize.x - 1.0f),
+        std::max(0.0f, m_windowSize.y - 1.0f),
+    };
+    const glm::vec2 center = m_windowSize * 0.5f;
+    m_windowRootPosition = {
+        static_cast<float>(rootX),
+        static_cast<float>(rootY),
+    };
+    const glm::vec2 warpPosition = m_windowRootPosition + center;
+    m_virtualCursor.set_bounds(bounds);
+    glm::vec2 initialPosition = center;
+    glm::vec2 initialRootPosition = warpPosition;
+    Window pointerRoot = None;
+    Window pointerChild = None;
+    int pointerRootX = 0;
+    int pointerRootY = 0;
+    int pointerWindowX = 0;
+    int pointerWindowY = 0;
+    unsigned int pointerMask = 0;
+    if (XQueryPointer(
+            m_display, m_window, &pointerRoot, &pointerChild,
+            &pointerRootX, &pointerRootY, &pointerWindowX, &pointerWindowY,
+            &pointerMask)
+        && pointerWindowX >= 0 && pointerWindowY >= 0
+        && pointerWindowX < attributes.width && pointerWindowY < attributes.height)
+    {
+        initialPosition = {
+            static_cast<float>(pointerWindowX),
+            static_cast<float>(pointerWindowY),
+        };
+        initialRootPosition = {
+            static_cast<float>(pointerRootX),
+            static_cast<float>(pointerRootY),
+        };
+    }
+    m_virtualCursor.reset(initialPosition, initialRootPosition);
+    m_virtualCursor.set_warp_position(warpPosition);
+    handle_mouse_motion_event(initialPosition.x, initialPosition.y);
 }
 
 vkShade::MouseCaptureStatus vkShade::InputBackendXlib::get_status() const
@@ -171,41 +244,6 @@ bool vkShade::InputBackendXlib::begin_mouse_capture()
     const Window root = DefaultRootWindow(m_captureDisplay);
     m_topLevelWindow = get_top_level_window(m_captureDisplay, m_window);
 
-    XWindowAttributes windowAttributes {};
-    m_applicationPointerEventMask = 0;
-    if (XGetWindowAttributes(m_display, m_window, &windowAttributes))
-    {
-        m_applicationPointerEventMask =
-            static_cast<unsigned int>(windowAttributes.your_event_mask) & ALL_POINTER_EVENT_MASKS;
-        Window child = None;
-        int rootX = 0;
-        int rootY = 0;
-        XTranslateCoordinates(m_display, m_window, DefaultRootWindow(m_display),
-                              0, 0, &rootX, &rootY, &child);
-
-        m_windowSize = {
-            static_cast<float>(windowAttributes.width),
-            static_cast<float>(windowAttributes.height),
-        };
-        const glm::vec2 bounds {
-            std::max(0.0f, m_windowSize.x - 1.0f),
-            std::max(0.0f, m_windowSize.y - 1.0f),
-        };
-        const glm::vec2 center = m_windowSize * 0.5f;
-        m_windowRootPosition = {
-            static_cast<float>(rootX),
-            static_cast<float>(rootY),
-        };
-        const glm::vec2 warpPosition {
-            m_windowRootPosition.x + center.x,
-            m_windowRootPosition.y + center.y,
-        };
-        m_virtualCursor.set_bounds(bounds);
-        m_virtualCursor.reset(center, warpPosition);
-        m_virtualCursor.set_warp_position(warpPosition);
-        handle_mouse_motion_event(center.x, center.y);
-    }
-
     m_captureWindow = XCreateWindow(
         m_captureDisplay, root, -1, -1, 1, 1, 0, CopyFromParent, InputOutput,
         CopyFromParent, CWOverrideRedirect | CWEventMask, &attributes);
@@ -224,7 +262,17 @@ bool vkShade::InputBackendXlib::begin_mouse_capture()
 
     if (grabStatus != GrabSuccess)
     {
-        Logger::warn("[Xlib] Could not capture pointer for overlay (grab status {})", grabStatus);
+        if (!m_lastGrabFailure || *m_lastGrabFailure != grabStatus)
+        {
+            Logger::warn(
+                "[Xlib] Could not capture pointer for overlay (grab status {})", grabStatus);
+        }
+        else
+        {
+            Logger::trace(
+                "[Xlib] Pointer capture remains pending (grab status {})", grabStatus);
+        }
+        m_lastGrabFailure = grabStatus;
         XFreeCursor(m_captureDisplay, m_hiddenCursor);
         XDestroyWindow(m_captureDisplay, m_captureWindow);
         XCloseDisplay(m_captureDisplay);
@@ -235,6 +283,7 @@ bool vkShade::InputBackendXlib::begin_mouse_capture()
         return false;
     }
 
+    m_lastGrabFailure.reset();
     suspend_raw_mouse_input();
     synchronize_cursor_to_pointer();
     m_lastFocusActive.reset();
@@ -262,6 +311,82 @@ void vkShade::InputBackendXlib::end_mouse_capture()
     restore_pointer_grab();
 }
 
+Window vkShade::InputBackendXlib::get_top_level_window(Display* display, Window window)
+{
+    // Focus properties may identify a Wine child or window-manager frame, so comparisons use top-level identities.
+    Window root = None;
+    Window parent = None;
+    Window* children = nullptr;
+    unsigned int childCount = 0;
+    Window current = window;
+
+    while (XQueryTree(display, current, &root, &parent, &children, &childCount))
+    {
+        if (children)
+            XFree(children);
+        if (parent == None || parent == root)
+            return current;
+        current = parent;
+    }
+    return window;
+}
+
+bool vkShade::InputBackendXlib::is_window_active(Display* display)
+{
+    // Root-window XI2 events are shared across X11 clients, so forward them only while this surface owns focus.
+    Window focusWindow = None;
+    int revertTo = RevertToNone;
+    XGetInputFocus(display, &focusWindow, &revertTo);
+    if (focusWindow == None || focusWindow == PointerRoot
+        || get_top_level_window(display, focusWindow) != m_topLevelWindow)
+        return false;
+
+    const Atom activeWindowAtom =
+        XInternAtom(display, "_NET_ACTIVE_WINDOW", True);
+    if (activeWindowAtom == None)
+        return true;
+
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long itemCount = 0;
+    unsigned long remaining = 0;
+    unsigned char* data = nullptr;
+    const int result = XGetWindowProperty(
+        display, DefaultRootWindow(display), activeWindowAtom,
+        0, 1, False, XA_WINDOW, &actualType, &actualFormat,
+        &itemCount, &remaining, &data);
+    Window activeWindow = None;
+    if (result == Success && actualType == XA_WINDOW && actualFormat == 32 && itemCount == 1)
+        activeWindow = *reinterpret_cast<Window*>(data);
+    if (data)
+        XFree(data);
+
+    return activeWindow == None
+        || get_top_level_window(display, activeWindow) == m_topLevelWindow;
+}
+
+bool vkShade::InputBackendXlib::is_pointer_inside_window(Display* display)
+{
+    // Keyboard focus may remain here after the pointer leaves, but the global XI2 observer continues receiving events.
+    XWindowAttributes attributes {};
+    if (!XGetWindowAttributes(display, m_window, &attributes))
+        return false;
+
+    Window root = None;
+    Window child = None;
+    int rootX = 0;
+    int rootY = 0;
+    int windowX = 0;
+    int windowY = 0;
+    unsigned int mask = 0;
+    if (!XQueryPointer(display, m_window, &root, &child,
+                       &rootX, &rootY, &windowX, &windowY, &mask))
+        return false;
+
+    return windowX >= 0 && windowY >= 0
+        && windowX < attributes.width && windowY < attributes.height;
+}
+
 int vkShade::InputBackendXlib::grab_pointer()
 {
     const int result = XGrabPointer(
@@ -278,7 +403,10 @@ int vkShade::InputBackendXlib::acquire_pointer_grab()
     if (result != AlreadyGrabbed)
         return result;
 
-    Logger::debug("[Xlib] Releasing application pointer grab for overlay");
+    Logger::trace("[Xlib] Releasing application pointer grab for overlay");
+    // A grab owned by the application's X client can only be released through
+    // its borrowed display. Remember enough state to restore it afterwards;
+    // a foreign-client grab remains untouched and falls back to XI2 observation.
     if (!m_restorePointerGrab)
     {
         m_restorePointerGrabEventMask = m_applicationPointerEventMask
@@ -289,7 +417,13 @@ int vkShade::InputBackendXlib::acquire_pointer_grab()
 
     XUngrabPointer(m_display, CurrentTime);
     XSync(m_display, False);
-    return grab_pointer();
+    result = grab_pointer();
+    if (result == AlreadyGrabbed)
+    {
+        m_restorePointerGrab = false;
+        m_restorePointerGrabEventMask = 0;
+    }
+    return result;
 }
 
 void vkShade::InputBackendXlib::restore_pointer_grab()
@@ -477,7 +611,8 @@ void vkShade::InputBackendXlib::restore_raw_mouse_input()
     }
 
     m_savedXISelections.clear();
-    XFlush(m_display);
+    if (m_display)
+        XFlush(m_display);
 }
 
 void vkShade::InputBackendXlib::handle_captured_event(const void* opaqueEvent)
@@ -498,7 +633,10 @@ void vkShade::InputBackendXlib::handle_captured_event(const void* opaqueEvent)
             if (!inside)
             {
                 m_pointerOutsideWindow = true;
-                m_virtualCursor.observe_root_motion(rootPosition);
+                const auto position = m_virtualCursor.observe_root_motion(
+                    rootPosition, localPosition);
+                if (position)
+                    handle_mouse_motion_event(position->x, position->y);
                 break;
             }
 
@@ -510,7 +648,8 @@ void vkShade::InputBackendXlib::handle_captured_event(const void* opaqueEvent)
                 break;
             }
 
-            const auto position = m_virtualCursor.observe_root_motion(rootPosition);
+            const auto position = m_virtualCursor.observe_root_motion(
+                rootPosition, localPosition);
             if (position)
                 handle_mouse_motion_event(position->x, position->y);
             break;
@@ -519,20 +658,8 @@ void vkShade::InputBackendXlib::handle_captured_event(const void* opaqueEvent)
         case ButtonRelease:
         {
             if (event.type == ButtonPress
-                && event.xbutton.button >= Button4 && event.xbutton.button <= 7)
-            {
-                if (event.xbutton.button <= Button5)
-                {
-                    handle_mouse_wheel_event(
-                        0.0f, event.xbutton.button == Button4 ? 1.0f : -1.0f);
-                }
-                else
-                {
-                    handle_mouse_wheel_event(
-                        event.xbutton.button == 6 ? 1.0f : -1.0f, 0.0f);
-                }
+                && forward_x11_wheel_button(event.xbutton.button))
                 break;
-            }
 
             MouseButton button;
             switch (event.xbutton.button)
@@ -546,6 +673,21 @@ void vkShade::InputBackendXlib::handle_captured_event(const void* opaqueEvent)
             break;
         }
     }
+}
+
+bool vkShade::InputBackendXlib::forward_x11_wheel_button(int button)
+{
+    if (button == Button4 || button == Button5)
+    {
+        handle_mouse_wheel_event(0.0f, button == Button4 ? 1.0f : -1.0f);
+        return true;
+    }
+    if (button == 6 || button == 7)
+    {
+        handle_mouse_wheel_event(button == 6 ? 1.0f : -1.0f, 0.0f);
+        return true;
+    }
+    return false;
 }
 
 void vkShade::InputBackendXlib::process_events()
@@ -586,117 +728,78 @@ void vkShade::InputBackendXlib::process_events()
     // Update previous state
     std::memcpy(m_previousKeymap, keymap, sizeof(keymap));
 
-    if (m_wheelDisplay)
+    if (m_xiObserverDisplay)
     {
-        while (XPending(m_wheelDisplay))
+        const bool hasEvents = XPending(m_xiObserverDisplay) > 0;
+        const bool windowActive = hasEvents && is_window_active(m_xiObserverDisplay);
+        const bool rawFallbackActive =
+            windowActive && m_captureRequested && !m_pointerGrabbed;
+        const bool wheelObserverActive =
+            windowActive && !m_captureRequested
+            && is_pointer_inside_window(m_xiObserverDisplay);
+
+        while (XPending(m_xiObserverDisplay))
         {
             XEvent event {};
-            XNextEvent(m_wheelDisplay, &event);
+            XNextEvent(m_xiObserverDisplay, &event);
             if (event.type != GenericEvent
-                || event.xcookie.extension != m_wheelXiOpcode
-                || event.xcookie.evtype != XI_RawButtonPress
-                || !XGetEventData(m_wheelDisplay, &event.xcookie))
+                || event.xcookie.extension != m_xiObserverOpcode
+                || !XGetEventData(m_xiObserverDisplay, &event.xcookie))
                 continue;
 
             const auto* rawEvent = static_cast<XIRawEvent*>(event.xcookie.data);
+            const int eventType = event.xcookie.evtype;
             const int button = rawEvent->detail;
-            XFreeEventData(m_wheelDisplay, &event.xcookie);
-
-            if (button >= Button4 && button <= 7
-                && is_window_active(m_wheelDisplay)
-                && is_pointer_inside_window(m_wheelDisplay))
+            // XI2 emits paired master and physical-source events. Forward only
+            // the source event so one physical action produces one GUI event.
+            const bool sourceEvent = rawEvent->deviceid == rawEvent->sourceid;
+            glm::vec2 motion {0.0f, 0.0f};
+            if (eventType == XI_RawMotion && rawFallbackActive && sourceEvent)
             {
-                if (button <= Button5)
-                {
-                    handle_mouse_wheel_event(
-                        0.0f, button == Button4 ? 1.0f : -1.0f);
-                }
-                else
-                {
-                    handle_mouse_wheel_event(
-                        button == 6 ? 1.0f : -1.0f, 0.0f);
-                }
+                motion = decode_xinput_relative_motion(
+                    std::span(
+                        rawEvent->valuators.mask,
+                        static_cast<size_t>(rawEvent->valuators.mask_len)),
+                    rawEvent->valuators.values);
             }
+            XFreeEventData(m_xiObserverDisplay, &event.xcookie);
+
+            if (eventType == XI_RawMotion && rawFallbackActive
+                && sourceEvent && motion != glm::vec2 {0.0f, 0.0f})
+            {
+                const glm::vec2 position =
+                    m_virtualCursor.observe_relative_motion(motion);
+                handle_mouse_motion_event(position.x, position.y);
+                continue;
+            }
+
+            const bool pressed = eventType == XI_RawButtonPress;
+            const bool released = eventType == XI_RawButtonRelease;
+            if (!pressed && !released)
+                continue;
+
+            if (sourceEvent && rawFallbackActive
+                && button >= Button1 && button <= Button3)
+            {
+                const MouseButton mouseButton = button == Button1
+                    ? MouseButton::LEFT
+                    : button == Button2 ? MouseButton::MIDDLE : MouseButton::RIGHT;
+                handle_mouse_button_event(mouseButton, pressed);
+                continue;
+            }
+
+            if (should_forward_xinput_wheel(
+                    button, sourceEvent, pressed,
+                    rawFallbackActive, wheelObserverActive))
+                forward_x11_wheel_button(button);
         }
+
     }
 
-    if (!m_mouseCaptured)
+    // Absolute polling observes application center-warps. During capture the
+    // private grab or XI2 fallback owns the virtual cursor instead.
+    if (!m_captureRequested)
         query_mouse_state();
-}
-
-Window vkShade::InputBackendXlib::get_top_level_window(Display* display, Window window)
-{
-    // Focus properties may identify a Wine child or window-manager frame, so comparisons use top-level identities.
-    Window root = None;
-    Window parent = None;
-    Window* children = nullptr;
-    unsigned int childCount = 0;
-    Window current = window;
-
-    while (XQueryTree(display, current, &root, &parent, &children, &childCount))
-    {
-        if (children)
-            XFree(children);
-        if (parent == None || parent == root)
-            return current;
-        current = parent;
-    }
-    return window;
-}
-
-bool vkShade::InputBackendXlib::is_window_active(Display* display)
-{
-    // Root-window XI2 events are shared across X11 clients, so forward them only while this surface owns focus.
-    Window focusWindow = None;
-    int revertTo = RevertToNone;
-    XGetInputFocus(display, &focusWindow, &revertTo);
-    if (focusWindow == None || focusWindow == PointerRoot
-        || get_top_level_window(display, focusWindow) != m_topLevelWindow)
-        return false;
-
-    const Atom activeWindowAtom = XInternAtom(display, "_NET_ACTIVE_WINDOW", True);
-    if (activeWindowAtom == None)
-        return true;
-
-    Atom actualType = None;
-    int actualFormat = 0;
-    unsigned long itemCount = 0;
-    unsigned long remaining = 0;
-    unsigned char* data = nullptr;
-    const int result = XGetWindowProperty(
-        display, DefaultRootWindow(display), activeWindowAtom,
-        0, 1, False, XA_WINDOW, &actualType, &actualFormat,
-        &itemCount, &remaining, &data);
-    Window activeWindow = None;
-    if (result == Success && actualType == XA_WINDOW && actualFormat == 32 && itemCount == 1)
-        activeWindow = *reinterpret_cast<Window*>(data);
-    if (data)
-        XFree(data);
-
-    return activeWindow == None
-        || get_top_level_window(display, activeWindow) == m_topLevelWindow;
-}
-
-bool vkShade::InputBackendXlib::is_pointer_inside_window(Display* display)
-{
-    // Keyboard focus may remain here after the pointer leaves, but the global XI2 observer continues receiving events.
-    XWindowAttributes attributes {};
-    if (!XGetWindowAttributes(display, m_window, &attributes))
-        return false;
-
-    Window root = None;
-    Window child = None;
-    int rootX = 0;
-    int rootY = 0;
-    int windowX = 0;
-    int windowY = 0;
-    unsigned int mask = 0;
-    if (!XQueryPointer(display, m_window, &root, &child,
-                       &rootX, &rootY, &windowX, &windowY, &mask))
-        return false;
-
-    return windowX >= 0 && windowY >= 0
-        && windowX < attributes.width && windowY < attributes.height;
 }
 
 void vkShade::InputBackendXlib::handle_key_event(uint32_t keyCode, bool pressed)
