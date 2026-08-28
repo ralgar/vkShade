@@ -183,18 +183,22 @@ bool vkShade::InputBackendXlib::begin_mouse_capture()
         XTranslateCoordinates(m_display, m_window, DefaultRootWindow(m_display),
                               0, 0, &rootX, &rootY, &child);
 
-        const glm::vec2 size {
+        m_windowSize = {
             static_cast<float>(windowAttributes.width),
             static_cast<float>(windowAttributes.height),
         };
         const glm::vec2 bounds {
-            std::max(0.0f, static_cast<float>(windowAttributes.width) - 1.0f),
-            std::max(0.0f, static_cast<float>(windowAttributes.height) - 1.0f),
+            std::max(0.0f, m_windowSize.x - 1.0f),
+            std::max(0.0f, m_windowSize.y - 1.0f),
         };
-        const glm::vec2 center = size * 0.5f;
+        const glm::vec2 center = m_windowSize * 0.5f;
+        m_windowRootPosition = {
+            static_cast<float>(rootX),
+            static_cast<float>(rootY),
+        };
         const glm::vec2 warpPosition {
-            static_cast<float>(rootX) + center.x,
-            static_cast<float>(rootY) + center.y,
+            m_windowRootPosition.x + center.x,
+            m_windowRootPosition.y + center.y,
         };
         m_virtualCursor.set_bounds(bounds);
         m_virtualCursor.reset(center, warpPosition);
@@ -232,6 +236,7 @@ bool vkShade::InputBackendXlib::begin_mouse_capture()
     }
 
     suspend_raw_mouse_input();
+    synchronize_cursor_to_pointer();
     m_lastFocusActive.reset();
     return true;
 }
@@ -311,6 +316,7 @@ void vkShade::InputBackendXlib::reconcile_focus()
         return;
 
     const bool active = is_window_active(m_captureDisplay);
+    const bool pointerWasGrabbed = m_pointerGrabbed;
     if (!active && m_pointerGrabbed)
     {
         XUngrabPointer(m_captureDisplay, CurrentTime);
@@ -332,12 +338,75 @@ void vkShade::InputBackendXlib::reconcile_focus()
         }
     }
 
+    if (!pointerWasGrabbed && m_pointerGrabbed)
+        synchronize_cursor_to_pointer();
+
     if (m_lastFocusActive && active != *m_lastFocusActive)
     {
         Logger::debug("[Xlib] Overlay pointer grab {} after focus change",
                       active ? (m_pointerGrabbed ? "restored" : "pending") : "released");
     }
     m_lastFocusActive = active;
+}
+
+void vkShade::InputBackendXlib::synchronize_cursor_to_pointer()
+{
+    XWindowAttributes attributes {};
+    if (!XGetWindowAttributes(m_captureDisplay, m_window, &attributes))
+        return;
+
+    Window translatedChild = None;
+    int windowRootX = 0;
+    int windowRootY = 0;
+    XTranslateCoordinates(
+        m_captureDisplay, m_window, DefaultRootWindow(m_captureDisplay),
+        0, 0, &windowRootX, &windowRootY, &translatedChild);
+
+    m_windowRootPosition = {
+        static_cast<float>(windowRootX),
+        static_cast<float>(windowRootY),
+    };
+    m_windowSize = {
+        static_cast<float>(attributes.width),
+        static_cast<float>(attributes.height),
+    };
+    const glm::vec2 bounds {
+        std::max(0.0f, m_windowSize.x - 1.0f),
+        std::max(0.0f, m_windowSize.y - 1.0f),
+    };
+    const glm::vec2 center = m_windowSize * 0.5f;
+    m_virtualCursor.set_bounds(bounds);
+    m_virtualCursor.set_warp_position(m_windowRootPosition + center);
+
+    Window root = None;
+    Window child = None;
+    int rootX = 0;
+    int rootY = 0;
+    int windowX = 0;
+    int windowY = 0;
+    unsigned int mask = 0;
+    if (!XQueryPointer(m_captureDisplay, m_window, &root, &child,
+                       &rootX, &rootY, &windowX, &windowY, &mask))
+        return;
+
+    const glm::vec2 localPosition {
+        static_cast<float>(windowX),
+        static_cast<float>(windowY),
+    };
+    const glm::vec2 rootPosition {
+        static_cast<float>(rootX),
+        static_cast<float>(rootY),
+    };
+    const bool inside = localPosition.x >= 0.0f && localPosition.y >= 0.0f
+                     && localPosition.x < m_windowSize.x
+                     && localPosition.y < m_windowSize.y;
+    m_pointerOutsideWindow = !inside;
+    if (!inside)
+        return;
+
+    m_virtualCursor.reset(localPosition, rootPosition);
+    handle_mouse_motion_event(localPosition.x, localPosition.y);
+    Logger::debug("[Xlib] Synchronized overlay cursor after pointer capture");
 }
 
 void vkShade::InputBackendXlib::suspend_raw_mouse_input()
@@ -422,6 +491,25 @@ void vkShade::InputBackendXlib::handle_captured_event(const void* opaqueEvent)
                 static_cast<float>(event.xmotion.x_root),
                 static_cast<float>(event.xmotion.y_root),
             };
+            const glm::vec2 localPosition = rootPosition - m_windowRootPosition;
+            const bool inside = localPosition.x >= 0.0f && localPosition.y >= 0.0f
+                             && localPosition.x < m_windowSize.x
+                             && localPosition.y < m_windowSize.y;
+            if (!inside)
+            {
+                m_pointerOutsideWindow = true;
+                m_virtualCursor.observe_root_motion(rootPosition);
+                break;
+            }
+
+            if (m_pointerOutsideWindow)
+            {
+                m_pointerOutsideWindow = false;
+                m_virtualCursor.reset(localPosition, rootPosition);
+                handle_mouse_motion_event(localPosition.x, localPosition.y);
+                break;
+            }
+
             const auto position = m_virtualCursor.observe_root_motion(rootPosition);
             if (position)
                 handle_mouse_motion_event(position->x, position->y);

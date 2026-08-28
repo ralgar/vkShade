@@ -58,6 +58,9 @@ namespace vkShade
         std::optional<bool> m_lastFocusActive;
         std::chrono::steady_clock::time_point m_nextGrabRetry {};
         VirtualMouseCursor m_virtualCursor {{0.0f, 0.0f}};
+        glm::vec2 m_windowRootPosition {0.0f, 0.0f};
+        glm::vec2 m_windowSize {0.0f, 0.0f};
+        bool m_pointerOutsideWindow {false};
         std::vector<XISelection> m_savedXISelections;
 
         void handle_key_event(uint32_t keyCode, bool pressed);
@@ -73,6 +76,7 @@ namespace vkShade
         void handle_captured_event(const void* event);
         int grab_pointer();
         int acquire_pointer_grab();
+        void synchronize_cursor_to_pointer();
         void restore_pointer_grab();
         void reconcile_focus();
     };
