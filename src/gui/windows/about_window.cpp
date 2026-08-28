@@ -7,7 +7,8 @@
 void vkShade::AboutWindow::render()
 {
     ImGui::SetNextWindowSize(ImVec2(300, 160), ImGuiCond_Always);
-    if (ImGui::Begin("About", &m_visible, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
+    if (ImGui::Begin("About", &m_visible,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
     {
         // Center the title
         float windowWidth = ImGui::GetContentRegionAvail().x;
