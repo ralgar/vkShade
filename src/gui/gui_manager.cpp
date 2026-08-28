@@ -49,6 +49,7 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 	// This initializes ImGui for Vulkan.
 	ImGui_ImplVulkan_InitInfo init_info = {};
@@ -169,6 +170,9 @@ void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
 
     // Draw the GUI
     ImGui::NewFrame();
+
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
+        ImGuiDockNodeFlags_NoDockingOverCentralNode | ImGuiDockNodeFlags_PassthruCentralNode);
 
     if (m_mainWindow.visible())
     {

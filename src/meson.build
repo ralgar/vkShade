@@ -8,7 +8,7 @@ version_hpp = declare_dependency(
 )
 
 glm = dependency('glm', fallback: ['glm', 'glm_dep'])
-imgui = dependency('imgui', fallback: ['imgui', 'imgui_dep'], static: true)
+imgui = dependency('imgui-docking', fallback: ['imgui-docking', 'imgui_dep'], static: true)
 inih = dependency('inih', fallback: ['inih', 'inih_dep'], static: true)
 magic_enum = dependency('magic_enum', fallback: ['magic_enum', 'magic_enum_dep'])
 reshadefx = dependency('reshadefx', fallback: ['reshadefx', 'reshadefx_dep'])

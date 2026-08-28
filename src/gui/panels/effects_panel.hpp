@@ -29,7 +29,6 @@ namespace vkShade
         ImVec2 m_windowPos = ImVec2(100, 100);
         ImVec2 m_windowSize = ImVec2(600, 450);
 
-        void render_controls_bar();
         void render_effect_lists();
         void render_uniform_controls();
 
