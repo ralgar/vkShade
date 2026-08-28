@@ -12,16 +12,16 @@
 #include <effect_module.hpp>
 #include <effect_preprocessor.hpp>
 #include <magic_enum/magic_enum.hpp>
-#include "core/logger.hpp"
 #include <vulkan/vulkan_core.h>
 
+#include "core/logger.hpp"
 #include "core/service_locator.hpp"
 #include "config/config_manager.hpp"
 #include "vk/image.hpp"
 #include "vk/initializers.hpp"
 #include "vk/macros.hpp"
-#include "vk/reshade_uniforms.hpp"
 #include "vk/sampler.hpp"
+#include "reshade_uniforms.hpp"
 
 vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
     : VulkanObject(device), m_extent(extent), m_format(format), m_fileName(effectPath.filename())
