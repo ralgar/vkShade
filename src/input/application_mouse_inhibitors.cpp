@@ -9,6 +9,7 @@
 
 #include "core/logger.hpp"
 #include "mouse_input_inhibitor_group.hpp"
+#include "sdl_module.hpp"
 
 namespace
 {
@@ -17,9 +18,6 @@ namespace
         uint32_t type;
     };
 
-    using SDLEventFilter = int (*)(void*, SDLEventHeader*);
-    using SDLGetEventFilter = int (*)(SDLEventFilter*, void**);
-    using SDLSetEventFilter = void (*)(SDLEventFilter, void*);
     using SDLFlushEvents = void (*)(uint32_t, uint32_t);
     using SDLGetRelativeMouseMode = int (*)();
     using SDLSetRelativeMouseMode = int (*)(int);
@@ -33,12 +31,6 @@ namespace
     constexpr uint32_t SDL_MOUSEWHEEL = 0x403;
     constexpr uint32_t RAW_INPUT_ERROR = UINT32_MAX;
     constexpr uint32_t RIDEV_REMOVE = 0x00000001;
-
-    template<typename Function>
-    Function find_default_function(const char* name)
-    {
-        return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
-    }
 
     struct WineModuleSearch
     {
@@ -76,20 +68,124 @@ namespace
         return function;
     }
 
-    class SDLMouseInputInhibitor final : public vkShade::MouseInputInhibitor
+    template<typename FilterResult>
+    class SDLEventFilter
     {
     public:
+        using Callback = FilterResult (*)(void*, SDLEventHeader*);
+        using Get = FilterResult (*)(Callback*, void**);
+        using Set = void (*)(Callback, void*);
+
+        explicit SDLEventFilter(vkShade::SdlModule& module)
+            : m_module(module)
+        {
+        }
+
+        bool install()
+        {
+            auto get = m_module.get_function<Get>("SDL_GetEventFilter");
+            auto set = m_module.get_function<Set>("SDL_SetEventFilter");
+            if (!get || !set)
+                return false;
+
+            m_previous = nullptr;
+            m_previousData = nullptr;
+            get(&m_previous, &m_previousData);
+            set(filter_mouse_events, this);
+            m_installed = true;
+            return true;
+        }
+
+        void reconcile()
+        {
+            auto get = m_module.get_function<Get>("SDL_GetEventFilter");
+            auto set = m_module.get_function<Set>("SDL_SetEventFilter");
+            if (!m_installed || !get || !set)
+                return;
+
+            Callback current = nullptr;
+            void* currentData = nullptr;
+            get(&current, &currentData);
+            if (current == filter_mouse_events && currentData == this)
+                return;
+
+            // SDL owns one process-global filter. Preserve a replacement as our
+            // new predecessor so non-mouse events keep reaching application code.
+            m_previous = current;
+            m_previousData = currentData;
+            set(filter_mouse_events, this);
+            vkShade::Logger::debug("[InputManager] Reinstalled SDL mouse event filter");
+        }
+
+        void restore()
+        {
+            auto get = m_module.get_function<Get>("SDL_GetEventFilter");
+            auto set = m_module.get_function<Set>("SDL_SetEventFilter");
+            if (m_installed && get && set)
+            {
+                Callback current = nullptr;
+                void* currentData = nullptr;
+                get(&current, &currentData);
+                // Do not overwrite a filter installed after ours; ownership of
+                // the process-global slot has already returned to the application.
+                if (current == filter_mouse_events && currentData == this)
+                {
+                    set(m_previous, m_previousData);
+                    vkShade::Logger::debug("[InputManager] Restored SDL event filter");
+                }
+                else
+                {
+                    vkShade::Logger::debug(
+                        "[InputManager] SDL event filter changed while overlay was active");
+                }
+            }
+
+            m_installed = false;
+            m_previous = nullptr;
+            m_previousData = nullptr;
+        }
+
+        bool is_installed() const
+        {
+            return m_installed;
+        }
+
+    private:
+        static FilterResult filter_mouse_events(void* opaque, SDLEventHeader* event)
+        {
+            auto& filter = *static_cast<SDLEventFilter*>(opaque);
+            if (event && event->type >= SDL_MOUSEMOTION && event->type <= SDL_MOUSEWHEEL)
+                return static_cast<FilterResult>(false);
+
+            return filter.m_previous
+                ? filter.m_previous(filter.m_previousData, event)
+                : static_cast<FilterResult>(true);
+        }
+
+        vkShade::SdlModule& m_module;
+        Callback m_previous {nullptr};
+        void* m_previousData {nullptr};
+        bool m_installed {false};
+    };
+
+    class SDL2MouseInputInhibitor final : public vkShade::MouseInputInhibitor
+    {
+    public:
+        explicit SDL2MouseInputInhibitor(vkShade::SdlModule module)
+            : m_module(std::move(module))
+            , m_eventFilter(m_module)
+        {
+            vkShade::Logger::debug(
+                "[InputManager] Found SDL2 input API in {}", m_module.get_path());
+        }
+
         bool inhibit() override
         {
             auto getRelativeMouseMode =
-                find_default_function<SDLGetRelativeMouseMode>("SDL_GetRelativeMouseMode");
+                m_module.get_function<SDLGetRelativeMouseMode>("SDL_GetRelativeMouseMode");
             auto setRelativeMouseMode =
-                find_default_function<SDLSetRelativeMouseMode>("SDL_SetRelativeMouseMode");
-            auto getEventFilter =
-                find_default_function<SDLGetEventFilter>("SDL_GetEventFilter");
-            auto setEventFilter =
-                find_default_function<SDLSetEventFilter>("SDL_SetEventFilter");
-            auto flushEvents = find_default_function<SDLFlushEvents>("SDL_FlushEvents");
+                m_module.get_function<SDLSetRelativeMouseMode>("SDL_SetRelativeMouseMode");
+            auto flushEvents = m_module.get_function<SDLFlushEvents>("SDL_FlushEvents");
 
             if (getRelativeMouseMode && setRelativeMouseMode && getRelativeMouseMode() != 0)
             {
@@ -104,14 +200,8 @@ namespace
                 }
             }
 
-            if (getEventFilter && setEventFilter)
+            if (m_eventFilter.install())
             {
-                m_previousFilter = nullptr;
-                m_previousFilterData = nullptr;
-                getEventFilter(&m_previousFilter, &m_previousFilterData);
-                setEventFilter(filter_mouse_events, this);
-                m_filterInstalled = true;
-
                 if (flushEvents)
                     flushEvents(SDL_MOUSEMOTION, SDL_MOUSEWHEEL);
 
@@ -119,7 +209,7 @@ namespace
             }
 
             m_nextReconcile = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
-            return m_restoreRelativeMode || m_filterInstalled;
+            return m_restoreRelativeMode || m_eventFilter.is_installed();
         }
 
         void reconcile() override
@@ -130,9 +220,9 @@ namespace
             m_nextReconcile = now + std::chrono::milliseconds(100);
 
             auto getRelativeMouseMode =
-                find_default_function<SDLGetRelativeMouseMode>("SDL_GetRelativeMouseMode");
+                m_module.get_function<SDLGetRelativeMouseMode>("SDL_GetRelativeMouseMode");
             auto setRelativeMouseMode =
-                find_default_function<SDLSetRelativeMouseMode>("SDL_SetRelativeMouseMode");
+                m_module.get_function<SDLSetRelativeMouseMode>("SDL_SetRelativeMouseMode");
             if (getRelativeMouseMode && setRelativeMouseMode && getRelativeMouseMode() != 0)
             {
                 if (setRelativeMouseMode(0) == 0)
@@ -140,58 +230,15 @@ namespace
                         "[InputManager] Re-disabled SDL relative mouse mode");
             }
 
-            auto getEventFilter =
-                find_default_function<SDLGetEventFilter>("SDL_GetEventFilter");
-            auto setEventFilter =
-                find_default_function<SDLSetEventFilter>("SDL_SetEventFilter");
-            if (!m_filterInstalled || !getEventFilter || !setEventFilter)
-                return;
-
-            SDLEventFilter currentFilter = nullptr;
-            void* currentFilterData = nullptr;
-            getEventFilter(&currentFilter, &currentFilterData);
-            if (currentFilter == filter_mouse_events && currentFilterData == this)
-                return;
-
-            // SDL owns one process-global filter. Preserve a replacement as our
-            // new predecessor so non-mouse events keep reaching application code.
-            m_previousFilter = currentFilter;
-            m_previousFilterData = currentFilterData;
-            setEventFilter(filter_mouse_events, this);
-            vkShade::Logger::debug("[InputManager] Reinstalled SDL mouse event filter");
+            m_eventFilter.reconcile();
         }
 
         void restore() override
         {
-            auto getEventFilter =
-                find_default_function<SDLGetEventFilter>("SDL_GetEventFilter");
-            auto setEventFilter =
-                find_default_function<SDLSetEventFilter>("SDL_SetEventFilter");
-            if (m_filterInstalled && getEventFilter && setEventFilter)
-            {
-                SDLEventFilter currentFilter = nullptr;
-                void* currentFilterData = nullptr;
-                getEventFilter(&currentFilter, &currentFilterData);
-                // Do not overwrite a filter installed after ours; ownership of
-                // the process-global slot has already returned to the application.
-                if (currentFilter == filter_mouse_events && currentFilterData == this)
-                {
-                    setEventFilter(m_previousFilter, m_previousFilterData);
-                    vkShade::Logger::debug("[InputManager] Restored SDL event filter");
-                }
-                else
-                {
-                    vkShade::Logger::debug(
-                        "[InputManager] SDL event filter changed while overlay was active");
-                }
-            }
-
-            m_filterInstalled = false;
-            m_previousFilter = nullptr;
-            m_previousFilterData = nullptr;
+            m_eventFilter.restore();
 
             auto setRelativeMouseMode =
-                find_default_function<SDLSetRelativeMouseMode>("SDL_SetRelativeMouseMode");
+                m_module.get_function<SDLSetRelativeMouseMode>("SDL_SetRelativeMouseMode");
             if (m_restoreRelativeMode && setRelativeMouseMode)
             {
                 if (setRelativeMouseMode(1) == 0)
@@ -203,21 +250,9 @@ namespace
         }
 
     private:
-        static int filter_mouse_events(void* opaque, SDLEventHeader* event)
-        {
-            auto& inhibitor = *static_cast<SDLMouseInputInhibitor*>(opaque);
-            if (event && event->type >= SDL_MOUSEMOTION && event->type <= SDL_MOUSEWHEEL)
-                return 0;
-
-            return inhibitor.m_previousFilter
-                ? inhibitor.m_previousFilter(inhibitor.m_previousFilterData, event)
-                : 1;
-        }
-
-        SDLEventFilter m_previousFilter {nullptr};
-        void* m_previousFilterData {nullptr};
+        vkShade::SdlModule m_module;
+        SDLEventFilter<int> m_eventFilter;
         bool m_restoreRelativeMode {false};
-        bool m_filterInstalled {false};
         std::chrono::steady_clock::time_point m_nextReconcile {};
     };
 
@@ -393,7 +428,8 @@ namespace
 std::unique_ptr<vkShade::MouseInputInhibitor> vkShade::create_application_mouse_inhibitor()
 {
     auto group = std::make_unique<MouseInputInhibitorGroup>();
-    group->add(std::make_unique<SDLMouseInputInhibitor>());
+    if (auto module = SdlModule::find(SdlAbi::Sdl2))
+        group->add(std::make_unique<SDL2MouseInputInhibitor>(std::move(*module)));
     group->add(std::make_unique<WineMouseInputInhibitor>());
     return group;
 }
