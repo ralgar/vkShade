@@ -4,8 +4,11 @@
 #include <cstdint>
 #include <dlfcn.h>
 #include <link.h>
+#include <memory>
 #include <mutex>
 #include <string_view>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "core/logger.hpp"
@@ -22,6 +25,17 @@ namespace
     using SDLFlushEvents = void (*)(uint32_t, uint32_t);
     using SDLGetRelativeMouseMode = int (*)();
     using SDLSetRelativeMouseMode = int (*)(int);
+
+    struct SDLWindow;
+    using SDLWindowId = uint32_t;
+    using SDLGetWindows = SDLWindow** (*)(int*);
+    using SDLGetWindowRelativeMouseMode = bool (*)(SDLWindow*);
+    using SDLSetWindowRelativeMouseMode = bool (*)(SDLWindow*, bool);
+    using SDLGetWindowId = SDLWindowId (*)(SDLWindow*);
+    using SDLGetWindowFromId = SDLWindow* (*)(SDLWindowId);
+    using SDLFree = void (*)(void*);
+    using SDLMainThreadCallback = void (*)(void*);
+    using SDLRunOnMainThread = bool (*)(SDLMainThreadCallback, void*, bool);
 
     using NtUserGetRegisteredRawInputDevices = uint32_t (*)(void*, uint32_t*, uint32_t);
     using NtUserRegisterRawInputDevices = int (*)(const void*, uint32_t, uint32_t);
@@ -280,6 +294,305 @@ namespace
         std::chrono::steady_clock::time_point m_nextReconcile {};
     };
 
+    struct SDL3Api
+    {
+        explicit SDL3Api(vkShade::SdlModule loadedModule)
+            : module(std::move(loadedModule))
+            , getWindows(module.get_function<SDLGetWindows>("SDL_GetWindows"))
+            , getRelativeMouseMode(module.get_function<SDLGetWindowRelativeMouseMode>(
+                  "SDL_GetWindowRelativeMouseMode"))
+            , setRelativeMouseMode(module.get_function<SDLSetWindowRelativeMouseMode>(
+                  "SDL_SetWindowRelativeMouseMode"))
+            , getWindowId(module.get_function<SDLGetWindowId>("SDL_GetWindowID"))
+            , getWindowFromId(module.get_function<SDLGetWindowFromId>("SDL_GetWindowFromID"))
+            , free(module.get_function<SDLFree>("SDL_free"))
+            , runOnMainThread(module.get_function<SDLRunOnMainThread>("SDL_RunOnMainThread"))
+        {
+        }
+
+        bool is_available() const
+        {
+            return getWindows && getRelativeMouseMode && setRelativeMouseMode
+                && getWindowId && getWindowFromId && free && runOnMainThread;
+        }
+
+        vkShade::SdlModule module;
+        SDLGetWindows getWindows {nullptr};
+        SDLGetWindowRelativeMouseMode getRelativeMouseMode {nullptr};
+        SDLSetWindowRelativeMouseMode setRelativeMouseMode {nullptr};
+        SDLGetWindowId getWindowId {nullptr};
+        SDLGetWindowFromId getWindowFromId {nullptr};
+        SDLFree free {nullptr};
+        SDLRunOnMainThread runOnMainThread {nullptr};
+    };
+
+    class SDL3RelativeModeInhibitor
+    {
+    public:
+        explicit SDL3RelativeModeInhibitor(std::shared_ptr<SDL3Api> api)
+            : m_state(std::make_shared<State>(std::move(api)))
+        {
+        }
+
+        bool inhibit()
+        {
+            uint64_t generation = 0;
+            {
+                const std::scoped_lock lock(m_state->mutex);
+                m_state->requested = true;
+                generation = ++m_state->generation;
+                m_state->reconcilePending = true;
+            }
+
+            if (schedule(TaskAction::Inhibit, generation, {}))
+                return true;
+
+            const std::scoped_lock lock(m_state->mutex);
+            if (m_state->generation == generation)
+                m_state->reconcilePending = false;
+            return false;
+        }
+
+        void reconcile()
+        {
+            uint64_t generation = 0;
+            {
+                const std::scoped_lock lock(m_state->mutex);
+                if (!m_state->requested || m_state->reconcilePending)
+                    return;
+
+                generation = m_state->generation;
+                m_state->reconcilePending = true;
+            }
+
+            if (schedule(TaskAction::Inhibit, generation, {}))
+                return;
+
+            const std::scoped_lock lock(m_state->mutex);
+            if (m_state->generation == generation)
+                m_state->reconcilePending = false;
+        }
+
+        void restore()
+        {
+            uint64_t generation = 0;
+            std::vector<SDLWindowId> windowIds;
+            {
+                const std::scoped_lock lock(m_state->mutex);
+                m_state->requested = false;
+                generation = ++m_state->generation;
+                m_state->reconcilePending = false;
+                windowIds.assign(
+                    m_state->restoreWindowIds.begin(), m_state->restoreWindowIds.end());
+            }
+
+            if (!windowIds.empty()
+                && !schedule(TaskAction::Restore, generation, std::move(windowIds)))
+            {
+                vkShade::Logger::warn(
+                    "[InputManager] Could not schedule SDL3 relative mouse mode restore");
+            }
+        }
+
+    private:
+        struct State
+        {
+            explicit State(std::shared_ptr<SDL3Api> sharedApi)
+                : api(std::move(sharedApi))
+            {
+            }
+
+            std::shared_ptr<SDL3Api> api;
+            std::mutex mutex;
+            std::unordered_set<SDLWindowId> restoreWindowIds;
+            // Main-thread callbacks may outlive the request that scheduled
+            // them; generations keep stale work from reversing newer state.
+            uint64_t generation {0};
+            bool requested {false};
+            bool reconcilePending {false};
+        };
+
+        enum class TaskAction
+        {
+            Inhibit,
+            Restore,
+        };
+
+        struct Task
+        {
+            std::shared_ptr<State> state;
+            TaskAction action;
+            uint64_t generation;
+            std::vector<SDLWindowId> windowIds;
+        };
+
+        bool schedule(
+            TaskAction action,
+            uint64_t generation,
+            std::vector<SDLWindowId> windowIds)
+        {
+            auto* task = new Task {
+                .state = m_state,
+                .action = action,
+                .generation = generation,
+                .windowIds = std::move(windowIds),
+            };
+
+            // SDL3 window relative-mode functions are main-thread-only. An
+            // asynchronous handoff avoids deadlocking a present thread while
+            // keeping the module and request state alive until SDL runs it.
+            if (m_state->api->runOnMainThread(run_task, task, false))
+                return true;
+
+            delete task;
+            return false;
+        }
+
+        static void run_task(void* opaque)
+        {
+            const std::unique_ptr<Task> task(static_cast<Task*>(opaque));
+            if (task->action == TaskAction::Restore)
+                restore_windows(*task);
+            else
+                inhibit_windows(*task);
+        }
+
+        static void inhibit_windows(const Task& task)
+        {
+            {
+                const std::scoped_lock lock(task.state->mutex);
+                if (!task.state->requested || task.state->generation != task.generation)
+                    return;
+            }
+
+            std::vector<SDLWindowId> changedWindowIds;
+            int windowCount = 0;
+            SDLWindow** windows = task.state->api->getWindows(&windowCount);
+            for (int index = 0; windows && index < windowCount; ++index)
+            {
+                SDLWindow* window = windows[index];
+                if (!window || !task.state->api->getRelativeMouseMode(window))
+                    continue;
+
+                if (task.state->api->setRelativeMouseMode(window, false))
+                    changedWindowIds.push_back(task.state->api->getWindowId(window));
+                else
+                    vkShade::Logger::warn(
+                        "[InputManager] SDL_SetWindowRelativeMouseMode(false) failed");
+            }
+            task.state->api->free(windows);
+
+            bool restoreImmediately = false;
+            {
+                const std::scoped_lock lock(task.state->mutex);
+                if (task.state->requested)
+                {
+                    task.state->restoreWindowIds.insert(
+                        changedWindowIds.begin(), changedWindowIds.end());
+                }
+                else
+                {
+                    restoreImmediately = true;
+                }
+
+                if (task.state->generation == task.generation)
+                    task.state->reconcilePending = false;
+            }
+
+            if (restoreImmediately)
+                restore_window_ids(*task.state->api, changedWindowIds);
+        }
+
+        static void restore_windows(const Task& task)
+        {
+            {
+                const std::scoped_lock lock(task.state->mutex);
+                if (task.state->requested)
+                {
+                    task.state->restoreWindowIds.insert(
+                        task.windowIds.begin(), task.windowIds.end());
+                    return;
+                }
+            }
+
+            restore_window_ids(*task.state->api, task.windowIds);
+
+            const std::scoped_lock lock(task.state->mutex);
+            if (!task.state->requested)
+            {
+                for (SDLWindowId windowId : task.windowIds)
+                    task.state->restoreWindowIds.erase(windowId);
+            }
+        }
+
+        static void restore_window_ids(
+            const SDL3Api& api,
+            const std::vector<SDLWindowId>& windowIds)
+        {
+            for (SDLWindowId windowId : windowIds)
+            {
+                SDLWindow* window = api.getWindowFromId(windowId);
+                if (window && !api.setRelativeMouseMode(window, true))
+                {
+                    vkShade::Logger::warn(
+                        "[InputManager] SDL_SetWindowRelativeMouseMode(true) failed");
+                }
+            }
+        }
+
+        std::shared_ptr<State> m_state;
+    };
+
+    class SDL3MouseInputInhibitor final : public vkShade::MouseInputInhibitor
+    {
+    public:
+        explicit SDL3MouseInputInhibitor(vkShade::SdlModule module)
+            : m_api(std::make_shared<SDL3Api>(std::move(module)))
+            , m_eventFilter(m_api->module)
+            , m_relativeMode(m_api)
+        {
+            vkShade::Logger::debug(
+                "[InputManager] Found SDL3 input API in {}", m_api->module.get_path());
+        }
+
+        bool inhibit() override
+        {
+            const bool relativeModeScheduled = m_api->is_available() && m_relativeMode.inhibit();
+            const bool filterInstalled = m_eventFilter.install();
+            auto flushEvents = m_api->module.get_function<SDLFlushEvents>("SDL_FlushEvents");
+            if (filterInstalled && flushEvents)
+                flushEvents(SDL_MOUSEMOTION, SDL_MOUSEWHEEL);
+
+            m_nextReconcile = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+            return relativeModeScheduled || filterInstalled;
+        }
+
+        void reconcile() override
+        {
+            const auto now = std::chrono::steady_clock::now();
+            if (now < m_nextReconcile)
+                return;
+            m_nextReconcile = now + std::chrono::milliseconds(100);
+
+            if (m_api->is_available())
+                m_relativeMode.reconcile();
+            m_eventFilter.reconcile();
+        }
+
+        void restore() override
+        {
+            m_eventFilter.restore();
+            if (m_api->is_available())
+                m_relativeMode.restore();
+        }
+
+    private:
+        std::shared_ptr<SDL3Api> m_api;
+        SDLEventFilter<bool> m_eventFilter;
+        SDL3RelativeModeInhibitor m_relativeMode;
+        std::chrono::steady_clock::time_point m_nextReconcile {};
+    };
+
     class WineMouseInputInhibitor final : public vkShade::MouseInputInhibitor
     {
     public:
@@ -454,6 +767,8 @@ std::unique_ptr<vkShade::MouseInputInhibitor> vkShade::create_application_mouse_
     auto group = std::make_unique<MouseInputInhibitorGroup>();
     if (auto module = SdlModule::find(SdlAbi::Sdl2))
         group->add(std::make_unique<SDL2MouseInputInhibitor>(std::move(*module)));
+    if (auto module = SdlModule::find(SdlAbi::Sdl3))
+        group->add(std::make_unique<SDL3MouseInputInhibitor>(std::move(*module)));
     group->add(std::make_unique<WineMouseInputInhibitor>());
     return group;
 }
