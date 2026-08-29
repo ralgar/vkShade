@@ -49,6 +49,9 @@ namespace vkShade
         void render_uniform_input(const Uniform& uniform);
         void render_uniform_radio(const Uniform& uniform);
         void render_uniform_slider(const Uniform& uniform);
+        void render_uniform_step_control(const Uniform& uniform);
+
+        void step_component(const Uniform& uniform, int32_t direction);
 
         template<typename T>
         static T get_ui_value(const std::optional<Uniform::Scalar>& value, T fallback)
