@@ -7,12 +7,14 @@
 #include "core/event_bus.hpp"
 #include "core/logger.hpp"
 #include "core/service_locator.hpp"
+#include "version.hpp" // cppcheck-suppress missingInclude
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
     const VkInstanceCreateInfo*                 pCreateInfo,
     const VkAllocationCallbacks*                pAllocator,
     VkInstance*                                 pInstance)
 {
+    vkShade::Logger::info("vkShade {}", VKSHADE_VERSION);
     vkShade::Logger::trace("Intercepted VkCreateInstance");
 
     // Step through the pNext chain until we get to the layer link info
