@@ -422,7 +422,19 @@ void vkShade::EffectsPanel::render_uniform_controls()
 
         ImGui::TableSetColumnIndex(1);
 
-        ImGui::SetNextItemWidth(-FLT_MIN);
+        bool hasStepControl = (*uniform.uiType == Uniform::UiType::Drag ||
+                               *uniform.uiType == Uniform::UiType::Slider) &&
+                               uniform.components == 1;
+
+        // Subtract width for step controls, if present.
+        float stepControlsWidth = 0.0f;
+        if (hasStepControl)
+        {
+            stepControlsWidth = 2 * ImGui::GetFrameHeight()
+                + ImGui::GetStyle().ItemSpacing.x + ImGui::GetStyle().CellPadding.x;
+        }
+
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - stepControlsWidth);
 
         switch (*uniform.uiType)
         {
@@ -438,6 +450,19 @@ void vkShade::EffectsPanel::render_uniform_controls()
         // Set the tooltip if we have one
         if (!uniform.uiTooltip.empty())
             ImGui::SetItemTooltip("%s", uniform.uiTooltip.c_str());
+
+        // Draw the step controls if appropriate
+        if (hasStepControl)
+        {
+            ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
+            spacing.x /= 2;
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, spacing);
+
+            ImGui::SameLine();
+            render_uniform_step_control(uniform);
+
+            ImGui::PopStyleVar();
+        }
 
         ImGui::TableSetColumnIndex(2);
 
@@ -501,7 +526,55 @@ void vkShade::EffectsPanel::render_uniform_combo(const Uniform& uniform)
 
 void vkShade::EffectsPanel::render_uniform_drag(const Uniform& uniform)
 {
-    ImGui::TextColored(UIStyle::Palette::YELLOW, "Unsupported widget: Drag");
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        T v = *value;
+
+        ImGuiDataType dataType;
+        Uniform::Scalar min;
+        Uniform::Scalar max;
+        std::string format;
+
+        switch (uniform.baseType)
+        {
+            case Uniform::BaseType::Float:
+                dataType = ImGuiDataType_Float;
+                min = get_ui_value(uniform.uiMin, 0.0f);
+                max = get_ui_value(uniform.uiMax, 1.0f);
+                format = "%.3f" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Int:
+                dataType = ImGuiDataType_S32;
+                min = get_ui_value(uniform.uiMin, int32_t{0});
+                max = get_ui_value(uniform.uiMax, int32_t{100});
+                format = "%d" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Uint:
+                dataType = ImGuiDataType_U32;
+                min = get_ui_value(uniform.uiMin, uint32_t{0});
+                max = get_ui_value(uniform.uiMax, uint32_t{100});
+                format = "%u" + uniform.uiUnits;
+                break;
+
+            default:
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for slider");
+                return;
+        }
+
+        float speed = get_ui_value(uniform.uiStep, 0.0f);
+        if (ImGui::DragScalarN("##value", dataType, &v, uniform.components, speed, &min, &max, format.c_str()))
+            m_preset.set(m_selectedActiveByName, uniform.name, v);
+    });
 }
 
 void vkShade::EffectsPanel::render_uniform_input(const Uniform& uniform)
@@ -516,5 +589,97 @@ void vkShade::EffectsPanel::render_uniform_radio(const Uniform& uniform)
 
 void vkShade::EffectsPanel::render_uniform_slider(const Uniform& uniform)
 {
-    ImGui::TextColored(UIStyle::Palette::YELLOW, "Unsupported widget: Slider");
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        T v = *value;
+
+        ImGuiDataType dataType;
+        Uniform::Scalar min;
+        Uniform::Scalar max;
+        std::string format;
+
+        switch (uniform.baseType)
+        {
+            case Uniform::BaseType::Float:
+                dataType = ImGuiDataType_Float;
+                min = get_ui_value(uniform.uiMin, 0.0f);
+                max = get_ui_value(uniform.uiMax, 1.0f);
+                format = "%.3f" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Int:
+                dataType = ImGuiDataType_S32;
+                min = get_ui_value(uniform.uiMin, int32_t{0});
+                max = get_ui_value(uniform.uiMax, int32_t{100});
+                format = "%d" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Uint:
+                dataType = ImGuiDataType_U32;
+                min = get_ui_value(uniform.uiMin, uint32_t{0});
+                max = get_ui_value(uniform.uiMax, uint32_t{100});
+                format = "%u" + uniform.uiUnits;
+                break;
+
+            default:
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for slider");
+                return;
+        }
+
+        if (ImGui::SliderScalarN("##value", dataType, &v, uniform.components, &min, &max, format.c_str()))
+            m_preset.set(m_selectedActiveByName, uniform.name, v);
+    });
+}
+
+void vkShade::EffectsPanel::render_uniform_step_control(const Uniform& uniform)
+{
+    ImGui::BeginGroup();
+
+    if (ImGui::Button("-"))
+        step_component(uniform, -1);
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("+"))
+        step_component(uniform, 1);
+
+    ImGui::EndGroup();
+}
+
+void vkShade::EffectsPanel::step_component(const Uniform& uniform, int32_t direction)
+{
+    Uniform::dispatch_type(uniform.baseType, uniform.components, [&]<typename T>(std::type_identity<T>)
+    {
+        using Scalar = typename UniformTraits<T>::Scalar;
+
+        if constexpr (UniformTraits<T>::components == 1 && (std::is_same_v<Scalar, float> ||
+            std::is_same_v<Scalar, int32_t> || std::is_same_v<Scalar, uint32_t>))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+
+            if (!value)
+                return;
+
+            Scalar& v = *value;
+
+            const Scalar step = get_ui_value(uniform.uiStep, Scalar{1});
+            v += step * direction;
+
+            // Clamp between min and max
+            if (uniform.uiMin)
+                v = std::max(v, get_ui_value(uniform.uiMin, std::numeric_limits<Scalar>::lowest()));
+            if (uniform.uiMax)
+                v = std::min(v, get_ui_value(uniform.uiMax, std::numeric_limits<Scalar>::max()));
+
+            m_preset.set(m_selectedActiveByName, uniform.name, *value);
+        }
+    });
 }

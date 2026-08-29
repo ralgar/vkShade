@@ -30,7 +30,7 @@ namespace vkShade
         // Padding and spacing
         constexpr float WINDOW_PADDING = 12.0f;
         constexpr float ITEM_SPACING_X = 8.0f;
-        constexpr float ITEM_SPACING_Y = 6.0f;
+        constexpr float ITEM_SPACING_Y = 4.0f;
         constexpr float FRAME_PADDING_X = 8.0f;
         constexpr float FRAME_PADDING_Y = 4.0f;
         constexpr float INDENT_SPACING = 16.0f;
