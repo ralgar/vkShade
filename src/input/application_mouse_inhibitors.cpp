@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <dlfcn.h>
 #include <link.h>
+#include <mutex>
 #include <string_view>
 #include <vector>
 
@@ -88,11 +89,16 @@ namespace
             if (!get || !set)
                 return false;
 
-            m_previous = nullptr;
-            m_previousData = nullptr;
-            get(&m_previous, &m_previousData);
+            Callback previous = nullptr;
+            void* previousData = nullptr;
+            get(&previous, &previousData);
+            {
+                const std::scoped_lock lock(m_mutex);
+                m_previous = previous;
+                m_previousData = previousData;
+                m_installed = true;
+            }
             set(filter_mouse_events, this);
-            m_installed = true;
             return true;
         }
 
@@ -100,7 +106,7 @@ namespace
         {
             auto get = m_module.get_function<Get>("SDL_GetEventFilter");
             auto set = m_module.get_function<Set>("SDL_SetEventFilter");
-            if (!m_installed || !get || !set)
+            if (!is_installed() || !get || !set)
                 return;
 
             Callback current = nullptr;
@@ -111,8 +117,11 @@ namespace
 
             // SDL owns one process-global filter. Preserve a replacement as our
             // new predecessor so non-mouse events keep reaching application code.
-            m_previous = current;
-            m_previousData = currentData;
+            {
+                const std::scoped_lock lock(m_mutex);
+                m_previous = current;
+                m_previousData = currentData;
+            }
             set(filter_mouse_events, this);
             vkShade::Logger::debug("[InputManager] Reinstalled SDL mouse event filter");
         }
@@ -121,7 +130,7 @@ namespace
         {
             auto get = m_module.get_function<Get>("SDL_GetEventFilter");
             auto set = m_module.get_function<Set>("SDL_SetEventFilter");
-            if (m_installed && get && set)
+            if (is_installed() && get && set)
             {
                 Callback current = nullptr;
                 void* currentData = nullptr;
@@ -130,7 +139,14 @@ namespace
                 // the process-global slot has already returned to the application.
                 if (current == filter_mouse_events && currentData == this)
                 {
-                    set(m_previous, m_previousData);
+                    Callback previous = nullptr;
+                    void* previousData = nullptr;
+                    {
+                        const std::scoped_lock lock(m_mutex);
+                        previous = m_previous;
+                        previousData = m_previousData;
+                    }
+                    set(previous, previousData);
                     vkShade::Logger::debug("[InputManager] Restored SDL event filter");
                 }
                 else
@@ -140,6 +156,7 @@ namespace
                 }
             }
 
+            const std::scoped_lock lock(m_mutex);
             m_installed = false;
             m_previous = nullptr;
             m_previousData = nullptr;
@@ -147,22 +164,29 @@ namespace
 
         bool is_installed() const
         {
+            const std::scoped_lock lock(m_mutex);
             return m_installed;
         }
 
     private:
         static FilterResult filter_mouse_events(void* opaque, SDLEventHeader* event)
         {
-            auto& filter = *static_cast<SDLEventFilter*>(opaque);
             if (event && event->type >= SDL_MOUSEMOTION && event->type <= SDL_MOUSEWHEEL)
-                return static_cast<FilterResult>(false);
+                return {};
 
-            return filter.m_previous
-                ? filter.m_previous(filter.m_previousData, event)
-                : static_cast<FilterResult>(true);
+            Callback previous = nullptr;
+            void* previousData = nullptr;
+            {
+                auto& filter = *static_cast<SDLEventFilter*>(opaque);
+                const std::scoped_lock lock(filter.m_mutex);
+                previous = filter.m_previous;
+                previousData = filter.m_previousData;
+            }
+            return previous ? previous(previousData, event) : FilterResult {1};
         }
 
         vkShade::SdlModule& m_module;
+        mutable std::mutex m_mutex;
         Callback m_previous {nullptr};
         void* m_previousData {nullptr};
         bool m_installed {false};
