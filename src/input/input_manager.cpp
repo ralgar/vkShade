@@ -218,6 +218,8 @@ vkShade::KeyCode vkShade::InputManager::map_key(xkb_keysym_t keysym)
         case XKB_KEY_Page_Up:      return KeyCode::KEY_PAGEUP;
         case XKB_KEY_Page_Down:    return KeyCode::KEY_PAGEDOWN;
         case XKB_KEY_Print:        return KeyCode::KEY_PRINTSCREEN;
+        case XKB_KEY_Scroll_Lock:  return KeyCode::KEY_SCROLLLOCK;
+        case XKB_KEY_Pause:        return KeyCode::KEY_PAUSE;
         case XKB_KEY_Up:           return KeyCode::KEY_UP;
         case XKB_KEY_Down:         return KeyCode::KEY_DOWN;
         case XKB_KEY_Left:         return KeyCode::KEY_LEFT;

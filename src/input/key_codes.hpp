@@ -71,6 +71,8 @@ namespace vkShade
         KEY_PAGEUP,
         KEY_PAGEDOWN,
         KEY_PRINTSCREEN,
+        KEY_SCROLLLOCK,
+        KEY_PAUSE,
         KEY_UP,
         KEY_DOWN,
         KEY_LEFT,
