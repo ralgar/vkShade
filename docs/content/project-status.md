@@ -1,10 +1,8 @@
 # Project Status
 
-This project is currently in the **PRE-ALPHA** phase of development. The
- core shader runtime and preset system are functional and increasingly
- feature-complete, while the GUI and other user-facing components are still
- under active development. There may be breaking changes as the project
- continues to mature.
+--8<--
+README.md:project-status
+--8<--
 
 ## Current Features
 

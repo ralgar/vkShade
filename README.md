@@ -23,8 +23,7 @@ vkShade is a ReShade-compatible Vulkan post-processing layer, written from the
 
 <!-- --8<-- [end:overview-text] -->
 
-See the [documentation](https://ralgar.github.io/vkShade) for installation
- and usage.
+See the [documentation](https://ralgar.github.io/vkShade) for more information.
 
 <p align="center">
   <a href="https://raw.githubusercontent.com/ralgar/vkShade/refs/heads/main/docs/content/assets/screenshot.png">
@@ -33,6 +32,22 @@ See the [documentation](https://ralgar.github.io/vkShade) for installation
   <br>
   <em>vkShade overlay running in-game (click to enlarge)</em>
 </p>
+
+
+## Project Status
+
+<!-- --8<-- [start:project-status] -->
+
+vkShade is currently in the **PRE-ALPHA** phase of development. The
+ core shader runtime and preset system are functional and increasingly
+ feature-complete, while the GUI and other user-facing components are still
+ under active development. Expect bugs, incomplete features, and breaking
+ changes as the project continues to mature.
+
+<!-- --8<-- [end:project-status] -->
+
+See the [documentation](https://ralgar.github.io/vkShade/project-status)
+ for current features, limitations, and development status.
 
 ## Acknowledgments
 
