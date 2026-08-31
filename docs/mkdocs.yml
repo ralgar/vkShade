@@ -47,6 +47,12 @@ markdown_extensions:
 
 nav:
   - Overview: index.md
+  - project-status.md
+  - Getting Started:
+    - installation.md
+    - usage.md
+    - configuration.md
+    - presets.md
   - Contributing:
     - API Reference: reference/generated/html/index.html
   - Reference:
