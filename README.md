@@ -27,7 +27,7 @@ See the [documentation](https://ralgar.github.io/vkShade) for installation
  and usage.
 
 <p align="center">
-  <a href="docs/content/assets/screenshot.png">
+  <a href="https://raw.githubusercontent.com/ralgar/vkShade/refs/heads/main/docs/content/assets/screenshot.png">
     <img src="docs/content/assets/screenshot.png" width="800" alt="vkShade in action">
   </a>
   <br>
