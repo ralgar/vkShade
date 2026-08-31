@@ -133,5 +133,8 @@ namespace vkShade
         static VkCompareOp         convert_stencil_func(reshadefx::stencil_func stencilFunc);
         static VkStencilOp         convert_stencil_op(reshadefx::stencil_op stencilOp);
         static Uniform::Type       convert_uniform_type(reshadefx::type type);
+
+        static uint32_t convert_color_space(VkColorSpaceKHR colorSpace);
+        static uint32_t format_bit_depth(VkFormat format);
     };
 } // namespace vkShade

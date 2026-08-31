@@ -256,6 +256,8 @@ bool vkShade::ReshadeEffect::compile(std::filesystem::path filePath)
 	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(m_swapchainInfo.extent.height));
 	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
 	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
+    pp.add_macro_definition("BUFFER_COLOR_BIT_DEPTH", std::to_string(format_bit_depth(m_swapchainInfo.format)));
+    pp.add_macro_definition("BUFFER_COLOR_SPACE", std::to_string(convert_color_space(m_swapchainInfo.colorSpace)));
 
     // Add include paths
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
@@ -445,6 +447,42 @@ vkShade::Uniform::Type vkShade::ReshadeEffect::convert_uniform_type(reshadefx::t
     if (type == T{ T::t_bool, 4, 1 })   return Uniform::Type::Bool4;
 
     throw std::invalid_argument("Unsupported uniform type");;
+}
+
+uint32_t vkShade::ReshadeEffect::convert_color_space(VkColorSpaceKHR colorSpace)
+{
+    switch (colorSpace)
+    {
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:         return 1;
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:   return 2;
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:           return 3;
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:              return 4;
+        default:                                        return 0;
+    }
+}
+
+uint32_t vkShade::ReshadeEffect::format_bit_depth(VkFormat format)
+{
+    switch (format)
+    {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_R8G8B8A8_SRGB:
+        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            return 8;
+
+        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+            return 10;
+
+        case VK_FORMAT_R16G16B16A16_UNORM:
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            return 16;
+
+        default:
+            Logger::warn("Unhandled swapchain format. Please report this issue.");
+            return 8;
+    }
 }
 
 void vkShade::ReshadeEffect::reflect_descriptors()
