@@ -23,14 +23,14 @@
 #include "vk/sampler.hpp"
 #include "reshade_uniforms.hpp"
 
-vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath)
-    : VulkanObject(device), m_extent(extent), m_format(format), m_fileName(effectPath.filename())
+vkShade::ReshadeEffect::ReshadeEffect(VulkanDevice& device, SwapchainInfo swapchainInfo, std::filesystem::path effectPath)
+    : VulkanObject(device), m_fileName(effectPath.filename()), m_swapchainInfo(swapchainInfo)
 {
     Logger::trace("Creating effect: {}", effectPath.filename().string());
 
     // Compile the ReShade effect from source
     reshadefx::effect_module module;
-    if (!this->compile(extent, effectPath))
+    if (!this->compile(effectPath))
         throw std::runtime_error("Failed to load effect: " + effectPath.filename().string());
 
     this->reflect_images();
@@ -240,7 +240,7 @@ void vkShade::ReshadeEffect::bind_input(VulkanImage& colorImage, VulkanImage& de
     }
 }
 
-bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path filePath)
+bool vkShade::ReshadeEffect::compile(std::filesystem::path filePath)
 {
     const bool useDebugInfo = false;
     const bool useSpecConstants = false;
@@ -252,10 +252,12 @@ bool vkShade::ReshadeEffect::compile(VkExtent2D extent, std::filesystem::path fi
     pp.add_macro_definition("__RESHADE_PERFORMANCE_MODE__", "0");
     pp.add_macro_definition("__RENDERER__", "0x21300");
 
-	pp.add_macro_definition("BUFFER_WIDTH", std::to_string(extent.width));
-	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(extent.height));
+	pp.add_macro_definition("BUFFER_WIDTH", std::to_string(m_swapchainInfo.extent.width));
+	pp.add_macro_definition("BUFFER_HEIGHT", std::to_string(m_swapchainInfo.extent.height));
 	pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
 	pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
+    pp.add_macro_definition("BUFFER_COLOR_BIT_DEPTH", std::to_string(format_bit_depth(m_swapchainInfo.format)));
+    pp.add_macro_definition("BUFFER_COLOR_SPACE", std::to_string(convert_color_space(m_swapchainInfo.colorSpace)));
 
     // Add include paths
     auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
@@ -445,6 +447,42 @@ vkShade::Uniform::Type vkShade::ReshadeEffect::convert_uniform_type(reshadefx::t
     if (type == T{ T::t_bool, 4, 1 })   return Uniform::Type::Bool4;
 
     throw std::invalid_argument("Unsupported uniform type");;
+}
+
+uint32_t vkShade::ReshadeEffect::convert_color_space(VkColorSpaceKHR colorSpace)
+{
+    switch (colorSpace)
+    {
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:         return 1;
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:   return 2;
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:           return 3;
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:              return 4;
+        default:                                        return 0;
+    }
+}
+
+uint32_t vkShade::ReshadeEffect::format_bit_depth(VkFormat format)
+{
+    switch (format)
+    {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_R8G8B8A8_SRGB:
+        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            return 8;
+
+        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+            return 10;
+
+        case VK_FORMAT_R16G16B16A16_UNORM:
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            return 16;
+
+        default:
+            Logger::warn("Unhandled swapchain format. Please report this issue.");
+            return 8;
+    }
 }
 
 void vkShade::ReshadeEffect::reflect_descriptors()
@@ -651,7 +689,7 @@ void vkShade::ReshadeEffect::reflect_images()
         usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-        m_stencilBuffer = std::make_unique<VulkanImage>(m_device, m_extent, VK_FORMAT_S8_UINT, usage);
+        m_stencilBuffer = std::make_unique<VulkanImage>(m_device, m_swapchainInfo.extent, VK_FORMAT_S8_UINT, usage);
     }
 }
 
@@ -671,7 +709,7 @@ void vkShade::ReshadeEffect::reflect_pipeline()
         }
 
         if (colorFormats.empty())
-            colorFormats.push_back(m_format);
+            colorFormats.push_back(m_swapchainInfo.format);
 
         // Create pipeline layout
         std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformSetLayout, pass.imageSetLayout };

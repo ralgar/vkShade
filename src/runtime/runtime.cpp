@@ -23,6 +23,7 @@ vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwap
     m_swapchain = swapchain;
     m_format = swapchainInfo.imageFormat;
     m_extent = swapchainInfo.imageExtent;
+    m_colorSpace = swapchainInfo.imageColorSpace;
 
     // Get swapchain images
     uint32_t imageCount = 0;
@@ -139,7 +140,12 @@ void vkShade::Runtime::on_effects_changed(const std::string& key, std::vector<st
                     if (entry.path().filename() == effect)
                     {
                         try {
-                            m_effects.push_back(std::make_shared<ReshadeEffect>(m_device, m_extent, m_format, entry.path()));
+                            SwapchainInfo swapchainInfo = {
+                                .extent = m_extent,
+                                .format = m_format,
+                                .colorSpace = m_colorSpace,
+                            };
+                            m_effects.push_back(std::make_shared<ReshadeEffect>(m_device, swapchainInfo, entry.path()));
                             loadedEffects.push_back(effect);
                             found = true;
                         } catch (const std::runtime_error& exception) {
