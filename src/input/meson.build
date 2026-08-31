@@ -13,10 +13,10 @@ libinput_library = static_library(
     glm,
     magic_enum,
     spdlog,
-    xcb,
-    x11,
-    xkbcommon,
     wayland_client,
+    x11,
+    xcb,
+    xkbcommon,
   ],
   include_directories : vkShade_include_path
 )

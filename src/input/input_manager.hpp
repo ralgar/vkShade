@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include <glm/vec2.hpp>
-#include <xkbcommon/xkbcommon.h>
 
 #include "core/event_bus.hpp"
 #include "key_codes.hpp"
@@ -13,6 +12,7 @@
 typedef struct xkb_context xkb_context;
 typedef struct xkb_keymap xkb_keymap;
 typedef struct xkb_state xkb_state;
+typedef uint32_t xkb_keycode_t;
 typedef uint32_t xkb_keysym_t;
 
 namespace vkShade
