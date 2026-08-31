@@ -21,6 +21,7 @@ vkshade = shared_library(
     magic_enum,
     spdlog,
     vma,
+    wayland_client,
   ],
   gnu_symbol_visibility: 'hidden',
   install : true,
