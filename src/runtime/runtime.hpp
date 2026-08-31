@@ -38,6 +38,7 @@ namespace vkShade
         VkSwapchainKHR m_swapchain;
         VkFormat m_format;
         VkExtent2D m_extent;
+        VkColorSpaceKHR m_colorSpace;
         std::vector<std::unique_ptr<VulkanImage>> m_images;
         std::unique_ptr<VulkanImage> m_depthDummy;
 

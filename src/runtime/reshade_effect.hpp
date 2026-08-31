@@ -11,6 +11,7 @@
 #include "hooks/hooks.hpp"
 #include "vk/buffer.hpp"
 #include "vk/shader_module.hpp"
+#include "vk/swapchain_info.hpp"
 #include "reshade_uniforms.hpp"
 
 namespace reshadefx
@@ -33,7 +34,7 @@ namespace vkShade
     class ReshadeEffect : public VulkanObject
     {
     public:
-        ReshadeEffect(VulkanDevice& device, VkExtent2D extent, VkFormat format, std::filesystem::path effectPath);
+        ReshadeEffect(VulkanDevice& device, SwapchainInfo swapchainInfo, std::filesystem::path effectPath);
         ~ReshadeEffect() override;
 
         void apply(VkCommandBuffer cmd, VulkanImage& outputImage);
@@ -52,9 +53,8 @@ namespace vkShade
             std::shared_ptr<ShaderModule> fragmentShader;
         };
 
-        VkExtent2D  m_extent;
-        VkFormat    m_format;
-        std::string m_fileName;
+        std::string   m_fileName;
+        SwapchainInfo m_swapchainInfo;
 
         std::unique_ptr<reshadefx::effect_module> m_module {nullptr};
         std::unique_ptr<VulkanBuffer> m_uniformBuffer {nullptr};
@@ -71,7 +71,7 @@ namespace vkShade
 
         std::vector<Pass> m_passes;
 
-        bool compile(VkExtent2D extent, std::filesystem::path filePath);
+        bool compile(std::filesystem::path filePath);
 
         Uniform* find_uniform(const std::string& name)
         {
