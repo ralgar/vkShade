@@ -27,6 +27,7 @@ struct VulkanDevice
 {
     VkDevice handle;
     VkPhysicalDevice physicalDevice;
+    VkPhysicalDeviceProperties2 properties;
     VkInstance instance;
     VkuDeviceDispatchTable dispatch;
     VmaAllocator allocator;
