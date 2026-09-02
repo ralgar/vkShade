@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -51,20 +50,25 @@ namespace vkShade
         {
             std::string mapKey = section + "::" + key;
             auto it = m_subscribers.find(mapKey);
-            if (it != m_subscribers.end())
-            {
-                for (const auto& subscription : it->second)
-                {
-                    subscription.callback(&value, subscription.instance, key);
-                }
-            }
+
+            if (it == m_subscribers.end())
+                return;
+
+            std::vector<Subscription> snapshot = it->second;
+
+            for (const auto& subscription : snapshot)
+                subscription.callback(&value, subscription.instance, key);
         }
 
         void notify_all(ConfigStore& store)
         {
-            for (auto& [_, subscriptions] : m_subscribers)
-                for (auto& subscription : subscriptions)
-                    subscription.reload(store);
+            std::vector<Subscription> snapshot;
+
+            for (const auto& [_, subscriptions] : m_subscribers)
+                snapshot.insert(snapshot.end(), subscriptions.begin(), subscriptions.end());
+
+            for (auto& subscription : snapshot)
+                subscription.reload(store);
         }
 
     private:
