@@ -1,6 +1,7 @@
 #include "hooks.hpp"
 
 #include <magic_enum/magic_enum.hpp>
+#include <vulkan/vulkan_core.h>
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #define VMA_IMPLEMENTATION
@@ -19,6 +20,18 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
     VkDevice*                                   pDevice)
 {
     vkShade::Logger::trace("Intercepted VkCreateDevice");
+
+    auto& thisInstance = get_instance_from_handle(physicalDevice);
+
+    // Query device properties
+    VkPhysicalDeviceProperties2 properties {};
+    thisInstance.dispatch.GetPhysicalDeviceProperties2(physicalDevice, &properties);
+
+    vkShade::Logger::info("Initializing device: {} (Vulkan {}.{}.{})",
+                          properties.properties.deviceName,
+                          VK_API_VERSION_MAJOR(properties.properties.apiVersion),
+                          VK_API_VERSION_MINOR(properties.properties.apiVersion),
+                          VK_API_VERSION_PATCH(properties.properties.apiVersion));
 
     // Step through the pNext chain until we get to the layer link info
     VkLayerDeviceCreateInfo* layerInfo = (VkLayerDeviceCreateInfo*)pCreateInfo->pNext;
@@ -95,12 +108,11 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateDevice(
         return result;
     }
 
-    auto& thisInstance = get_instance_from_handle(physicalDevice);
-
     // Create device data
     VulkanDevice thisDevice;
     thisDevice.handle = *pDevice;
     thisDevice.physicalDevice = physicalDevice;
+    thisDevice.properties = properties;
     thisDevice.instance = thisInstance.handle;
 
     // Initialize dispatch table
