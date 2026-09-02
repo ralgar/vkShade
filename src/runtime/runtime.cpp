@@ -16,6 +16,10 @@
 #include "vk/macros.hpp"
 #include "reshade_uniforms.hpp"
 
+// Give the layer's render submission up to 1 second to complete. A timeout
+//  indicates an abnormal GPU condition, so we will abort rather than hang.
+constexpr uint64_t FENCE_TIMEOUT_NS = 1'000'000'000;
+
 vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
     : VulkanObject(device)
 {
@@ -102,7 +106,7 @@ vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwap
 vkShade::Runtime::~Runtime()
 {
     // Wait for the command buffer to finish executing
-    m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000);
+    VK_CHECK(m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, VK_TRUE, FENCE_TIMEOUT_NS));
 
     // Clean up
     m_device.dispatch.DestroyCommandPool(m_device.handle, m_commandPool, nullptr);
@@ -123,7 +127,7 @@ void vkShade::Runtime::on_effects_changed(const std::string& key, std::vector<st
     auto searchPaths = config.get<std::vector<std::string>>("ReShade", "EffectSearchPaths");
 
     // Wait for the command buffer to finish executing
-    m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000);
+    VK_CHECK(m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, VK_TRUE, FENCE_TIMEOUT_NS));
 
     m_effects.clear();
     std::vector<std::string> loadedEffects;
@@ -178,8 +182,8 @@ void vkShade::Runtime::render(uint32_t imageIndex)
     VulkanImage* swapchainImage = m_images.at(imageIndex).get();
     const auto reshadeFrameState = this->update_time();
 
-    // Wait until the previous command buffer has finished executing. Timeout of 1 second.
-	VK_CHECK(m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, 1000000000));
+    // Wait until the previous command buffer has finished executing.
+	VK_CHECK(m_device.dispatch.WaitForFences(m_device.handle, 1, &m_fence, true, FENCE_TIMEOUT_NS));
 	VK_CHECK(m_device.dispatch.ResetFences(m_device.handle, 1, &m_fence));
 
     // Reset the command buffer
