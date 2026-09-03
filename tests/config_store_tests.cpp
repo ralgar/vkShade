@@ -44,6 +44,46 @@ private:
     std::filesystem::path m_path;
 };
 
+class ReloadReplacementListener
+{
+public:
+    void on_value(const std::string&, const std::string&)
+    {
+        callCount++;
+    }
+
+    uint32_t callCount {0};
+};
+
+class ReloadMutationListener
+{
+public:
+    ReloadMutationListener(ConfigStore& config,
+                           ReloadReplacementListener& removed,
+                           ReloadReplacementListener& replacement)
+        : m_config(config),
+          m_removed(removed),
+          m_replacement(replacement)
+    {
+    }
+
+    void on_value(const std::string&, const std::string&)
+    {
+        callCount++;
+        m_config.on_changed("reload", "value")
+            .disconnect<&ReloadReplacementListener::on_value>(&m_removed);
+        m_config.on_changed("reload", "value")
+            .connect<&ReloadReplacementListener::on_value>(&m_replacement);
+    }
+
+    uint32_t callCount {0};
+
+private:
+    ConfigStore& m_config;
+    ReloadReplacementListener& m_removed;
+    ReloadReplacementListener& m_replacement;
+};
+
 TEST_CASE("ConfigStore: Set and get string", "[config][manager]")
 {
     ConfigStore config(ConfigStore::Type::Internal);
@@ -221,6 +261,34 @@ TEST_CASE("ConfigStore: Load from file", "[config][manager]")
     REQUIRE(*vsync == true);
     REQUIRE(volume.has_value());
     REQUIRE_THAT(*volume, Catch::Matchers::WithinRel(0.75f, 0.01f));
+}
+
+TEST_CASE("ConfigStore: Reload tolerates subscription changes from callbacks",
+          "[config][manager][observer]")
+{
+    TempConfigFile tempFile("test_reload_subscription_mutation.ini");
+    tempFile.write("[reload]\nvalue = first\n");
+
+    ConfigStore config(ConfigStore::Type::Internal);
+    ReloadReplacementListener removed;
+    ReloadReplacementListener replacement;
+    ReloadMutationListener mutation(config, removed, replacement);
+
+    config.on_changed("reload", "value")
+        .connect<&ReloadMutationListener::on_value>(&mutation);
+    config.on_changed("reload", "value")
+        .connect<&ReloadReplacementListener::on_value>(&removed);
+
+    REQUIRE(config.load(tempFile.path()));
+    CHECK(mutation.callCount == 1);
+    CHECK(removed.callCount == 0);
+    CHECK(replacement.callCount == 0);
+
+    tempFile.write("[reload]\nvalue = second\n");
+    REQUIRE(config.load(tempFile.path()));
+    CHECK(mutation.callCount == 2);
+    CHECK(removed.callCount == 0);
+    CHECK(replacement.callCount == 1);
 }
 
 TEST_CASE("ConfigStore: Load non-existent file does nothing", "[config][manager]")

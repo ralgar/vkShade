@@ -68,6 +68,46 @@ private:
     uint32_t m_callCount = 0;
 };
 
+class ObserverReplacementListener
+{
+public:
+    void on_value(const std::string&, const std::string&)
+    {
+        callCount++;
+    }
+
+    uint32_t callCount {0};
+};
+
+class ObserverMutationListener
+{
+public:
+    ObserverMutationListener(ConfigObserver& observer,
+                             ObserverReplacementListener& removed,
+                             ObserverReplacementListener& replacement)
+        : m_observer(observer),
+          m_removed(removed),
+          m_replacement(replacement)
+    {
+    }
+
+    void on_value(const std::string&, const std::string&)
+    {
+        callCount++;
+        m_observer.on_changed("test", "value")
+            .disconnect<&ObserverReplacementListener::on_value>(&m_removed);
+        m_observer.on_changed("test", "value")
+            .connect<&ObserverReplacementListener::on_value>(&m_replacement);
+    }
+
+    uint32_t callCount {0};
+
+private:
+    ConfigObserver& m_observer;
+    ObserverReplacementListener& m_removed;
+    ObserverReplacementListener& m_replacement;
+};
+
 TEST_CASE("ConfigObserver: Connect free function and notify", "[config][observer]")
 {
     g_callbackLog.clear();
@@ -106,6 +146,30 @@ TEST_CASE("ConfigObserver: Multiple handlers for same key", "[config][observer]"
     REQUIRE(g_callbackLog[0] == "string:hello");
     REQUIRE(listener.get_call_count() == 1);
     REQUIRE(listener.get_last_string() == "hello");
+}
+
+TEST_CASE("ConfigObserver: Subscription changes take effect on the next notification",
+          "[config][observer]")
+{
+    ConfigObserver observer;
+    ObserverReplacementListener removed;
+    ObserverReplacementListener replacement;
+    ObserverMutationListener mutation(observer, removed, replacement);
+
+    observer.on_changed("test", "value")
+        .connect<&ObserverMutationListener::on_value>(&mutation);
+    observer.on_changed("test", "value")
+        .connect<&ObserverReplacementListener::on_value>(&removed);
+
+    observer.notify("test", "value", std::string("first"));
+    CHECK(mutation.callCount == 1);
+    CHECK(removed.callCount == 0);
+    CHECK(replacement.callCount == 0);
+
+    observer.notify("test", "value", std::string("second"));
+    CHECK(mutation.callCount == 2);
+    CHECK(removed.callCount == 0);
+    CHECK(replacement.callCount == 1);
 }
 
 TEST_CASE("ConfigObserver: Different sections and keys don't interfere", "[config][observer]")

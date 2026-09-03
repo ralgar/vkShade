@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -54,21 +56,23 @@ namespace vkShade
             if (it == m_subscribers.end())
                 return;
 
-            std::vector<Subscription> snapshot = it->second;
+            const auto snapshot = it->second;
 
             for (const auto& subscription : snapshot)
-                subscription.callback(&value, subscription.instance, key);
+                if (subscription->connected)
+                    subscription->callback(&value, subscription->instance, key);
         }
 
         void notify_all(ConfigStore& store)
         {
-            std::vector<Subscription> snapshot;
+            std::vector<std::shared_ptr<Subscription>> snapshot;
 
             for (const auto& [_, subscriptions] : m_subscribers)
                 snapshot.insert(snapshot.end(), subscriptions.begin(), subscriptions.end());
 
-            for (auto& subscription : snapshot)
-                subscription.reload(store);
+            for (const auto& subscription : snapshot)
+                if (subscription->connected)
+                    subscription->reload(store);
         }
 
     private:
@@ -76,6 +80,7 @@ namespace vkShade
 
         struct Subscription
         {
+            bool connected {true};
             std::string section;
             std::string key;
 
@@ -86,8 +91,10 @@ namespace vkShade
             std::function<void(ConfigStore&)> reload;
         };
 
-        // Map: "Section::Key" -> [Subscription]
-        std::unordered_map<std::string, std::vector<Subscription>> m_subscribers;
+        // Snapshots share each node's connection state with the live list, so
+        // disconnecting a handler suppresses it without a second lookup index.
+        using SubscriptionPtr = std::shared_ptr<Subscription>;
+        std::unordered_map<std::string, std::vector<SubscriptionPtr>> m_subscribers;
 
         // Helper traits
         template<typename T>

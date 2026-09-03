@@ -23,26 +23,26 @@ namespace vkShade
 
         // Check if already connected
         auto& handlers = m_subscribers[mapKey];
-        for (const auto& sub : handlers)
-        {
-            if (sub.function == pFunction && sub.instance == nullptr)
-                return;  // Already connected
-        }
+        if (std::ranges::any_of(handlers, [pFunction](const SubscriptionPtr& sub)
+            {
+                return sub->function == pFunction && sub->instance == nullptr;
+            }))
+            return;  // Already connected
 
         // If not, create a new subscription.
-        Subscription subscription;
+        auto subscription = std::make_shared<Subscription>();
 
-        subscription.section = section;
-        subscription.key = key;
-        subscription.function = pFunction;
-        subscription.instance = nullptr;
+        subscription->section = section;
+        subscription->key = key;
+        subscription->function = pFunction;
+        subscription->instance = nullptr;
 
-        subscription.callback = [](const void* pValue, void*, const std::string& k)
+        subscription->callback = [](const void* pValue, void*, const std::string& k)
         {
             Func(k, *static_cast<const ArgType*>(pValue));
         };
 
-        subscription.reload = [section, key](ConfigStore& store)
+        subscription->reload = [section, key](ConfigStore& store)
         {
             auto value = store.get<ArgType>(section, key);
 
@@ -71,27 +71,27 @@ namespace vkShade
 
         // Check if already connected
         auto& handlers = m_subscribers[mapKey];
-        for (const auto& sub : handlers)
-        {
-            if (sub.function == pMethod && sub.instance == instance)
-                return;  // Already connected
-        }
+        if (std::ranges::any_of(handlers, [pMethod, instance](const SubscriptionPtr& sub)
+            {
+                return sub->function == pMethod && sub->instance == instance;
+            }))
+            return;  // Already connected
 
         // If not then create a new subscription
-        Subscription subscription;
+        auto subscription = std::make_shared<Subscription>();
 
-        subscription.section = section;
-        subscription.key = key;
-        subscription.function = pMethod;
-        subscription.instance = instance;
+        subscription->section = section;
+        subscription->key = key;
+        subscription->function = pMethod;
+        subscription->instance = instance;
 
-        subscription.callback = [](const void* pValue, void* pInstance, const std::string& k)
+        subscription->callback = [](const void* pValue, void* pInstance, const std::string& k)
         {
             Class* obj = static_cast<Class*>(pInstance);
             (obj->*Method)(k, *static_cast<const ArgType*>(pValue));
         };
 
-        subscription.reload = [instance, section, key](ConfigStore& store)
+        subscription->reload = [instance, section, key](ConfigStore& store)
         {
             auto value = store.get<ArgType>(section, key);
             if (value)
@@ -113,9 +113,12 @@ namespace vkShade
         {
             auto& handlers = it->second;
             handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
-                [pFunction](const Subscription& sub)
+                [pFunction](const SubscriptionPtr& sub)
                 {
-                    return sub.function == pFunction && sub.instance == nullptr;
+                    const bool matches = sub->function == pFunction && sub->instance == nullptr;
+                    if (matches)
+                        sub->connected = false;
+                    return matches;
                 }),
                 handlers.end()
             );
@@ -146,9 +149,12 @@ namespace vkShade
         {
             auto& handlers = it->second;
             handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
-                [pMethod, instance](const Subscription& sub)
+                [pMethod, instance](const SubscriptionPtr& sub)
                 {
-                    return sub.function == pMethod && sub.instance == instance;
+                    const bool matches = sub->function == pMethod && sub->instance == instance;
+                    if (matches)
+                        sub->connected = false;
+                    return matches;
                 }),
                 handlers.end()
             );
