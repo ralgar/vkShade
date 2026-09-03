@@ -387,13 +387,13 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
 
     // NOTE: Command buffers are dispatchable types. Their creation must go through our
     //  own hook, not the dispatch table, to ensure the dispatch pointer fixup runs.
-    vkShade_AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd);
+    VK_CHECK(vkShade_AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd));
 
     VkCommandBufferBeginInfo beginInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
-    m_device.dispatch.BeginCommandBuffer(cmd, &beginInfo);
+    VK_CHECK(m_device.dispatch.BeginCommandBuffer(cmd, &beginInfo));
 
     // Transition UNDEFINED -> TRANSFER_DST_OPTIMAL
     this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -418,7 +418,7 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
     // Transition TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
     this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    m_device.dispatch.EndCommandBuffer(cmd);
+    VK_CHECK(m_device.dispatch.EndCommandBuffer(cmd));
 
     VkSubmitInfo submitInfo = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,

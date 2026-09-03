@@ -31,9 +31,9 @@ vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwap
 
     // Get swapchain images
     uint32_t imageCount = 0;
-    m_device.dispatch.GetSwapchainImagesKHR(m_device.handle, swapchain, &imageCount, nullptr);
+    VK_CHECK(m_device.dispatch.GetSwapchainImagesKHR(m_device.handle, swapchain, &imageCount, nullptr));
     std::vector<VkImage> images(imageCount);
-    m_device.dispatch.GetSwapchainImagesKHR(m_device.handle, swapchain, &imageCount, images.data());
+    VK_CHECK(m_device.dispatch.GetSwapchainImagesKHR(m_device.handle, swapchain, &imageCount, images.data()));
 
     // Create image views
     for (auto& image : images)
@@ -73,7 +73,7 @@ vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwap
         .flags = VK_FENCE_CREATE_SIGNALED_BIT,
     };
 
-    m_device.dispatch.CreateFence(m_device.handle, &fenceInfo, nullptr, &m_fence);
+    VK_CHECK(m_device.dispatch.CreateFence(m_device.handle, &fenceInfo, nullptr, &m_fence));
 
     // Allocate command buffer
     VkCommandBufferAllocateInfo allocInfo = {
@@ -194,7 +194,7 @@ void vkShade::Runtime::render(uint32_t imageIndex)
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     };
-    m_device.dispatch.BeginCommandBuffer(m_commandBuffer, &beginInfo);
+    VK_CHECK(m_device.dispatch.BeginCommandBuffer(m_commandBuffer, &beginInfo));
 
     // Blit swapchain image to ping-pong and transition to COLOR_ATTACHMENT
     swapchainImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -270,7 +270,7 @@ void vkShade::Runtime::render(uint32_t imageIndex)
     swapchainImage->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     // End and submit
-    m_device.dispatch.EndCommandBuffer(m_commandBuffer);
+    VK_CHECK(m_device.dispatch.EndCommandBuffer(m_commandBuffer));
 
     VkSubmitInfo submitInfo = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -278,7 +278,7 @@ void vkShade::Runtime::render(uint32_t imageIndex)
         .pCommandBuffers = &m_commandBuffer,
     };
 
-    m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, m_fence);
+    VK_CHECK(m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, m_fence));
     m_frameCount++;
 }
 
