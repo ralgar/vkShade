@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "core/events/reload_effects.hpp"
+#include "effect_reload_state.hpp"
 #include "vk/object.hpp"
 #include "reshade_effect.hpp"
 
@@ -46,6 +47,8 @@ namespace vkShade
         VkFence m_fence {VK_NULL_HANDLE};
         VkCommandPool m_commandPool {VK_NULL_HANDLE};
         VkCommandBuffer m_commandBuffer {VK_NULL_HANDLE};
+        EffectReloadState m_effectReload;
+        bool m_fenceWaitTimedOut {false};
         std::vector<std::shared_ptr<ReshadeEffect>> m_effects;
         std::shared_ptr<VulkanImage> m_pingPongA;
         std::shared_ptr<VulkanImage> m_pingPongB;
@@ -57,5 +60,7 @@ namespace vkShade
 
         [[nodiscard]]
         ReshadeFrameState update_time();
+
+        void reload_effects(const std::vector<std::string>& effects);
     };
 }  // namespace vkShade
