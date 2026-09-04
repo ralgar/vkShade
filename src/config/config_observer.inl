@@ -45,9 +45,7 @@ namespace vkShade
         subscription.reload = [section, key](ConfigStore& store)
         {
             auto value = store.get<ArgType>(section, key);
-
-            if (value)
-                Func(key, *value);
+            Func(key, value ? *value : ArgType{});
         };
 
         handlers.push_back(std::move(subscription));
@@ -94,8 +92,7 @@ namespace vkShade
         subscription.reload = [instance, section, key](ConfigStore& store)
         {
             auto value = store.get<ArgType>(section, key);
-            if (value)
-                (instance->*Method)(key, *value);
+            (instance->*Method)(key, value ? *value : ArgType{});
         };
 
         handlers.push_back(std::move(subscription));
