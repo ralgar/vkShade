@@ -48,20 +48,30 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
     if ((perms & std::filesystem::perms::owner_read) == std::filesystem::perms::none)
         return false;
 
-    // Clear existing state if there is any
-    m_watcher.reset();
-    this->clear();
-
     // Parse the INI file
-    int result = ini_parse(filePath.string().c_str(), config_ini_handler, &m_config);
+    std::unordered_map<std::string, std::string> config;
+    int result = ini_parse(filePath.string().c_str(), config_ini_handler, &config);
     if (result != 0)
     {
-        Logger::error("Failed to load or parse config file: {}", filePath.c_str());
+        if (result > 0)
+            Logger::error("Failed to parse file at line {}: {}", result, filePath.string());
+        else if (result == -1)
+            Logger::error("Failed to open file for parsing: {}", filePath.string());
+        else
+            Logger::error("Failed to parse file (error {}): {}", result, filePath.string());
+
         return false;
     }
 
+    // Clear old state
+    m_watcher.reset();
+    this->clear();
+
+    // Commit new state
+    m_config = std::move(config);
     m_observer.notify_all(*this);
 
+    // Set up the file watcher
     m_watcher = Platform::FileWatcher::create();
     m_watcher->watch(filePath);
 
