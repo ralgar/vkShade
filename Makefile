@@ -73,4 +73,5 @@ venv:
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf $(BUILD32_DIR)
+	meson subprojects purge --confirm
 	rm -rf docs/content/reference/generated/csharp venv
