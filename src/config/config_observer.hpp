@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -57,7 +58,8 @@ namespace vkShade
             std::vector<Subscription> snapshot = it->second;
 
             for (const auto& subscription : snapshot)
-                subscription.callback(&value, subscription.instance, key);
+                if (*subscription.alive)
+                    subscription.callback(&value, subscription.instance, key);
         }
 
         void notify_all(ConfigStore& store)
@@ -68,7 +70,8 @@ namespace vkShade
                 snapshot.insert(snapshot.end(), subscriptions.begin(), subscriptions.end());
 
             for (auto& subscription : snapshot)
-                subscription.reload(store);
+                if (*subscription.alive)
+                    subscription.reload(store);
         }
 
     private:
@@ -84,6 +87,9 @@ namespace vkShade
 
             Callback callback;
             std::function<void(ConfigStore&)> reload;
+
+            // Track liveness so we don't use-after-free in snapshots
+            std::shared_ptr<bool> alive = std::make_shared<bool>(true);
         };
 
         // Map: "Section::Key" -> [Subscription]

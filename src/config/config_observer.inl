@@ -112,6 +112,11 @@ namespace vkShade
         if (it != m_subscribers.end())
         {
             auto& handlers = it->second;
+
+            for (auto& sub : handlers)
+                if (sub.function == pFunction && sub.instance == nullptr)
+                    *sub.alive = false;
+
             handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
                 [pFunction](const Subscription& sub)
                 {
@@ -145,6 +150,11 @@ namespace vkShade
         if (it != m_subscribers.end())
         {
             auto& handlers = it->second;
+
+            for (auto& sub : handlers)
+                if (sub.function == pMethod && sub.instance == instance)
+                    *sub.alive = false;
+
             handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
                 [pMethod, instance](const Subscription& sub)
                 {
