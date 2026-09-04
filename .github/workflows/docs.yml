@@ -4,11 +4,22 @@ name: Docs
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
+  lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/igorshubovych/markdownlint-cli:v0.49.1
+    steps:
+      - uses: actions/checkout@v4
+      - run: markdownlint "**/*.md"
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -24,27 +35,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y doxygen
 
-      - name: Build documentation
-        run: |
-          doxygen ./docs/Doxyfile
-          mkdocs build --strict -f ./docs/mkdocs.yml
+      - name: Generate API reference
+        run: doxygen ./docs/Doxyfile
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Build documentation
+        run: mkdocs build --strict -f ./docs/mkdocs.yml
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs/site
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
-
     permissions:
       pages: write
       id-token: write
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
