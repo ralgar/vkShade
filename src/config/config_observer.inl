@@ -33,8 +33,6 @@ namespace vkShade
         // If not, create a new subscription.
         auto subscription = std::make_shared<Subscription>();
 
-        subscription->section = section;
-        subscription->key = key;
         subscription->function = pFunction;
         subscription->instance = nullptr;
 
@@ -79,8 +77,6 @@ namespace vkShade
         // If not then create a new subscription
         auto subscription = std::make_shared<Subscription>();
 
-        subscription->section = section;
-        subscription->key = key;
         subscription->function = pMethod;
         subscription->instance = instance;
 

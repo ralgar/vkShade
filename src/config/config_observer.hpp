@@ -79,9 +79,6 @@ namespace vkShade
 
         struct Subscription
         {
-            std::string section;
-            std::string key;
-
             void* function;
             void* instance;
 
