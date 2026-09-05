@@ -28,21 +28,30 @@ namespace vkShade::Platform
         bool watch(const std::filesystem::path& path) override
         {
             // Remove any existing watch first
-            if (m_watchDescriptor >= 0)
-            {
-                inotify_rm_watch(m_fd, m_watchDescriptor);
-                m_watchDescriptor = -1;
-            }
+            this->unwatch();
 
-            std::filesystem::path absolutePath = std::filesystem::absolute(path);
+            m_path = std::filesystem::absolute(path);
 
-            m_directory = absolutePath.parent_path();
-            m_filename = absolutePath.filename();
-
-            m_watchDescriptor = inotify_add_watch(m_fd, m_directory.c_str(),
+            m_watchDescriptor = inotify_add_watch(m_fd, m_path.parent_path().c_str(),
                 IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE | IN_DELETE | IN_DELETE_SELF);
 
+            if (m_watchDescriptor >= 0)
+                Logger::debug("Watching for changes: {}", m_path.string());
+
             return m_watchDescriptor >= 0;
+        }
+
+        void unwatch() override
+        {
+            if (m_watchDescriptor >= 0)
+            {
+                if (inotify_rm_watch(m_fd, m_watchDescriptor) != 0)
+                    Logger::trace("inotify_rm_watch() failed (errno {}), descriptor may already be invalid", errno);
+
+                Logger::debug("Stopped watching: {}", m_path.string());
+                m_watchDescriptor = -1;
+                m_path.clear();
+            }
         }
 
         bool changed() override
@@ -88,17 +97,17 @@ namespace vkShade::Platform
                         {
                             // The watch was invalidated, e.g. because the watched
                             //  directory was deleted or unmounted.
-                            Logger::error("inotify watch invalidated: {}", m_directory.string());
+                            Logger::error("inotify watch invalidated: {}", m_path.parent_path().string());
                             m_watchDescriptor = -1;
                             changed = false;
                         }
-                        else if (event->len > 0 && m_filename == event->name)
+                        else if (event->len > 0 && m_path.filename() == event->name)
                         {
                             // Treat writes, atomic replacements, creation, and deletion as changes.
                             // Editors commonly replace files by renaming a temporary file over them.
                             if (event->mask & (IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE | IN_DELETE))
                             {
-                                Logger::debug("File change detected: {}", m_filename.string());
+                                Logger::debug("Change detected: {}", m_path.string());
                                 changed = true;
                             }
                         }
@@ -115,7 +124,6 @@ namespace vkShade::Platform
         int m_fd {-1};
         int m_watchDescriptor {-1};
 
-        std::filesystem::path m_directory;
-        std::filesystem::path m_filename;
+        std::filesystem::path m_path;
     };
 } // namespace vkShade::Platform
