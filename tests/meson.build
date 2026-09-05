@@ -89,6 +89,8 @@ fake_sdl3 = shared_module('fake_sdl3',
 
 sdl_module_tests = executable('sdl_module_tests',
   'sdl_module_tests.cpp',
+  '../src/input/application_mouse_inhibitors.cpp',
+  '../src/input/mouse_input_inhibitor_group.cpp',
   '../src/input/sdl_module.cpp',
   cpp_args : [
     '-DFAKE_SDL2_PATH="' + fake_sdl2.full_path() + '"',
@@ -96,6 +98,7 @@ sdl_module_tests = executable('sdl_module_tests',
   ],
   dependencies : [
     catch2,
+    spdlog,
   ],
   include_directories : include_directories('../src')
 )
