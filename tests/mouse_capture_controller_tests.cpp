@@ -86,11 +86,13 @@ TEST_CASE("Mouse capture transitions application and backend once")
     CHECK(controller.get_status() == MouseCaptureStatus::Active);
     CHECK(inhibitor.inhibitCalls == 1);
     CHECK(backend.acquireCalls == 1);
+    CHECK(inhibitor.reconcileCalls == 0);
 
     controller.set_requested(true, start + 1ms);
     controller.update(start + 2ms);
 
     CHECK(inhibitor.inhibitCalls == 1);
+    CHECK(inhibitor.reconcileCalls == 2);
     CHECK(backend.acquireCalls == 1);
 
     controller.set_requested(false, start + 3ms);

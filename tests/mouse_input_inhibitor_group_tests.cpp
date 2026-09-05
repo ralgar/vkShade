@@ -57,12 +57,15 @@ TEST_CASE("Mouse input inhibitor group restores only active members in reverse o
     group.add(std::make_unique<RecordingInhibitor>("Wine", true, calls));
 
     CHECK(group.inhibit());
+    group.reconcile();
     group.restore();
 
     CHECK(calls == std::vector<std::string> {
         "inhibit SDL",
         "inhibit Unavailable",
         "inhibit Wine",
+        "reconcile SDL",
+        "reconcile Wine",
         "restore Wine",
         "restore SDL",
     });
