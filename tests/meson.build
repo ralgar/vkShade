@@ -75,6 +75,31 @@ mouse_input_inhibitor_group_tests = executable('mouse_input_inhibitor_group_test
   include_directories : include_directories('../src')
 )
 
+fake_sdl2 = shared_module('fake_sdl2',
+  'fake_sdl2.cpp',
+  name_prefix : '',
+  install : false,
+)
+
+fake_sdl3 = shared_module('fake_sdl3',
+  'fake_sdl3.cpp',
+  name_prefix : '',
+  install : false,
+)
+
+sdl_module_tests = executable('sdl_module_tests',
+  'sdl_module_tests.cpp',
+  '../src/input/sdl_module.cpp',
+  cpp_args : [
+    '-DFAKE_SDL2_PATH="' + fake_sdl2.full_path() + '"',
+    '-DFAKE_SDL3_PATH="' + fake_sdl3.full_path() + '"',
+  ],
+  dependencies : [
+    catch2,
+  ],
+  include_directories : include_directories('../src')
+)
+
 test('ConfigObserver', config_observer_tests)
 test('ConfigParser', config_parser_tests)
 test('ConfigStore', config_store_tests)
@@ -83,3 +108,9 @@ test('ReshadeUniforms', reshade_uniform_tests)
 test('MouseCaptureController', mouse_capture_controller_tests)
 test('VirtualMouseCursor', virtual_mouse_cursor_tests)
 test('MouseInputInhibitorGroup', mouse_input_inhibitor_group_tests)
+test('SdlModule', sdl_module_tests,
+  depends : [
+    fake_sdl2,
+    fake_sdl3,
+  ]
+)
