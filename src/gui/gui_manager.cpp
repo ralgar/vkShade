@@ -8,6 +8,7 @@
 #include "core/logger.hpp"
 #include "hooks/hooks.hpp"
 #include "input/input_events.hpp"
+#include "input/input_manager.hpp"
 #include "windows/main_window.hpp"
 #include "vk/macros.hpp"
 #include "gui_style.hpp"
@@ -113,6 +114,9 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
 vkShade::GuiManager::~GuiManager()
 {
+    if (vkShade::Locator<InputManager>::has())
+        vkShade::Locator<InputManager>::get().capture_mouse(false);
+
     // Unsubscribe from input events
     auto& eventBus = Locator<EventBus>::get();
     eventBus.sink<KeyboardEvent>().disconnect<&GuiManager::on_keyboard_event>(this);
