@@ -55,23 +55,23 @@ namespace vkShade
             if (it == m_subscribers.end())
                 return;
 
-            std::vector<Subscription> snapshot = it->second;
+            std::vector<SubscriptionWeakPtr> snapshot(it->second.begin(), it->second.end());
 
-            for (const auto& subscription : snapshot)
-                if (*subscription.alive)
-                    subscription.callback(&value, subscription.instance, key);
+            for (const auto& weakPtr : snapshot)
+                if (auto subscription = weakPtr.lock())  // Still alive?
+                    subscription->callback(&value, subscription->instance, key);
         }
 
         void notify_all(ConfigStore& store)
         {
-            std::vector<Subscription> snapshot;
+            std::vector<SubscriptionWeakPtr> snapshot;
 
             for (const auto& [_, subscriptions] : m_subscribers)
                 snapshot.insert(snapshot.end(), subscriptions.begin(), subscriptions.end());
 
-            for (auto& subscription : snapshot)
-                if (*subscription.alive)
-                    subscription.reload(store);
+            for (const auto& weakPtr : snapshot)
+                if (auto subscription = weakPtr.lock())  // Still alive?
+                    subscription->reload(store);
         }
 
     private:
@@ -79,21 +79,18 @@ namespace vkShade
 
         struct Subscription
         {
-            std::string section;
-            std::string key;
-
             void* function;
             void* instance;
 
             Callback callback;
             std::function<void(ConfigStore&)> reload;
-
-            // Track liveness so we don't use-after-free in snapshots
-            std::shared_ptr<bool> alive = std::make_shared<bool>(true);
         };
 
-        // Map: "Section::Key" -> [Subscription]
-        std::unordered_map<std::string, std::vector<Subscription>> m_subscribers;
+        using SubscriptionPtr = std::shared_ptr<Subscription>;
+        using SubscriptionWeakPtr = std::weak_ptr<Subscription>;
+
+        // Map: "Section::Key" -> [SubscriptionPtr]
+        std::unordered_map<std::string, std::vector<SubscriptionPtr>> m_subscribers;
 
         // Helper traits
         template<typename T>
