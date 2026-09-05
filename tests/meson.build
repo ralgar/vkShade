@@ -66,6 +66,15 @@ virtual_mouse_cursor_tests = executable('virtual_mouse_cursor_tests',
   include_directories : include_directories('../src')
 )
 
+mouse_input_inhibitor_group_tests = executable('mouse_input_inhibitor_group_tests',
+  'mouse_input_inhibitor_group_tests.cpp',
+  '../src/input/mouse_input_inhibitor_group.cpp',
+  dependencies : [
+    catch2,
+  ],
+  include_directories : include_directories('../src')
+)
+
 test('ConfigObserver', config_observer_tests)
 test('ConfigParser', config_parser_tests)
 test('ConfigStore', config_store_tests)
@@ -73,3 +82,4 @@ test('EventBus', event_bus_tests)
 test('ReshadeUniforms', reshade_uniform_tests)
 test('MouseCaptureController', mouse_capture_controller_tests)
 test('VirtualMouseCursor', virtual_mouse_cursor_tests)
+test('MouseInputInhibitorGroup', mouse_input_inhibitor_group_tests)
