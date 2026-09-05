@@ -2,6 +2,7 @@
 
 #include "config_observer.hpp"
 #include "config_store.hpp"
+#include <memory>
 
 // This file must only be included from config_store.hpp, AFTER
 // class ConfigStore is fully defined. connect_impl's body calls
@@ -25,24 +26,24 @@ namespace vkShade
         auto& handlers = m_subscribers[mapKey];
         for (const auto& sub : handlers)
         {
-            if (sub.function == pFunction && sub.instance == nullptr)
+            if (sub->function == pFunction && sub->instance == nullptr)
                 return;  // Already connected
         }
 
         // If not, create a new subscription.
-        Subscription subscription;
+        auto subscription = std::make_shared<Subscription>();
 
-        subscription.section = section;
-        subscription.key = key;
-        subscription.function = pFunction;
-        subscription.instance = nullptr;
+        subscription->section = section;
+        subscription->key = key;
+        subscription->function = pFunction;
+        subscription->instance = nullptr;
 
-        subscription.callback = [](const void* pValue, void*, const std::string& k)
+        subscription->callback = [](const void* pValue, void*, const std::string& k)
         {
             Func(k, *static_cast<const ArgType*>(pValue));
         };
 
-        subscription.reload = [section, key](ConfigStore& store)
+        subscription->reload = [section, key](ConfigStore& store)
         {
             auto value = store.get<ArgType>(section, key);
             Func(key, value ? *value : ArgType{});
@@ -71,25 +72,25 @@ namespace vkShade
         auto& handlers = m_subscribers[mapKey];
         for (const auto& sub : handlers)
         {
-            if (sub.function == pMethod && sub.instance == instance)
+            if (sub->function == pMethod && sub->instance == instance)
                 return;  // Already connected
         }
 
         // If not then create a new subscription
-        Subscription subscription;
+        auto subscription = std::make_shared<Subscription>();
 
-        subscription.section = section;
-        subscription.key = key;
-        subscription.function = pMethod;
-        subscription.instance = instance;
+        subscription->section = section;
+        subscription->key = key;
+        subscription->function = pMethod;
+        subscription->instance = instance;
 
-        subscription.callback = [](const void* pValue, void* pInstance, const std::string& k)
+        subscription->callback = [](const void* pValue, void* pInstance, const std::string& k)
         {
             Class* obj = static_cast<Class*>(pInstance);
             (obj->*Method)(k, *static_cast<const ArgType*>(pValue));
         };
 
-        subscription.reload = [instance, section, key](ConfigStore& store)
+        subscription->reload = [instance, section, key](ConfigStore& store)
         {
             auto value = store.get<ArgType>(section, key);
             (instance->*Method)(key, value ? *value : ArgType{});
@@ -109,15 +110,10 @@ namespace vkShade
         if (it != m_subscribers.end())
         {
             auto& handlers = it->second;
-
-            for (auto& sub : handlers)
-                if (sub.function == pFunction && sub.instance == nullptr)
-                    *sub.alive = false;
-
             handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
-                [pFunction](const Subscription& sub)
+                [pFunction](const SubscriptionPtr& sub)
                 {
-                    return sub.function == pFunction && sub.instance == nullptr;
+                    return sub->function == pFunction && sub->instance == nullptr;
                 }),
                 handlers.end()
             );
@@ -147,15 +143,10 @@ namespace vkShade
         if (it != m_subscribers.end())
         {
             auto& handlers = it->second;
-
-            for (auto& sub : handlers)
-                if (sub.function == pMethod && sub.instance == instance)
-                    *sub.alive = false;
-
             handlers.erase(std::remove_if(handlers.begin(), handlers.end(),
-                [pMethod, instance](const Subscription& sub)
+                [pMethod, instance](const SubscriptionPtr& sub)
                 {
-                    return sub.function == pMethod && sub.instance == instance;
+                    return sub->function == pMethod && sub->instance == instance;
                 }),
                 handlers.end()
             );
