@@ -18,7 +18,9 @@ namespace vkShade
     private:
         Display* m_display;
         Display* m_wheelDisplay {nullptr};
+        int      m_wheelXiOpcode {0};
         Window   m_window;
+        Window   m_topLevelWindow {0};
         char     m_previousKeymap[32];  // Track previous keyboard state
 
         // Track previous mouse state
@@ -30,5 +32,8 @@ namespace vkShade
         void handle_key_event(uint32_t keyCode, bool pressed);
         void query_mouse_state();
         void update_modifiers(unsigned int state);
+        bool is_window_active(Display* display);
+        bool is_pointer_inside_window(Display* display);
+        static Window get_top_level_window(Display* display, Window window);
     };
 } // namespace vkShade

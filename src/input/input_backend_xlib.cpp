@@ -3,6 +3,8 @@
 #include <cstring>
 
 #include "core/logger.hpp"
+#include <X11/extensions/XInput2.h>
+#include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
@@ -21,12 +23,37 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
     // Initialize previous key states
     std::memset(m_previousKeymap, 0, sizeof(m_previousKeymap));
 
-    // Observe wheel button events without consuming the application's queue.
+    // Observe raw wheel button events without selecting exclusive core button
+    // events from the application's window.
     m_wheelDisplay = XOpenDisplay(DisplayString(m_display));
     if (m_wheelDisplay)
     {
-        XSelectInput(m_wheelDisplay, m_window, ButtonPressMask | ButtonReleaseMask);
-        XFlush(m_wheelDisplay);
+        m_topLevelWindow = get_top_level_window(m_wheelDisplay, m_window);
+        int event = 0;
+        int error = 0;
+        int major = 2;
+        int minor = 0;
+        const bool xi2Available = XQueryExtension(m_wheelDisplay, "XInputExtension",
+            &m_wheelXiOpcode, &event, &error) && XIQueryVersion(m_wheelDisplay, &major, &minor) == Success;
+
+        if (xi2Available)
+        {
+            unsigned char mask[XIMaskLen(XI_RawButtonPress)] {};
+            XISetMask(mask, XI_RawButtonPress);
+            XIEventMask eventMask {
+                .deviceid = XIAllMasterDevices,
+                .mask_len = static_cast<int>(sizeof(mask)),
+                .mask = mask,
+            };
+            XISelectEvents(m_wheelDisplay, DefaultRootWindow(m_wheelDisplay), &eventMask, 1);
+            XFlush(m_wheelDisplay);
+        }
+        else
+        {
+            Logger::warn("[Xlib] XInput2 is unavailable for mouse wheel input");
+            XCloseDisplay(m_wheelDisplay);
+            m_wheelDisplay = nullptr;
+        }
     }
     else
     {
@@ -73,18 +100,29 @@ void vkShade::InputBackendXlib::process_events()
         {
             XEvent event {};
             XNextEvent(m_wheelDisplay, &event);
-            if (event.type == ButtonPress
-                && event.xbutton.button >= Button4 && event.xbutton.button <= 7)
+            if (event.type != GenericEvent
+                || event.xcookie.extension != m_wheelXiOpcode
+                || event.xcookie.evtype != XI_RawButtonPress
+                || !XGetEventData(m_wheelDisplay, &event.xcookie))
+                continue;
+
+            const auto* rawEvent = static_cast<XIRawEvent*>(event.xcookie.data);
+            const int button = rawEvent->detail;
+            XFreeEventData(m_wheelDisplay, &event.xcookie);
+
+            if (button >= Button4 && button <= 7
+                && is_window_active(m_wheelDisplay)
+                && is_pointer_inside_window(m_wheelDisplay))
             {
-                if (event.xbutton.button <= Button5)
+                if (button <= Button5)
                 {
                     handle_mouse_wheel_event(
-                        0.0f, event.xbutton.button == Button4 ? 1.0f : -1.0f);
+                        0.0f, button == Button4 ? 1.0f : -1.0f);
                 }
                 else
                 {
                     handle_mouse_wheel_event(
-                        event.xbutton.button == 6 ? 1.0f : -1.0f, 0.0f);
+                        button == 6 ? 1.0f : -1.0f, 0.0f);
                 }
             }
         }
@@ -92,6 +130,81 @@ void vkShade::InputBackendXlib::process_events()
 
     // Query mouse state
     query_mouse_state();
+}
+
+Window vkShade::InputBackendXlib::get_top_level_window(Display* display, Window window)
+{
+    // Focus properties may identify a Wine child or window-manager frame, so comparisons use top-level identities.
+    Window root = None;
+    Window parent = None;
+    Window* children = nullptr;
+    unsigned int childCount = 0;
+    Window current = window;
+
+    while (XQueryTree(display, current, &root, &parent, &children, &childCount))
+    {
+        if (children)
+            XFree(children);
+        if (parent == None || parent == root)
+            return current;
+        current = parent;
+    }
+    return window;
+}
+
+bool vkShade::InputBackendXlib::is_window_active(Display* display)
+{
+    // Root-window XI2 events are shared across X11 clients, so forward them only while this surface owns focus.
+    Window focusWindow = None;
+    int revertTo = RevertToNone;
+    XGetInputFocus(display, &focusWindow, &revertTo);
+    if (focusWindow == None || focusWindow == PointerRoot
+        || get_top_level_window(display, focusWindow) != m_topLevelWindow)
+        return false;
+
+    const Atom activeWindowAtom = XInternAtom(display, "_NET_ACTIVE_WINDOW", True);
+    if (activeWindowAtom == None)
+        return true;
+
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long itemCount = 0;
+    unsigned long remaining = 0;
+    unsigned char* data = nullptr;
+    const int result = XGetWindowProperty(
+        display, DefaultRootWindow(display), activeWindowAtom,
+        0, 1, False, XA_WINDOW, &actualType, &actualFormat,
+        &itemCount, &remaining, &data);
+    Window activeWindow = None;
+    if (result == Success && actualType == XA_WINDOW && actualFormat == 32 && itemCount == 1)
+        activeWindow = *reinterpret_cast<Window*>(data);
+    if (data)
+        XFree(data);
+
+    return activeWindow == None
+        || get_top_level_window(display, activeWindow) == m_topLevelWindow;
+}
+
+bool vkShade::InputBackendXlib::is_pointer_inside_window(Display* display)
+{
+    // Keyboard focus may remain here after the pointer leaves, but the global XI2 observer continues receiving events.
+    XWindowAttributes attributes {};
+    if (!XGetWindowAttributes(display, m_window, &attributes))
+        return false;
+
+    Window root = None;
+    Window child = None;
+    int rootX = 0;
+    int rootY = 0;
+    int windowX = 0;
+    int windowY = 0;
+    unsigned int mask = 0;
+    if (!XQueryPointer(display, m_window, &root, &child,
+                       &rootX, &rootY, &windowX, &windowY, &mask))
+        return false;
+
+    return windowX >= 0 && windowY >= 0
+        && windowX < attributes.width && windowY < attributes.height;
 }
 
 void vkShade::InputBackendXlib::handle_key_event(uint32_t keyCode, bool pressed)

@@ -16,6 +16,7 @@ libinput_library = static_library(
     wayland_client,
     x11,
     xcb,
+    xi,
     xkbcommon,
   ],
   include_directories : vkShade_include_path
