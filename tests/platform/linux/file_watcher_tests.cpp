@@ -170,3 +170,61 @@ TEST_CASE("LinuxFileWatcher: Can re-watch after the underlying directory was del
     write_file(file, "changed");
     REQUIRE(watcher.changed());
 }
+
+TEST_CASE("LinuxFileWatcher: unwatch() stops detecting changes", "[platform][filewatcher]")
+{
+    fs::path dir = make_temp_dir("unwatch_stops");
+    fs::path file = dir / "config.ini";
+    write_file(file);
+
+    LinuxFileWatcher watcher;
+    REQUIRE(watcher.watch(file));
+
+    watcher.unwatch();
+
+    write_file(file, "changed");
+
+    REQUIRE_FALSE(watcher.changed());
+}
+
+TEST_CASE("LinuxFileWatcher: unwatch() with no active watch is safe", "[platform][filewatcher]")
+{
+    LinuxFileWatcher watcher;
+
+    // Never watched anything — should not crash or misbehave.
+    watcher.unwatch();
+    REQUIRE_FALSE(watcher.changed());
+}
+
+TEST_CASE("LinuxFileWatcher: unwatch() can be called twice in a row safely", "[platform][filewatcher]")
+{
+    fs::path dir = make_temp_dir("unwatch_twice");
+    fs::path file = dir / "config.ini";
+    write_file(file);
+
+    LinuxFileWatcher watcher;
+    REQUIRE(watcher.watch(file));
+
+    watcher.unwatch();
+    watcher.unwatch();  // Second call must be a safe no-op, not UB/crash
+
+    write_file(file, "changed");
+    REQUIRE_FALSE(watcher.changed());
+}
+
+TEST_CASE("LinuxFileWatcher: Can watch again after unwatch()", "[platform][filewatcher]")
+{
+    fs::path dir = make_temp_dir("unwatch_then_rewatch");
+    fs::path file = dir / "config.ini";
+    write_file(file);
+
+    LinuxFileWatcher watcher;
+    REQUIRE(watcher.watch(file));
+
+    watcher.unwatch();
+
+    REQUIRE(watcher.watch(file));
+
+    write_file(file, "changed");
+    REQUIRE(watcher.changed());
+}

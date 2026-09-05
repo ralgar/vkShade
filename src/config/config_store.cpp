@@ -7,6 +7,7 @@
 #include <magic_enum/magic_enum.hpp>
 
 #include "core/logger.hpp"
+#include "platform/file_watcher.hpp"
 
 // Static callback function for inih parser
 static int config_ini_handler(void* user, const char* section, const char* name, const char* value)
@@ -27,10 +28,13 @@ vkShade::ConfigStore::ConfigStore(Type type)
 {
     m_typeString = std::string(magic_enum::enum_name(m_type));
     std::transform(m_typeString.begin(), m_typeString.end(), m_typeString.begin(), ::tolower);
+
+    m_watcher = Platform::FileWatcher::create();
 }
 
 void vkShade::ConfigStore::clear()
 {
+    m_watcher->unwatch();
     m_currentFile = std::filesystem::path{};
     m_config.clear();
     m_observer.notify_all(*this);
@@ -63,82 +67,84 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
         return false;
     }
 
-    // Clear old state
-    m_watcher.reset();
+    // Clear old state and commit new
     this->clear();
-
-    // Commit new state
     m_config = std::move(config);
     m_observer.notify_all(*this);
 
-    // Set up the file watcher
-    m_watcher = Platform::FileWatcher::create();
+    m_currentFile = filePath;
     m_watcher->watch(filePath);
 
     Logger::info("Loaded {} file: {}", m_typeString, filePath.string());
-
-    m_currentFile = filePath;
     return true;
 }
 
 bool vkShade::ConfigStore::save(std::filesystem::path filePath)
 {
-    std::ofstream file(filePath);
-    if (!file.is_open())
-    {
-        Logger::error("Failed to open {} file for writing: {}", m_typeString, filePath.string());
-        return false;
-    }
-
-    // Group by section
-    std::map<std::string, std::vector<std::pair<std::string, std::string>>> sections;
-
-    for (const auto& [key, value] : m_config)
-    {
-        // Split "Section::Key" back into parts
-        size_t pos = key.find("::");
-        if (pos == std::string::npos)
-            continue;
-
-        std::string section = key.substr(0, pos);
-        std::string name = key.substr(pos + 2);
-
-        sections[section].emplace_back(name, value);
-    }
-
-    // Write in specific order: unnamed section, vkShade, then alphabetical
-    auto write_section = [&](const std::string& section_name)
-    {
-        auto it = sections.find(section_name);
-        if (it != sections.end())
+    {  // Scoped file open
+        std::ofstream file(filePath);
+        if (!file.is_open())
         {
-            if (!section_name.empty())
-                file << "[" << section_name << "]\n";
+            Logger::error("Failed to open {} file for writing: {}", m_typeString, filePath.string());
+            return false;
+        }
 
+        // Unwatch so we don't automatically reload
+        m_watcher->unwatch();
+
+        // Group by section
+        std::map<std::string, std::vector<std::pair<std::string, std::string>>> sections;
+
+        for (const auto& [key, value] : m_config)
+        {
+            // Split "Section::Key" back into parts
+            size_t pos = key.find("::");
+            if (pos == std::string::npos)
+                continue;
+
+            std::string section = key.substr(0, pos);
+            std::string name = key.substr(pos + 2);
+
+            sections[section].emplace_back(name, value);
+        }
+
+        // Write in specific order: unnamed section, vkShade, then alphabetical
+        auto write_section = [&](const std::string& section_name)
+        {
+            auto it = sections.find(section_name);
+            if (it != sections.end())
+            {
+                if (!section_name.empty())
+                    file << "[" << section_name << "]\n";
+
+                for (const auto& [name, value] : it->second)
+                    file << name << " = " << value << "\n";
+
+                file << "\n";
+                sections.erase(it);
+            }
+        };
+
+        write_section("");        // Unnamed/global section first
+        write_section("vkShade"); // App settings second
+
+        // Write remaining sections alphabetically
+        for (auto it = sections.begin(); it != sections.end(); it++)
+        {
+            file << "[" << it->first << "]\n";
             for (const auto& [name, value] : it->second)
                 file << name << " = " << value << "\n";
 
-            file << "\n";
-            sections.erase(it);
+            if (std::next(it) != sections.end())
+                file << "\n";
         }
-    };
+    }  // File closes
 
-    write_section("");        // Unnamed/global section first
-    write_section("vkShade"); // App settings second
-
-    // Write remaining sections alphabetically
-    for (auto it = sections.begin(); it != sections.end(); it++)
-    {
-        file << "[" << it->first << "]\n";
-        for (const auto& [name, value] : it->second)
-            file << name << " = " << value << "\n";
-
-        if (std::next(it) != sections.end())
-            file << "\n";
-    }
+    Logger::info("Saved {} file: {}", m_typeString, filePath.string());
 
     m_currentFile = filePath;
-    Logger::info("Saved {} file: {}", m_typeString, filePath.string());
+    m_watcher->watch(filePath);
+
     return true;
 }
 

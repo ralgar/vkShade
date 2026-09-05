@@ -1,5 +1,8 @@
 #include "main_window.hpp"
 
+#include <imgui.h>
+#include <ImGuiFileDialog.h>
+
 #include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 
@@ -59,18 +62,29 @@ void vkShade::MainWindow::render_menu_bar()
 
             if (ImGui::MenuItem("Open"))
             {
-                // TODO: Open file browser and select file
-                m_preset.load("ReShade.ini");  // From CWD
+                IGFD::FileDialogConfig config;
+                config.path = ".";
+                config.flags = ImGuiFileDialogFlags_Modal;
+                config.countSelectionMax = 1;
+                ImGuiFileDialog::Instance()->OpenDialog(
+                    "OpenPreset", "Open Preset", "Preset Files{.ini}", config);
             }
 
             ImGui::Separator();
 
-            if (ImGui::MenuItem("Save", nullptr, nullptr, true))
+            if (ImGui::MenuItem("Save", nullptr, nullptr, m_preset.has_file()))
             {
-                if (m_preset.has_file())
-                    m_preset.save();
-                else
-                    m_preset.save("ReShade.ini");  // In CWD
+                m_preset.save();
+            }
+
+            if (ImGui::MenuItem("Save As", nullptr, nullptr, true))
+            {
+                IGFD::FileDialogConfig config;
+                config.path = ".";
+                config.flags = ImGuiFileDialogFlags_Modal;
+                config.countSelectionMax = 1;
+                ImGuiFileDialog::Instance()->OpenDialog(
+                    "SavePreset", "Save Preset", "Preset Files{.ini}", config);
             }
 
             ImGui::Separator();
@@ -94,6 +108,29 @@ void vkShade::MainWindow::render_menu_bar()
         }
 
         ImGui::EndMenuBar();
+    }
+
+    // Draw the file dialogs and define their handlers
+    if (ImGuiFileDialog::Instance()->Display("OpenPreset", ImGuiWindowFlags_NoCollapse, ImVec2(600, 400)))
+    {
+        if (ImGuiFileDialog::Instance()->IsOk())
+        {
+            std::string filePath = ImGuiFileDialog::Instance()->GetFilePathName();
+            m_preset.load(filePath);
+        }
+
+        ImGuiFileDialog::Instance()->Close();
+    }
+
+    if (ImGuiFileDialog::Instance()->Display("SavePreset", ImGuiWindowFlags_NoCollapse, ImVec2(600, 400)))
+    {
+        if (ImGuiFileDialog::Instance()->IsOk())
+        {
+            std::string filePath = ImGuiFileDialog::Instance()->GetFilePathName();
+            m_preset.save(filePath);
+        }
+
+        ImGuiFileDialog::Instance()->Close();
     }
 
     ImGui::PopStyleVar();  // WindowPadding

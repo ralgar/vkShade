@@ -9,6 +9,7 @@ version_hpp = declare_dependency(
 
 glm = dependency('glm', fallback: ['glm', 'glm_dep'])
 imgui = dependency('imgui-docking', fallback: ['imgui-docking', 'imgui_dep'], static: true)
+imguifiledialog = dependency('imguifiledialog', fallback: ['imguifiledialog', 'imguifiledialog_dep'], static: true)
 inih = dependency('inih', fallback: ['inih', 'inih_dep'], static: true,
   default_options: ['distro_install=false', 'with_INIReader=false', 'tests=false', 'max_line_length=65536']
 )

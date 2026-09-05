@@ -1,7 +1,5 @@
 #pragma once
 
-#include <imgui.h>
-
 #include "config/config_store.hpp"
 #include "../panels/effects_panel.hpp"
 #include "../panels/log_panel.hpp"

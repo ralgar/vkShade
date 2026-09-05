@@ -12,6 +12,7 @@ libgui_library = static_library(
   dependencies : [
     glm,
     imgui,
+    imguifiledialog,
     magic_enum,
     spdlog,
     version_hpp,

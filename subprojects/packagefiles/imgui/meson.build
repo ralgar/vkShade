@@ -3,7 +3,7 @@ project(
   'cpp',
   license: 'MIT',
   version: '1.91.6',
-  meson_version: '>=0.50.0',
+  meson_version: '>=0.54.0',
 )
 
 if host_machine.system() == 'darwin'
@@ -129,3 +129,5 @@ imgui_dep = declare_dependency(
   include_directories: include_dirs,
   link_with: imgui,
 )
+
+meson.override_dependency('imgui-docking', imgui_dep)
