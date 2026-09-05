@@ -56,9 +56,20 @@ mouse_capture_controller_tests = executable('mouse_capture_controller_tests',
   include_directories : include_directories('../src')
 )
 
+virtual_mouse_cursor_tests = executable('virtual_mouse_cursor_tests',
+  'virtual_mouse_cursor_tests.cpp',
+  '../src/input/virtual_mouse_cursor.cpp',
+  dependencies : [
+    catch2,
+    glm,
+  ],
+  include_directories : include_directories('../src')
+)
+
 test('ConfigObserver', config_observer_tests)
 test('ConfigParser', config_parser_tests)
 test('ConfigStore', config_store_tests)
 test('EventBus', event_bus_tests)
 test('ReshadeUniforms', reshade_uniform_tests)
 test('MouseCaptureController', mouse_capture_controller_tests)
+test('VirtualMouseCursor', virtual_mouse_cursor_tests)
