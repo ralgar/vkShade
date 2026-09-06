@@ -562,10 +562,7 @@ void vkShade::EffectsPanel::render_uniform_combo(const Uniform& uniform)
     }
 
     if (uniform.uiItems.empty())
-    {
-        ImGui::TextColored(UIStyle::Palette::RED, "Combo uniform has no items");
-        return;
-    }
+        return;  // No items, so we don't draw. This matches ReShade behavior.
 
     Uniform::dispatch_type(uniform.baseType, uniform.components,
         [&]<typename T>(std::type_identity<T>)
@@ -669,7 +666,59 @@ void vkShade::EffectsPanel::render_uniform_input(const Uniform& uniform)
 
 void vkShade::EffectsPanel::render_uniform_radio(const Uniform& uniform)
 {
-    ImGui::TextColored(UIStyle::Palette::YELLOW, "Unsupported widget: Radio");
+    if ((uniform.baseType != Uniform::BaseType::Bool &&
+        uniform.baseType != Uniform::BaseType::Int &&
+        uniform.baseType != Uniform::BaseType::Uint) ||
+        uniform.components != 1)
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for radio");
+        return;
+    }
+
+    // Bool radios default to a plain True/False pair when no items are given.
+    static const std::vector<std::string> defaultBoolItems = { "False", "True" };
+    const std::vector<std::string>& items =
+        (uniform.baseType == Uniform::BaseType::Bool && uniform.uiItems.empty())
+            ? defaultBoolItems
+            : uniform.uiItems;
+
+    if (items.empty())
+        return;  // No items, so we don't draw. This matches ReShade behavior.
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        if constexpr (UniformTraits<T>::components == 1 &&
+                     (std::is_same_v<typename UniformTraits<T>::Scalar, bool> ||
+                      std::is_same_v<typename UniformTraits<T>::Scalar, int32_t> ||
+                      std::is_same_v<typename UniformTraits<T>::Scalar, uint32_t>))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+            if (!value)
+            {
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+                return;
+            }
+
+            int current = static_cast<int>(*value);
+
+            for (int i = 0; i < static_cast<int>(items.size()); i++)
+            {
+                ImGui::PushID(i);
+
+                if (ImGui::RadioButton(items[i].c_str(), current == i))
+                {
+                    T newValue = static_cast<T>(i);
+                    m_preset.set(m_selectedActiveByName, uniform.name, newValue);
+                }
+
+                ImGui::PopID();
+
+                if (i < static_cast<int>(items.size()) - 1)
+                    ImGui::SameLine();
+            }
+        }
+    });
 }
 
 void vkShade::EffectsPanel::render_uniform_slider(const Uniform& uniform)
