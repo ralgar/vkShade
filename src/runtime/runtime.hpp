@@ -34,6 +34,10 @@ namespace vkShade
     private:
         using Clock = std::chrono::steady_clock;
 
+        // Give the layer's render submission up to 10 seconds to complete. A timeout
+        //  indicates an abnormal condition, so we'll abort rather than hang.
+        static constexpr uint64_t FENCE_TIMEOUT_NS = 10'000'000'000;
+
         // Swapchain resources
         VkSwapchainKHR m_swapchain;
         VkFormat m_format;

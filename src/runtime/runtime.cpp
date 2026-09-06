@@ -16,10 +16,6 @@
 #include "vk/macros.hpp"
 #include "reshade_uniforms.hpp"
 
-// Give the layer's render submission up to 1 second to complete. A timeout
-//  indicates an abnormal GPU condition, so we will abort rather than hang.
-constexpr uint64_t FENCE_TIMEOUT_NS = 1'000'000'000;
-
 vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwapchainCreateInfoKHR swapchainInfo)
     : VulkanObject(device)
 {
