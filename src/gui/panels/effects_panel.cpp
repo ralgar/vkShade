@@ -554,7 +554,59 @@ void vkShade::EffectsPanel::render_uniform_color(const Uniform& uniform)
 
 void vkShade::EffectsPanel::render_uniform_combo(const Uniform& uniform)
 {
-    ImGui::TextColored(UIStyle::Palette::YELLOW, "Unsupported widget: Combo");
+    if ((uniform.baseType != Uniform::BaseType::Int && uniform.baseType != Uniform::BaseType::Uint) ||
+        uniform.components != 1)
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for combo");
+        return;
+    }
+
+    if (uniform.uiItems.empty())
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Combo uniform has no items");
+        return;
+    }
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        if constexpr (UniformTraits<T>::components == 1 &&
+                     (std::is_same_v<typename UniformTraits<T>::Scalar, int32_t> ||
+                      std::is_same_v<typename UniformTraits<T>::Scalar, uint32_t>))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+            if (!value)
+            {
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+                return;
+            }
+
+            int current = static_cast<int>(*value);
+            if (current < 0 || current >= static_cast<int>(uniform.uiItems.size()))
+                current = 0;
+
+            const char* previewLabel = uniform.uiItems[current].c_str();
+
+            if (ImGui::BeginCombo("##value", previewLabel))
+            {
+                for (int i = 0; i < static_cast<int>(uniform.uiItems.size()); i++)
+                {
+                    const bool isSelected = (i == current);
+
+                    if (ImGui::Selectable(uniform.uiItems[i].c_str(), isSelected))
+                    {
+                        T newValue = static_cast<T>(i);
+                        m_preset.set(m_selectedActiveByName, uniform.name, newValue);
+                    }
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+        }
+    });
 }
 
 void vkShade::EffectsPanel::render_uniform_drag(const Uniform& uniform)
