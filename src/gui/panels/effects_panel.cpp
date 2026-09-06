@@ -511,7 +511,15 @@ void vkShade::EffectsPanel::render_uniform_controls()
 
 void vkShade::EffectsPanel::render_uniform_button(const Uniform& uniform)
 {
-    ImGui::TextColored(UIStyle::Palette::YELLOW, "Unsupported widget: Button");
+    if (uniform.baseType != Uniform::BaseType::Bool || uniform.components != 1)
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for button");
+        return;
+    }
+
+    bool pressed = ImGui::Button(uniform.uiLabel.c_str(), ImVec2(-FLT_MIN, 0));
+
+    m_preset.set(m_selectedActiveByName, uniform.name, pressed);
 }
 
 void vkShade::EffectsPanel::render_uniform_color(const Uniform& uniform)
