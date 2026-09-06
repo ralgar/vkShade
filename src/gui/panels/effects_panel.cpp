@@ -683,7 +683,90 @@ void vkShade::EffectsPanel::render_uniform_drag(const Uniform& uniform)
 
 void vkShade::EffectsPanel::render_uniform_input(const Uniform& uniform)
 {
-    ImGui::TextColored(UIStyle::Palette::YELLOW, "Unsupported widget: Input");
+    if (uniform.baseType == Uniform::BaseType::Bool && uniform.components == 1)
+    {
+        auto value = m_preset.get<bool>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        bool v = *value;
+        if (ImGui::Checkbox("##value", &v))
+            m_preset.set(m_selectedActiveByName, uniform.name, v);
+
+        return;
+    }
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        T v = *value;
+
+        ImGuiDataType dataType;
+        std::string format;
+
+        switch (uniform.baseType)
+        {
+            case Uniform::BaseType::Float:
+                dataType = ImGuiDataType_Float;
+                format = "%.3f" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Int:
+                dataType = ImGuiDataType_S32;
+                format = "%d" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Uint:
+                dataType = ImGuiDataType_U32;
+                format = "%u" + uniform.uiUnits;
+                break;
+
+            default:
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for input");
+                return;
+        }
+
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+
+        if (ImGui::InputScalarN("##value", dataType, &v, uniform.components, nullptr, nullptr, format.c_str(), flags))
+        {
+            using Scalar = typename UniformTraits<T>::Scalar;
+
+            // Clamp to min/max if the shader specified them.
+            Scalar min = get_ui_value(uniform.uiMin, std::numeric_limits<Scalar>::lowest());
+            Scalar max = get_ui_value(uniform.uiMax, std::numeric_limits<Scalar>::max());
+
+            if constexpr (UniformTraits<T>::components == 1)
+            {
+                if (uniform.uiMin)
+                    v = std::max(v, min);
+                if (uniform.uiMax)
+                    v = std::min(v, max);
+            }
+            else
+            {
+                for (uint32_t i = 0; i < UniformTraits<T>::components; i++)
+                {
+                    if (uniform.uiMin)
+                        v[i] = std::max(v[i], min);
+                    if (uniform.uiMax)
+                        v[i] = std::min(v[i], max);
+                }
+            }
+
+            m_preset.set(m_selectedActiveByName, uniform.name, v);
+        }
+    });
 }
 
 void vkShade::EffectsPanel::render_uniform_radio(const Uniform& uniform)
