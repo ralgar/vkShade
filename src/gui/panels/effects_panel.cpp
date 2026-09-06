@@ -516,7 +516,40 @@ void vkShade::EffectsPanel::render_uniform_button(const Uniform& uniform)
 
 void vkShade::EffectsPanel::render_uniform_color(const Uniform& uniform)
 {
-    ImGui::TextColored(UIStyle::Palette::YELLOW, "Unsupported widget: Color");
+    if (uniform.baseType != Uniform::BaseType::Float ||
+        (uniform.components != 3 && uniform.components != 4))
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for color");
+        return;
+    }
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        if constexpr (std::is_same_v<typename UniformTraits<T>::Scalar, float> &&
+            (UniformTraits<T>::components == 3 || UniformTraits<T>::components == 4))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+            if (!value)
+            {
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+                return;
+            }
+
+            T v = *value;
+
+            ImGuiColorEditFlags flags = ImGuiColorEditFlags_None;
+
+            bool changed = false;
+            if constexpr (UniformTraits<T>::components == 3)
+                changed = ImGui::ColorEdit3("##value", &v[0], flags);
+            else if constexpr (UniformTraits<T>::components == 4)
+                changed = ImGui::ColorEdit4("##value", &v[0], flags);
+
+            if (changed)
+                m_preset.set(m_selectedActiveByName, uniform.name, v);
+        }
+    });
 }
 
 void vkShade::EffectsPanel::render_uniform_combo(const Uniform& uniform)
