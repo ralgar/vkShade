@@ -1,5 +1,6 @@
 #include "main_window.hpp"
 
+
 #include <imgui.h>
 #include <ImGuiFileDialog.h>
 
@@ -67,7 +68,7 @@ void vkShade::MainWindow::render_menu_bar()
                 config.flags = ImGuiFileDialogFlags_Modal;
                 config.countSelectionMax = 1;
                 ImGuiFileDialog::Instance()->OpenDialog(
-                    "OpenPreset", "Open Preset", "Preset Files{.ini}", config);
+                    "OpenPreset", "Open Preset", "Preset Files (*.ini){.ini}", config);
             }
 
             ImGui::Separator();
@@ -81,10 +82,10 @@ void vkShade::MainWindow::render_menu_bar()
             {
                 IGFD::FileDialogConfig config;
                 config.path = ".";
-                config.flags = ImGuiFileDialogFlags_Modal;
+                config.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ConfirmOverwrite;
                 config.countSelectionMax = 1;
                 ImGuiFileDialog::Instance()->OpenDialog(
-                    "SavePreset", "Save Preset", "Preset Files{.ini}", config);
+                    "SavePreset", "Save Preset", "Preset Files (*.ini){.ini}", config);
             }
 
             ImGui::Separator();
