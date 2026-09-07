@@ -2,6 +2,7 @@
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
+#include <imgui_internal.h>
 #include <vulkan/vulkan_core.h>
 
 #include "core/service_locator.hpp"
@@ -162,6 +163,53 @@ void vkShade::GuiManager::on_text_input_event(const TextInputEvent& event)
     ImGui::GetIO().AddInputCharactersUTF8(event.text.c_str());
 }
 
+void vkShade::GuiManager::setup_dockspace()
+{
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->Pos);
+    ImGui::SetNextWindowSize(viewport->Size);
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGuiWindowFlags dockspaceFlags =
+        ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoNavFocus |
+        ImGuiWindowFlags_NoBackground;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::Begin("DockSpace", nullptr, dockspaceFlags);
+    ImGui::PopStyleVar(3);
+
+    ImGuiID dockspaceId = ImGui::DockSpace(ImGui::GetID("MainDockSpace"), ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+
+    if (!m_dockspaceInitialized)
+    {
+        m_dockspaceInitialized = true;
+
+        ImGuiID dockLeft, dockMain;
+        ImGui::DockBuilderRemoveNode(dockspaceId);
+        ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->Size);
+
+        // Prevent docking to root (viewport) node
+        ImGui::DockBuilderGetNode(dockspaceId)->LocalFlags |= ImGuiDockNodeFlags_NoDockingOverMe;
+
+        ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.30f, &dockLeft, &dockMain);
+
+        ImGui::DockBuilderDockWindow("vkShade", dockLeft);
+
+        ImGui::DockBuilderFinish(dockspaceId);
+    }
+
+    ImGui::End();
+}
+
 void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -171,11 +219,11 @@ void vkShade::GuiManager::update(float deltaTime, VkExtent2D swapchainExtent)
     // Draw the GUI
     ImGui::NewFrame();
 
-    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
-        ImGuiDockNodeFlags_NoDockingOverCentralNode | ImGuiDockNodeFlags_PassthruCentralNode);
 
     if (m_mainWindow.visible())
     {
+        setup_dockspace();
+
         m_mainWindow.render();
 
         // Last: Draw the cursor on top of everything

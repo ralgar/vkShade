@@ -29,6 +29,8 @@ namespace vkShade
         VkDevice m_device;
         VkDescriptorPool m_descriptorPool;
 
+        bool m_dockspaceInitialized {false};
+
         MainWindow m_mainWindow;
 
         void draw_cursor();
@@ -38,5 +40,7 @@ namespace vkShade
         void on_mouse_motion_event(const MouseMotionEvent& event);
         void on_mouse_wheel_event(const MouseWheelEvent& event);
         void on_text_input_event(const TextInputEvent& event);
+
+        void setup_dockspace();
     };
 } // namespace vkShade
