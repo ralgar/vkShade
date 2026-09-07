@@ -13,8 +13,8 @@
 #include "vk/macros.hpp"
 #include "gui_style.hpp"
 #include "input_helpers.hpp"
-#include "fonts/inter_regular.h"
-#include "fonts/meslo_lgs_regular.h"
+#include "fonts/inter_regular.hpp"
+#include "fonts/meslo_lgs_regular.hpp"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
 {
