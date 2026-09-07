@@ -112,7 +112,9 @@ void vkShade::LogPanel::render()
 
     ImGui::Separator();
 
+    ImGui::PushFont(UIStyle::MonoFont);
     render_log_messages();
+    ImGui::PopFont();
 }
 
 void vkShade::LogPanel::render_control_bar()

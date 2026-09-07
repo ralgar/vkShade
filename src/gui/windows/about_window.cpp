@@ -6,9 +6,11 @@
 
 void vkShade::AboutWindow::render()
 {
-    ImGui::SetNextWindowSize(ImVec2(300, 160), ImGuiCond_Always);
-    if (ImGui::Begin("About", &m_visible,
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
+    // Set a minimum size constraint
+    ImGui::SetNextWindowSizeConstraints(ImVec2(300, 160), ImVec2(FLT_MAX, FLT_MAX));
+
+    if (ImGui::Begin("About", &m_visible, ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize))
     {
         // Center the title
         float windowWidth = ImGui::GetContentRegionAvail().x;
@@ -20,7 +22,7 @@ void vkShade::AboutWindow::render()
         ImGui::Separator();
         ImGui::Spacing();
 
-        ImGui::TextDisabled("A Vulkan post-processing layer.");
+        ImGui::TextDisabled("A ReShade-compatible Vulkan post-processing layer.");
 
         ImGui::Spacing();
 

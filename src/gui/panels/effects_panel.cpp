@@ -118,7 +118,8 @@ void vkShade::EffectsPanel::render_effect_lists()
             ImGui::TableNextRow();
 
             // We subtract the button height from the listbox Y, to reserve space for row 2 buttons.
-            float buttonHeight = UIStyle::BUTTON_HEIGHT + ImGui::GetStyle().FramePadding.y * 2;
+            float buttonHeight = ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.y * 2.0f
+                + ImGui::GetStyle().CellPadding.y * 2.0f;
 
             // Available Effects Cell
             ImGui::TableSetColumnIndex(0);
@@ -194,7 +195,11 @@ void vkShade::EffectsPanel::render_effect_lists()
             bool canMoveDown = m_selectedActive >= 0 &&
                                m_selectedActive < (int32_t)activeEffects.size() - 1;
 
-            float btnWidth   = 80.0f;
+            // Size both buttons to fit the longer label ("Move Down")
+            float textWidthUp   = ImGui::CalcTextSize("Move Up").x;
+            float textWidthDown = ImGui::CalcTextSize("Move Down").x;
+            float btnWidth      = std::max(textWidthUp, textWidthDown) + ImGui::GetStyle().FramePadding.x * 2.0f;
+
             float totalWidth = btnWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
             float indent     = (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f;
             if (indent > 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
