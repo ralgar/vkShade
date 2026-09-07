@@ -47,6 +47,9 @@ namespace vkShade
         constexpr ImVec4 BACKGROUND_COLOR = ImVec4(0.12f, 0.12f, 0.13f, 1.0f);
         constexpr ImVec4 FRAME_BG_COLOR = ImVec4(0.20f, 0.20f, 0.22f, 1.0f);
 
+        inline ImFont* RegularFont = nullptr;
+        inline ImFont* MonoFont = nullptr;
+
         // Apply style to ImGui context
         inline void ApplyStyle()
         {

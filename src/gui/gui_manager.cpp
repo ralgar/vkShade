@@ -13,6 +13,8 @@
 #include "vk/macros.hpp"
 #include "gui_style.hpp"
 #include "input_helpers.hpp"
+#include "fonts/inter_regular.h"
+#include "fonts/meslo_lgs_regular.h"
 
 vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFormat)
 {
@@ -98,6 +100,26 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
 	ImGui_ImplVulkan_Init(&init_info);
+
+    // Load font
+    ImFontConfig fontConfig;
+    fontConfig.OversampleH = 3;
+    fontConfig.OversampleV = 3;
+    fontConfig.PixelSnapH = true;
+
+    ImFont* regularFont = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
+        InterRegular_compressed_data_base85,
+        16.0f,
+        &fontConfig
+    );
+
+    UIStyle::MonoFont = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
+        MesloLGSRegular_compressed_data_base85,
+        16.0f,
+        &fontConfig
+    );
+
+    io.FontDefault = regularFont;
 	ImGui_ImplVulkan_CreateFontsTexture();
 
     // Apply custom style
