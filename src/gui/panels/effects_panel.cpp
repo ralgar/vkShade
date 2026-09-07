@@ -3,6 +3,8 @@
 #include "config/config_manager.hpp"
 #include "core/events/reload_effects.hpp"
 #include "core/service_locator.hpp"
+#include "hooks/hooks.hpp"
+#include "runtime/runtime.hpp"
 #include "../gui_helpers.hpp"
 #include "../gui_style.hpp"
 #include "imgui.h"
@@ -17,13 +19,15 @@ void vkShade::EffectsPanel::render()
 {
     ImVec2 contentSize = ImGui::GetContentRegionAvail();
 
-    float uniformHeight = contentSize.y * 0.5f;
+    float uniformHeight = contentSize.y * 0.55f;
     float effectsHeight = contentSize.y - uniformHeight - ImGui::GetStyle().ItemSpacing.y * 2;
 
     // Effects section
     ImGui::BeginChild("EffectsSection", ImVec2(0, effectsHeight), false);
     render_effect_lists();
     ImGui::EndChild();
+
+    ImGui::Separator();
 
     // Uniforms section
     ImGui::BeginChild("UniformsSection", ImVec2(0, uniformHeight), false);
@@ -125,7 +129,10 @@ void vkShade::EffectsPanel::render_effect_lists()
             {
                 if (render_effect_listbox("##AvailableEffects", availableEffects, m_selectedAvailable,
                                           ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - buttonHeight)))
+                {
                     m_selectedActive = -1;  // When we select in this listbox, deselect in the other.
+                    m_selectedActiveByName.clear();
+                }
             }
 
             // Center Buttons Cell
@@ -149,7 +156,9 @@ void vkShade::EffectsPanel::render_effect_lists()
                     // Add to active list
                     activeEffects.push_back(effect);
                     m_preset.set("", "Effects", activeEffects);
+                    m_selectedActive = activeEffects.size() - 1;
                     m_selectedAvailable = -1;
+                    m_selectedActiveByName = effect;
                 }
 
                 bool canDeactivate = m_selectedActive >= 0 &&
@@ -161,6 +170,7 @@ void vkShade::EffectsPanel::render_effect_lists()
                     activeEffects.erase(activeEffects.begin() + m_selectedActive);
                     m_preset.set("", "Effects", activeEffects);
                     m_selectedActive = -1;
+                    m_selectedActiveByName.clear();
                 }
             }
 
@@ -174,7 +184,19 @@ void vkShade::EffectsPanel::render_effect_lists()
 
                 if (render_effect_listbox("##ActiveEffects", activeEffects, m_selectedActive,
                                           ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - buttonHeight), flaggedEffects))
+                {
                     m_selectedAvailable = -1;   // When we select in this listbox, deselect in the other.
+
+                    if (m_selectedActive >= 0 &&
+                        m_selectedActive < static_cast<int32_t>(activeEffects.size()))
+                    {
+                        m_selectedActiveByName = activeEffects[m_selectedActive];
+                    }
+                    else
+                    {
+                        m_selectedActiveByName.clear();
+                    }
+                }
             }
         }
 
@@ -218,23 +240,6 @@ void vkShade::EffectsPanel::render_effect_lists()
             ImGui::EndTable();
         }
     }
-}
-
-void vkShade::EffectsPanel::render_uniform_controls()
-{
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    const char* text = "Effect uniforms will be adjustable here";
-
-    float availHeight = ImGui::GetContentRegionAvail().y;
-    float textHeight = ImGui::CalcTextSize(text).y;
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (availHeight - textHeight) * 0.5f);
-
-    float textWidth = ImGui::CalcTextSize(text).x;
-    ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - textWidth) * 0.5f + ImGui::GetCursorPosX());
-
-    ImGui::TextDisabled("%s", text);
 }
 
 bool vkShade::EffectsPanel::render_effect_listbox(const char* label,
@@ -288,4 +293,624 @@ bool vkShade::EffectsPanel::render_effect_listbox(const char* label,
     }
 
     return changed;
+}
+
+void vkShade::EffectsPanel::render_uniform_controls()
+{
+    // FIXME: This is awful but we're already doing it elsewhere and it works for now
+    Runtime& runtime = g_runtimes.begin()->second;
+
+    const ReshadeEffect* effect = runtime.get_effect(m_selectedActiveByName);
+    if (!effect)
+    {
+        const char* text = "No effect selected";
+
+        float availHeight = ImGui::GetContentRegionAvail().y;
+        float textHeight = ImGui::CalcTextSize(text).y;
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (availHeight - textHeight) * 0.5f);
+
+        float textWidth = ImGui::CalcTextSize(text).x;
+        ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - textWidth) * 0.5f + ImGui::GetCursorPosX());
+
+        ImGui::TextDisabled("%s", text);
+
+        return;
+    }
+
+    // Reset Button (All Uniforms)
+    if (ImGui::Button("Reset All to Default", ImVec2(-FLT_MIN, 0.0f)))
+    {
+        for (const auto& uniform : effect->uniforms())
+        {
+            if (uniform.noReset)
+                continue;
+
+            Uniform::dispatch_type(uniform.baseType, uniform.components,
+                [&]<typename T>(std::type_identity<T>)
+            {
+                T value {};
+
+                if constexpr (UniformTraits<T>::components == 1)
+                {
+                    value = std::get<typename UniformTraits<T>::Scalar>(
+                        uniform.defaultValues[0].value());
+                }
+                else
+                {
+                    for (uint32_t i = 0; i < UniformTraits<T>::components; i++)
+                    {
+                        value[i] = std::get<typename UniformTraits<T>::Scalar>(
+                            uniform.defaultValues[i].value());
+                    }
+                }
+
+                m_preset.set(m_selectedActiveByName, uniform.name, value);
+            });
+        }
+    }
+
+    constexpr float labelWidth = 180.0f;
+    const float resetWidth = ImGui::CalcTextSize("Reset").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+
+    std::string_view currentCategory;
+    bool tableOpen = false;
+    bool tableIndented = false;
+    bool firstUniform = true;
+    for (const auto& uniform : effect->uniforms())
+    {
+        if (firstUniform || uniform.uiCategory != currentCategory)
+        {
+            firstUniform = false;
+
+            if (tableOpen)
+            {
+                ImGui::EndTable();
+
+                if (tableIndented)
+                {
+                    ImGui::Unindent();
+                    tableIndented = false;
+                }
+
+                tableOpen = false;
+            }
+
+            if (!currentCategory.empty())
+                ImGui::PopID();
+
+            currentCategory = uniform.uiCategory;
+
+            if (!currentCategory.empty())
+            {
+                ImGui::PushID(currentCategory.data());
+
+                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
+
+                if (!uniform.uiCategoryClosed)
+                    flags |= ImGuiTreeNodeFlags_DefaultOpen;
+
+                if (!ImGui::CollapsingHeader(currentCategory.data(), flags))
+                    continue;
+
+                ImGui::Indent();
+                tableIndented = true;
+            }
+
+            tableOpen = ImGui::BeginTable("Uniforms", 3, ImGuiTableFlags_SizingStretchProp);
+
+            if (tableOpen)
+            {
+                ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, labelWidth);
+                ImGui::TableSetupColumn("Value");
+                ImGui::TableSetupColumn("Reset", ImGuiTableColumnFlags_WidthFixed, resetWidth);
+            }
+        }
+
+        if (uniform.hidden || !tableOpen)
+            continue;
+
+        ImGui::PushID(uniform.name.c_str());
+
+        ImGui::BeginDisabled(uniform.disabled);
+
+        ImGui::TableNextRow();
+
+        ImGui::TableSetColumnIndex(0);
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(uniform.uiLabel.c_str());
+
+        ImGui::TableSetColumnIndex(1);
+
+        bool hasStepControl = (*uniform.uiType == Uniform::UiType::Drag ||
+                               *uniform.uiType == Uniform::UiType::Slider) &&
+                               uniform.components == 1;
+
+        // Subtract width for step controls, if present.
+        float stepControlsWidth = 0.0f;
+        if (hasStepControl)
+        {
+            stepControlsWidth = 2 * ImGui::GetFrameHeight()
+                + ImGui::GetStyle().ItemSpacing.x + ImGui::GetStyle().CellPadding.x;
+        }
+
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - stepControlsWidth);
+
+        switch (*uniform.uiType)
+        {
+            case Uniform::UiType::Input:  render_uniform_input(uniform);  break;
+            case Uniform::UiType::Drag:   render_uniform_drag(uniform);   break;
+            case Uniform::UiType::Slider: render_uniform_slider(uniform); break;
+            case Uniform::UiType::Combo:  render_uniform_combo(uniform);  break;
+            case Uniform::UiType::Radio:  render_uniform_radio(uniform);  break;
+            case Uniform::UiType::Color:  render_uniform_color(uniform);  break;
+            case Uniform::UiType::Button: render_uniform_button(uniform); break;
+        }
+
+        // Set the tooltip if we have one
+        if (!uniform.uiTooltip.empty())
+            ImGui::SetItemTooltip("%s", uniform.uiTooltip.c_str());
+
+        // Draw the step controls if appropriate
+        if (hasStepControl)
+        {
+            ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
+            spacing.x /= 2;
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, spacing);
+
+            ImGui::SameLine();
+            render_uniform_step_control(uniform);
+
+            ImGui::PopStyleVar();
+        }
+
+        ImGui::TableSetColumnIndex(2);
+
+        // Reset Button (Individual Uniform)
+        if (!uniform.noReset && ImGui::Button("Reset"))
+        {
+            Uniform::dispatch_type(uniform.baseType, uniform.components,
+                [&]<typename T>(std::type_identity<T>)
+            {
+                T value {};
+
+                if constexpr (UniformTraits<T>::components == 1)
+                {
+                    value = std::get<typename UniformTraits<T>::Scalar>(
+                        uniform.defaultValues[0].value());
+                }
+                else
+                {
+                    for (uint32_t i = 0; i < UniformTraits<T>::components; i++)
+                    {
+                        value[i] = std::get<typename UniformTraits<T>::Scalar>(
+                            uniform.defaultValues[i].value());
+                    }
+                }
+
+                m_preset.set(m_selectedActiveByName, uniform.name, value);
+            });
+        }
+
+        ImGui::EndDisabled();
+
+        ImGui::PopID();
+    }
+
+    if (tableOpen)
+    {
+        ImGui::EndTable();
+
+        if (tableIndented)
+            ImGui::Unindent();
+    }
+
+    if (!currentCategory.empty())
+        ImGui::PopID();
+}
+
+void vkShade::EffectsPanel::render_uniform_button(const Uniform& uniform)
+{
+    if (uniform.baseType != Uniform::BaseType::Bool || uniform.components != 1)
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for button");
+        return;
+    }
+
+    bool pressed = ImGui::Button(uniform.uiLabel.c_str(), ImVec2(-FLT_MIN, 0));
+
+    m_preset.set(m_selectedActiveByName, uniform.name, pressed);
+}
+
+void vkShade::EffectsPanel::render_uniform_color(const Uniform& uniform)
+{
+    if (uniform.baseType != Uniform::BaseType::Float ||
+        (uniform.components != 3 && uniform.components != 4))
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for color");
+        return;
+    }
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        if constexpr (std::is_same_v<typename UniformTraits<T>::Scalar, float> &&
+            (UniformTraits<T>::components == 3 || UniformTraits<T>::components == 4))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+            if (!value)
+            {
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+                return;
+            }
+
+            T v = *value;
+
+            ImGuiColorEditFlags flags = ImGuiColorEditFlags_None;
+
+            bool changed = false;
+            if constexpr (UniformTraits<T>::components == 3)
+                changed = ImGui::ColorEdit3("##value", &v[0], flags);
+            else if constexpr (UniformTraits<T>::components == 4)
+                changed = ImGui::ColorEdit4("##value", &v[0], flags);
+
+            if (changed)
+                m_preset.set(m_selectedActiveByName, uniform.name, v);
+        }
+    });
+}
+
+void vkShade::EffectsPanel::render_uniform_combo(const Uniform& uniform)
+{
+    if ((uniform.baseType != Uniform::BaseType::Int && uniform.baseType != Uniform::BaseType::Uint) ||
+        uniform.components != 1)
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for combo");
+        return;
+    }
+
+    if (uniform.uiItems.empty())
+        return;  // No items, so we don't draw. This matches ReShade behavior.
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        if constexpr (UniformTraits<T>::components == 1 &&
+                     (std::is_same_v<typename UniformTraits<T>::Scalar, int32_t> ||
+                      std::is_same_v<typename UniformTraits<T>::Scalar, uint32_t>))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+            if (!value)
+            {
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+                return;
+            }
+
+            int current = static_cast<int>(*value);
+            if (current < 0 || current >= static_cast<int>(uniform.uiItems.size()))
+                current = 0;
+
+            const char* previewLabel = uniform.uiItems[current].c_str();
+
+            if (ImGui::BeginCombo("##value", previewLabel))
+            {
+                for (int i = 0; i < static_cast<int>(uniform.uiItems.size()); i++)
+                {
+                    const bool isSelected = (i == current);
+
+                    if (ImGui::Selectable(uniform.uiItems[i].c_str(), isSelected))
+                    {
+                        T newValue = static_cast<T>(i);
+                        m_preset.set(m_selectedActiveByName, uniform.name, newValue);
+                    }
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+        }
+    });
+}
+
+void vkShade::EffectsPanel::render_uniform_drag(const Uniform& uniform)
+{
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        T v = *value;
+
+        ImGuiDataType dataType;
+        Uniform::Scalar min;
+        Uniform::Scalar max;
+        std::string format;
+
+        switch (uniform.baseType)
+        {
+            case Uniform::BaseType::Float:
+                dataType = ImGuiDataType_Float;
+                min = get_ui_value(uniform.uiMin, 0.0f);
+                max = get_ui_value(uniform.uiMax, 1.0f);
+                format = "%.3f" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Int:
+                dataType = ImGuiDataType_S32;
+                min = get_ui_value(uniform.uiMin, int32_t{0});
+                max = get_ui_value(uniform.uiMax, int32_t{100});
+                format = "%d" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Uint:
+                dataType = ImGuiDataType_U32;
+                min = get_ui_value(uniform.uiMin, uint32_t{0});
+                max = get_ui_value(uniform.uiMax, uint32_t{100});
+                format = "%u" + uniform.uiUnits;
+                break;
+
+            default:
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for slider");
+                return;
+        }
+
+        float speed = get_ui_value(uniform.uiStep, 0.0f);
+        if (ImGui::DragScalarN("##value", dataType, &v, uniform.components, speed, &min, &max, format.c_str()))
+            m_preset.set(m_selectedActiveByName, uniform.name, v);
+    });
+}
+
+void vkShade::EffectsPanel::render_uniform_input(const Uniform& uniform)
+{
+    if (uniform.baseType == Uniform::BaseType::Bool && uniform.components == 1)
+    {
+        auto value = m_preset.get<bool>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        bool v = *value;
+        if (ImGui::Checkbox("##value", &v))
+            m_preset.set(m_selectedActiveByName, uniform.name, v);
+
+        return;
+    }
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        T v = *value;
+
+        ImGuiDataType dataType;
+        std::string format;
+
+        switch (uniform.baseType)
+        {
+            case Uniform::BaseType::Float:
+                dataType = ImGuiDataType_Float;
+                format = "%.3f" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Int:
+                dataType = ImGuiDataType_S32;
+                format = "%d" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Uint:
+                dataType = ImGuiDataType_U32;
+                format = "%u" + uniform.uiUnits;
+                break;
+
+            default:
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for input");
+                return;
+        }
+
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+
+        auto render_input = [&](auto* component)
+        {
+            if (ImGui::InputScalar("##value", dataType, component, nullptr, nullptr, format.c_str(), flags))
+            {
+                using Scalar = typename UniformTraits<T>::Scalar;
+
+                // Clamp to min/max if the shader specified them.
+                if (uniform.uiMin)
+                {
+                    auto min = get_ui_value(uniform.uiMin, std::numeric_limits<Scalar>::lowest());
+                    *component = std::max(*component, min);
+                }
+                if (uniform.uiMax)
+                {
+                    auto max = get_ui_value(uniform.uiMax, std::numeric_limits<Scalar>::max());
+                    *component = std::min(*component, max);
+                }
+
+                m_preset.set(m_selectedActiveByName, uniform.name, v);
+            }
+        };
+
+        for (uint32_t i = 0; i < uniform.components; i++)
+        {
+            ImGui::PushID(i);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+
+            if constexpr (UniformTraits<T>::components == 1)
+                render_input(&v);
+            else
+                render_input(&v[i]);
+
+            ImGui::PopID();
+        }
+    });
+}
+
+void vkShade::EffectsPanel::render_uniform_radio(const Uniform& uniform)
+{
+    if ((uniform.baseType != Uniform::BaseType::Bool &&
+        uniform.baseType != Uniform::BaseType::Int &&
+        uniform.baseType != Uniform::BaseType::Uint) ||
+        uniform.components != 1)
+    {
+        ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for radio");
+        return;
+    }
+
+    // Bool radios default to a plain True/False pair when no items are given.
+    static const std::vector<std::string> defaultBoolItems = { "False", "True" };
+    const std::vector<std::string>& items =
+        (uniform.baseType == Uniform::BaseType::Bool && uniform.uiItems.empty())
+            ? defaultBoolItems
+            : uniform.uiItems;
+
+    if (items.empty())
+        return;  // No items, so we don't draw. This matches ReShade behavior.
+
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        if constexpr (UniformTraits<T>::components == 1 &&
+                     (std::is_same_v<typename UniformTraits<T>::Scalar, bool> ||
+                      std::is_same_v<typename UniformTraits<T>::Scalar, int32_t> ||
+                      std::is_same_v<typename UniformTraits<T>::Scalar, uint32_t>))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+            if (!value)
+            {
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+                return;
+            }
+
+            int current = static_cast<int>(*value);
+
+            for (int i = 0; i < static_cast<int>(items.size()); i++)
+            {
+                ImGui::PushID(i);
+
+                if (ImGui::RadioButton(items[i].c_str(), current == i))
+                {
+                    T newValue = static_cast<T>(i);
+                    m_preset.set(m_selectedActiveByName, uniform.name, newValue);
+                }
+
+                ImGui::PopID();
+
+                if (i < static_cast<int>(items.size()) - 1)
+                    ImGui::SameLine();
+            }
+        }
+    });
+}
+
+void vkShade::EffectsPanel::render_uniform_slider(const Uniform& uniform)
+{
+    Uniform::dispatch_type(uniform.baseType, uniform.components,
+        [&]<typename T>(std::type_identity<T>)
+    {
+        auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+        if (!value)
+        {
+            ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform value");
+            return;
+        }
+
+        T v = *value;
+
+        ImGuiDataType dataType;
+        Uniform::Scalar min;
+        Uniform::Scalar max;
+        std::string format;
+
+        switch (uniform.baseType)
+        {
+            case Uniform::BaseType::Float:
+                dataType = ImGuiDataType_Float;
+                min = get_ui_value(uniform.uiMin, 0.0f);
+                max = get_ui_value(uniform.uiMax, 1.0f);
+                format = "%.3f" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Int:
+                dataType = ImGuiDataType_S32;
+                min = get_ui_value(uniform.uiMin, int32_t{0});
+                max = get_ui_value(uniform.uiMax, int32_t{100});
+                format = "%d" + uniform.uiUnits;
+                break;
+
+            case Uniform::BaseType::Uint:
+                dataType = ImGuiDataType_U32;
+                min = get_ui_value(uniform.uiMin, uint32_t{0});
+                max = get_ui_value(uniform.uiMax, uint32_t{100});
+                format = "%u" + uniform.uiUnits;
+                break;
+
+            default:
+                ImGui::TextColored(UIStyle::Palette::RED, "Invalid uniform type for slider");
+                return;
+        }
+
+        if (ImGui::SliderScalarN("##value", dataType, &v, uniform.components, &min, &max, format.c_str()))
+            m_preset.set(m_selectedActiveByName, uniform.name, v);
+    });
+}
+
+void vkShade::EffectsPanel::render_uniform_step_control(const Uniform& uniform)
+{
+    ImGui::BeginGroup();
+
+    if (ImGui::Button("-"))
+        step_component(uniform, -1);
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("+"))
+        step_component(uniform, 1);
+
+    ImGui::EndGroup();
+}
+
+void vkShade::EffectsPanel::step_component(const Uniform& uniform, int32_t direction)
+{
+    Uniform::dispatch_type(uniform.baseType, uniform.components, [&]<typename T>(std::type_identity<T>)
+    {
+        using Scalar = typename UniformTraits<T>::Scalar;
+
+        if constexpr (UniformTraits<T>::components == 1 && (std::is_same_v<Scalar, float> ||
+            std::is_same_v<Scalar, int32_t> || std::is_same_v<Scalar, uint32_t>))
+        {
+            auto value = m_preset.get<T>(m_selectedActiveByName, uniform.name);
+
+            if (!value)
+                return;
+
+            Scalar& v = *value;
+
+            const Scalar step = get_ui_value(uniform.uiStep, Scalar{1});
+            v += step * direction;
+
+            // Clamp between min and max
+            if (uniform.uiMin)
+                v = std::max(v, get_ui_value(uniform.uiMin, std::numeric_limits<Scalar>::lowest()));
+            if (uniform.uiMax)
+                v = std::min(v, get_ui_value(uniform.uiMax, std::numeric_limits<Scalar>::max()));
+
+            m_preset.set(m_selectedActiveByName, uniform.name, *value);
+        }
+    });
 }

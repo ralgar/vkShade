@@ -1,6 +1,7 @@
 #pragma once
 
 #include <assert.h>
+#include <memory>
 #include <shared_mutex>
 #include <unordered_map>
 
@@ -44,10 +45,18 @@ inline void* const dispatch_key_from_handle(const void* handle)
     return *reinterpret_cast<void* const*>(handle);
 }
 
+namespace vkShade
+{
+    class Runtime;
+}
+
 // Layer book-keeping information
 // These are only modified during create/destroy
 extern std::unordered_map<void*, VulkanInstance> g_vulkanInstances;
 extern std::unordered_map<void*, VulkanDevice>   g_vulkanDevices;
+
+// Runtime book-keeping
+extern std::unordered_map<VkSwapchainKHR, vkShade::Runtime> g_runtimes;
 
 // Convenience functions for getting handles
 inline VulkanInstance& get_instance_from_handle(const void* handle)
