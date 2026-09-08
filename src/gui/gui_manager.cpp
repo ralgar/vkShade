@@ -5,6 +5,7 @@
 #include <imgui_internal.h>
 #include <vulkan/vulkan_core.h>
 
+#include "config/config_manager.hpp"
 #include "core/service_locator.hpp"
 #include "core/logger.hpp"
 #include "hooks/hooks.hpp"
@@ -101,26 +102,11 @@ vkShade::GuiManager::GuiManager(VulkanDevice deviceContext, VkFormat swapchainFo
 
 	ImGui_ImplVulkan_Init(&init_info);
 
-    // Load font
-    ImFontConfig fontConfig;
-    fontConfig.OversampleH = 3;
-    fontConfig.OversampleV = 3;
-    fontConfig.PixelSnapH = true;
-
-    ImFont* regularFont = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
-        InterRegular_compressed_data_base85,
-        16.0f,
-        &fontConfig
-    );
-
-    UIStyle::MonoFont = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
-        MesloLGSRegular_compressed_data_base85,
-        16.0f,
-        &fontConfig
-    );
-
-    io.FontDefault = regularFont;
-	ImGui_ImplVulkan_CreateFontsTexture();
+    // Load font and subscribe to config changes
+    auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
+    uint32_t fontSize = config.get<uint32_t>("UI", "FontSize").value_or(14u);
+    this->rebuild_fonts(fontSize);
+    config.on_changed("UI", "FontSize").connect<&GuiManager::on_font_size_changed>(this);
 
     // Apply custom style
     UIStyle::ApplyStyle();
@@ -160,6 +146,11 @@ void vkShade::GuiManager::draw_cursor()
     drawList->AddCircleFilled(pos, 1.5f, IM_COL32(255, 0, 0, 255));
 }
 
+void vkShade::GuiManager::on_font_size_changed(const std::string& key, uint32_t value)
+{
+    this->rebuild_fonts(value);
+}
+
 void vkShade::GuiManager::on_keyboard_event(const KeyboardEvent& event)
 {
     ImGui::GetIO().AddKeyEvent(to_imgui_key(event.keyCode), event.pressed);
@@ -183,6 +174,35 @@ void vkShade::GuiManager::on_mouse_wheel_event(const MouseWheelEvent& event)
 void vkShade::GuiManager::on_text_input_event(const TextInputEvent& event)
 {
     ImGui::GetIO().AddInputCharactersUTF8(event.text.c_str());
+}
+
+void vkShade::GuiManager::rebuild_fonts(const uint32_t size)
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    io.Fonts->Clear();
+
+    ImFontConfig fontConfig;
+    fontConfig.OversampleH = 3;
+    fontConfig.OversampleV = 3;
+    fontConfig.PixelSnapH = true;
+
+    ImFont* regularFont = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
+        InterRegular_compressed_data_base85,
+        static_cast<float>(size),
+        &fontConfig
+    );
+
+    UIStyle::MonoFont = io.Fonts->AddFontFromMemoryCompressedBase85TTF(
+        MesloLGSRegular_compressed_data_base85,
+        static_cast<float>(size),
+        &fontConfig
+    );
+
+    io.FontDefault = regularFont;
+
+    ImGui_ImplVulkan_DestroyFontsTexture();
+    ImGui_ImplVulkan_CreateFontsTexture();
 }
 
 void vkShade::GuiManager::setup_dockspace()
