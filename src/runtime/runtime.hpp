@@ -24,8 +24,18 @@ namespace vkShade
         VulkanImage& image(size_t index) const;
         uint32_t image_count() const { return m_images.size(); }
 
-        void on_effects_changed(const std::string& key, std::vector<std::string> effects);
+        const ReshadeEffect* get_effect(std::string_view name) const
+        {
+            for (const auto& effect : m_effects)
+            {
+                if (effect->name() == name)
+                    return effect.get();
+            }
 
+            return nullptr;
+        }
+
+        void on_effects_changed(const std::string& key, std::vector<std::string> effects);
         void on_reload_effects(const Events::ReloadEffects& event);
 
         // Render layer on top of swapchain
