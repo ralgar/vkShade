@@ -28,6 +28,9 @@ namespace vkShade
         void on_pointer_axis(uint32_t time, uint32_t axis, wl_fixed_t value);
         void on_pointer_axis_discrete(uint32_t axis, int32_t discrete);
 
+        // TODO(wayland): Implement MouseCaptureBackend using owned relative-
+        // pointer proxies and the shared virtual cursor, then initialize the
+        // base capture controller once surface lifetime is tracked here.
         void process_events() override;
 
     private:

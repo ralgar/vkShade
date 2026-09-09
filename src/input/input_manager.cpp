@@ -1,13 +1,17 @@
 #include "input_manager.hpp"
 #include "input/key_codes.hpp"
 
+#include <chrono>
+
 #include <magic_enum/magic_enum.hpp>
 #include "core/logger.hpp"
 #include <xkbcommon/xkbcommon.h>
 
 #include "config/config_manager.hpp"
+#include "application_mouse_inhibitors.hpp"
 #include "core/service_locator.hpp"
 #include "input_events.hpp"
+#include "mouse_capture_controller.hpp"
 
 vkShade::InputManager::InputManager()
     : m_eventBus(vkShade::Locator<EventBus>::get())
@@ -89,6 +93,29 @@ vkShade::InputManager::~InputManager()
         xkb_context_unref(m_xkbContext);
         m_xkbContext = nullptr;
     }
+}
+
+void vkShade::InputManager::initialize_mouse_capture(MouseCaptureBackend& backend)
+{
+    m_mouseInputInhibitor = create_application_mouse_inhibitor();
+    m_mouseCaptureController = std::make_unique<MouseCaptureController>(
+        backend, *m_mouseInputInhibitor, std::chrono::milliseconds(100));
+}
+
+void vkShade::InputManager::shutdown_mouse_capture()
+{
+    if (m_mouseCaptureController)
+    {
+        m_mouseCaptureController->set_requested(false, MouseCaptureController::Clock::now());
+        m_mouseCaptureController.reset();
+    }
+    m_mouseInputInhibitor.reset();
+}
+
+void vkShade::InputManager::capture_mouse(bool capture)
+{
+    if (m_mouseCaptureController)
+        m_mouseCaptureController->set_requested(capture, MouseCaptureController::Clock::now());
 }
 
 void vkShade::InputManager::bind_action(const std::string& actionName, vkShade::KeyCode keyCode)
@@ -272,6 +299,9 @@ void vkShade::InputManager::on_keybind_changed(const std::string& configKey, std
 void vkShade::InputManager::update()
 {
     this->process_events();
+
+    if (m_mouseCaptureController)
+        m_mouseCaptureController->update(MouseCaptureController::Clock::now());
 
     // Update action binding states
     for (auto& [name, binding] : m_actionBindings)

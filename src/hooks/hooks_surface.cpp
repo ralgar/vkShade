@@ -59,6 +59,13 @@ VK_LAYER_EXPORT VkResult vkShade_CreateXcbSurfaceKHR(VkInstance                 
     VkResult result = createXcbSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
     if (result == VK_SUCCESS)
     {
+        if (vkShade::Locator<vkShade::InputManager>::has())
+        {
+            auto* oldBackend = dynamic_cast<vkShade::InputBackendXlib*>(
+                &vkShade::Locator<vkShade::InputManager>::get());
+            if (oldBackend)
+                oldBackend->prepare_for_surface_replacement(nullptr, 0);
+        }
         vkShade::Locator<vkShade::InputManager>::reset();
         vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendXcb>(connection, window);
         vkShade::Logger::debug("X11 (XCB) surface created");
@@ -87,6 +94,13 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
     VkResult result = createXlibSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
     if (result == VK_SUCCESS)
     {
+        if (vkShade::Locator<vkShade::InputManager>::has())
+        {
+            auto* oldBackend = dynamic_cast<vkShade::InputBackendXlib*>(
+                &vkShade::Locator<vkShade::InputManager>::get());
+            if (oldBackend)
+                oldBackend->prepare_for_surface_replacement(display, window);
+        }
         vkShade::Locator<vkShade::InputManager>::reset();
         vkShade::Locator<vkShade::InputManager>::emplace<vkShade::InputBackendXlib>(display, window);
         vkShade::Logger::debug("X11 (Xlib) surface created");
