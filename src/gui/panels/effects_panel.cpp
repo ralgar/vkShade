@@ -103,8 +103,23 @@ void vkShade::EffectsPanel::render_effect_lists()
             ImGui::TextDisabled("Active Effects");
 
             ImGui::SameLine();
-            float buttonWidth = ImGui::CalcTextSize("Reload").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttonWidth);
+
+            const float buttonWidth = ImGui::CalcTextSize("Reload").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            const float checkboxWidth = ImGui::GetFrameHeight();
+            const float groupWidth = checkboxWidth + ImGui::GetStyle().ItemSpacing.x + buttonWidth;
+
+            // Right-align the group, but never overlap the "Active Effects" text.
+            const float offset = ImGui::GetContentRegionAvail().x - groupWidth;
+            if (offset > 0.0f)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+
+            bool effectsEnabled = internalCfg.get<bool>("__INTERNAL__", "EffectsEnabled").value_or(true);
+            if (ImGui::Checkbox("##EffectsEnabled", &effectsEnabled))
+                internalCfg.set("__INTERNAL__", "EffectsEnabled", effectsEnabled);
+
+            ImGui::SetItemTooltip("Toggle effects");
+
+            ImGui::SameLine();
 
             if (ImGui::Button("Reload"))
             {

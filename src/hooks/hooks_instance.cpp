@@ -81,6 +81,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
         // Initialize instance-level subsystems
         vkShade::Locator<vkShade::ConfigManager>::emplace();
         vkShade::Locator<vkShade::EventBus>::emplace();
+
+        // Initialize internal config values
+        auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();
+        internalCfg.set("__INTERNAL__", "EffectsEnabled", true);
     }
 
     return VK_SUCCESS;

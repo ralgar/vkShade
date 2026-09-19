@@ -208,14 +208,15 @@ void vkShade::Runtime::render(uint32_t imageIndex)
 
     // Render effects if enabled
     auto& input = vkShade::Locator<vkShade::InputManager>::get();
-    static bool enabled = true;
+    auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();
+    const bool effectsEnabled = internalCfg.get<bool>("__INTERNAL__", "EffectsEnabled").value_or(true);
     if (input.is_action_just_pressed("ToggleEffects"))
-        enabled = !enabled;
+        internalCfg.set<bool>("__INTERNAL__", "EffectsEnabled", !effectsEnabled);
 
     VulkanImage* readImage = m_pingPongA.get();
     VulkanImage* writeImage = m_pingPongB.get();
 
-    if (enabled)
+    if (effectsEnabled)
     {
         for (auto effect : m_effects)
         {
