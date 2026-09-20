@@ -1,4 +1,5 @@
 libruntime_source = [
+  'reshade_buffer_metadata.cpp',
   'reshade_effect.cpp',
   'reshade_uniforms.cpp',
   'runtime.cpp',

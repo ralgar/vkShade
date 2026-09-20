@@ -24,6 +24,7 @@ vkShade::Runtime::Runtime(VulkanDevice& device, VkSwapchainKHR swapchain, VkSwap
     m_format = swapchainInfo.imageFormat;
     m_extent = swapchainInfo.imageExtent;
     m_colorSpace = swapchainInfo.imageColorSpace;
+    Logger::debug("Swapchain format: {}", magic_enum::enum_name(m_format));
 
     // Get swapchain images
     uint32_t imageCount = 0;
