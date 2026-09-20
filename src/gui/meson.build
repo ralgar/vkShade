@@ -14,6 +14,7 @@ libgui_library = static_library(
     imgui,
     imguifiledialog,
     magic_enum,
+    libplatform,
     spdlog,
     version_hpp,
     vma,

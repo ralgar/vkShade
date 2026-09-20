@@ -11,22 +11,45 @@
 #include "wayland_callbacks.hpp"
 
 vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
+    : m_context(waylandDisplay)
 {
-    m_display = waylandDisplay;
+    if (!m_context.is_available())
+        return;
 
-    m_queue = wl_display_create_queue(m_display);
-
-    wl_registry* reg = wl_display_get_registry(m_display);
-
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(reg), m_queue);
-    wl_registry_add_listener(reg, &reg_listener, this);     // Pass 'this' as void* in callbacks
-    wl_display_roundtrip_queue(m_display, m_queue);
-
-    wl_registry_destroy(reg);
+    wl_registry_add_listener(m_context.get_registry(), &reg_listener, this);
+    if (!m_context.synchronize())
+        Logger::error("Failed to initialize Wayland input globals");
 }
 
-void vkShade::InputBackendWayland::on_keyboard_key(uint32_t key, uint32_t state)
+vkShade::InputBackendWayland::~InputBackendWayland()
 {
+    if (m_pointer)
+    {
+        if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(m_pointer)) >= WL_POINTER_RELEASE_SINCE_VERSION)
+            wl_pointer_release(m_pointer);
+        else
+            wl_pointer_destroy(m_pointer);
+    }
+    if (m_keyboard)
+    {
+        if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(m_keyboard)) >= WL_KEYBOARD_RELEASE_SINCE_VERSION)
+            wl_keyboard_release(m_keyboard);
+        else
+            wl_keyboard_destroy(m_keyboard);
+    }
+    if (m_seat)
+    {
+        if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(m_seat)) >= WL_SEAT_RELEASE_SINCE_VERSION)
+            wl_seat_release(m_seat);
+        else
+            wl_seat_destroy(m_seat);
+    }
+}
+
+void vkShade::InputBackendWayland::on_keyboard_key(
+    uint32_t serial, uint32_t key, uint32_t state)
+{
+    m_context.get_state()->set_input_serial(serial);
     uint32_t keyCode = key + 8;  // Wayland uses evdev codes, XKB expects +8
     bool pressed = (state == WL_KEYBOARD_KEY_STATE_PRESSED);
 
@@ -83,6 +106,7 @@ void vkShade::InputBackendWayland::on_pointer_motion(uint32_t time, wl_fixed_t x
 
 void vkShade::InputBackendWayland::on_pointer_button(uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
 {
+    m_context.get_state()->set_input_serial(serial);
     // Wayland button codes: BTN_LEFT=0x110, BTN_RIGHT=0x111, BTN_MIDDLE=0x112
     MouseButton mouseButton;
     switch (button)
@@ -121,7 +145,7 @@ void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t
     {
         uint32_t seatVersion = std::min(version, 5u);
         m_seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, seatVersion));
-        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_seat), m_queue);
+        m_context.assign_queue(reinterpret_cast<wl_proxy*>(m_seat));
         wl_seat_add_listener(m_seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_seat");
     }
@@ -133,7 +157,7 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     if (caps & WL_SEAT_CAPABILITY_KEYBOARD)
     {
         m_keyboard = wl_seat_get_keyboard(seat);
-        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_keyboard), m_queue);
+        m_context.assign_queue(reinterpret_cast<wl_proxy*>(m_keyboard));
         wl_keyboard_add_listener(m_keyboard, &kb_listener, this);  // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_keyboard");
     }
@@ -142,7 +166,7 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
     if (caps & WL_SEAT_CAPABILITY_POINTER)
     {
         m_pointer = wl_seat_get_pointer(seat);
-        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_pointer), m_queue);
+        m_context.assign_queue(reinterpret_cast<wl_proxy*>(m_pointer));
         wl_pointer_add_listener(m_pointer, &pointer_listener, this);
         Logger::trace("Bound to wl_pointer");
     }
@@ -150,7 +174,11 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
 
 void vkShade::InputBackendWayland::process_events()
 {
-    // Process Wayland events on our own queue
-    if (m_display && m_queue)
-        wl_display_dispatch_queue_pending(m_display, m_queue);
+    m_context.dispatch_pending();
+}
+
+std::shared_ptr<vkShade::Platform::WaylandClientState>
+vkShade::InputBackendWayland::get_wayland_client_state() const
+{
+    return m_context.get_state();
 }

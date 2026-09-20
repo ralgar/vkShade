@@ -21,7 +21,7 @@ static void kb_leave(void* data, wl_keyboard* kbd, uint32_t serial, wl_surface* 
 
 static void kb_key(void* data, wl_keyboard* kbd, uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
 {
-    static_cast<vkShade::InputBackendWayland*>(data)->on_keyboard_key(key, state);
+    static_cast<vkShade::InputBackendWayland*>(data)->on_keyboard_key(serial, key, state);
 }
 
 static void kb_modifiers(void* data, wl_keyboard* kbd, uint32_t serial,
