@@ -25,7 +25,8 @@ namespace vkShade
         VulkanImage(VulkanDevice& device, VkExtent2D size, VkFormat format, VkImageUsageFlags usageFlags);
 
         // Non-owning constructor: wraps existing image + creates its own view
-        VulkanImage(VulkanDevice& device, VkImage image, VkExtent2D size, VkFormat format);
+        VulkanImage(VulkanDevice& device, VkImage image, VkExtent2D size, VkFormat format,
+                    VkImageUsageFlags usageFlags, uint32_t arrayLayers);
 
         ~VulkanImage() override;
 
@@ -59,6 +60,7 @@ namespace vkShade
 
         void create_image();
         void create_image_view();
+        void register_tracking(TrackedImageOrigin origin, uint32_t arrayLayers = 1);
 
         void load_from_file(const std::string& filePath);
 

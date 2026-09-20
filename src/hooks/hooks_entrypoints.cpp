@@ -36,6 +36,17 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetDeviceProcAddr(VkDevice
     GETPROCADDR(QueuePresentKHR);
 
     GETPROCADDR(AllocateCommandBuffers);
+    GETPROCADDR(CreateImage);
+    GETPROCADDR(DestroyImage);
+    GETPROCADDR(CreateImageView);
+    GETPROCADDR(DestroyImageView);
+    GETPROCADDR(CreateFramebuffer);
+    GETPROCADDR(DestroyFramebuffer);
+    GETPROCADDR(CmdBeginRendering);
+    GETPROCADDR(CmdBeginRenderingKHR);
+    GETPROCADDR(CmdBeginRenderPass);
+    GETPROCADDR(CmdBeginRenderPass2);
+    GETPROCADDR(CmdBeginRenderPass2KHR);
 
     // Acquire a reader lock
     {
