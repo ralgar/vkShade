@@ -21,7 +21,7 @@ static void kb_leave(void* data, wl_keyboard* kbd, uint32_t serial, wl_surface* 
 
 static void kb_key(void* data, wl_keyboard* kbd, uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
 {
-    static_cast<vkShade::InputBackendWayland*>(data)->on_keyboard_key(key, state);
+    static_cast<vkShade::InputBackendWayland*>(data)->on_keyboard_key(serial, key, state);
 }
 
 static void kb_modifiers(void* data, wl_keyboard* kbd, uint32_t serial,
@@ -73,7 +73,7 @@ const wl_registry_listener reg_listener = {
 void pointer_enter_handler(void* data, wl_pointer* pointer, uint32_t serial,
                           wl_surface* surface, wl_fixed_t x, wl_fixed_t y) {
     auto* manager = static_cast<vkShade::InputBackendWayland*>(data);
-    manager->on_pointer_enter(surface, x, y);
+    manager->on_pointer_enter(serial, surface, x, y);
 }
 
 void pointer_leave_handler(void* data, wl_pointer* pointer, uint32_t serial,

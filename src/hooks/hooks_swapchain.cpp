@@ -88,6 +88,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     auto& eventBus = vkShade::Locator<vkShade::EventBus>::get();
 
     // Update managers
+    input.set_pointer_bounds({
+        static_cast<float>(runtime.extent().width > 0 ? runtime.extent().width - 1 : 0),
+        static_cast<float>(runtime.extent().height > 0 ? runtime.extent().height - 1 : 0),
+    });
     configManager.update();
     eventBus.update();
     input.update();
@@ -98,7 +102,13 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
         gui.visible(!gui.visible());
     }
 
+    const bool captureRequested = gui.visible();
+    input.capture_mouse(captureRequested);
     gui.update(1.f/60.f, it->second.extent());
+    // GUI actions may close the overlay during update; release capture in this
+    // present rather than leaving application input inhibited for another frame.
+    if (gui.visible() != captureRequested)
+        input.capture_mouse(gui.visible());
 
     // For each swapchain being presented
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++)

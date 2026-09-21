@@ -7,6 +7,7 @@
 #include "core/event_bus.hpp"
 #include "core/logger.hpp"
 #include "core/service_locator.hpp"
+#include "input/input_manager.hpp"
 #include "version.hpp" // cppcheck-suppress missingInclude
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateInstance(
@@ -106,4 +107,9 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroyInstance(VkInstance instance, con
 
     // Remove from layer's bookkeeping
     g_vulkanInstances.erase(dispatch_key_from_handle(instance));
+
+    // Fallback for applications that never destroy their surfaces: release the input backend while the
+    // application still owns its window-system connection.
+    if (g_vulkanInstances.empty() && vkShade::Locator<vkShade::InputManager>::has())
+        vkShade::Locator<vkShade::InputManager>::reset();
 }
