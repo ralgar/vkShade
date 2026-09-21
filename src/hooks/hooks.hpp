@@ -31,11 +31,11 @@ struct VulkanDevice
     VkPhysicalDeviceProperties2 properties;
     VkInstance instance;
     VkuDeviceDispatchTable dispatch;
-    VmaAllocator allocator;
+    VmaAllocator allocator {VK_NULL_HANDLE};
 
     VkQueue       queue;
     uint32_t      queueFamilyIndex;
-    VkCommandPool commandPool;
+    VkCommandPool commandPool {VK_NULL_HANDLE};
 };
 
 inline void* const dispatch_key_from_handle(const void* handle)
