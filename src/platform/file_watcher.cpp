@@ -15,7 +15,8 @@ namespace vkShade::Platform
             return std::make_unique<FileWatcherImpl>();
         }
         catch (const std::system_error& e) {
-            Logger::error("Failed to create file watcher: {}", e.what());
+            Logger::warn("File watcher unavailable, changed files will not be reloaded automatically: {}",
+                         e.what());
             return nullptr;
         }
     }

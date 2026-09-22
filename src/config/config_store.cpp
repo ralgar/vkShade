@@ -34,7 +34,8 @@ vkShade::ConfigStore::ConfigStore(Type type)
 
 void vkShade::ConfigStore::clear()
 {
-    m_watcher->unwatch();
+    if (m_watcher)
+        m_watcher->unwatch();
     m_currentFile = std::filesystem::path{};
     m_config.clear();
     m_observer.notify_all(*this);
@@ -73,7 +74,8 @@ bool vkShade::ConfigStore::load(std::filesystem::path filePath)
     m_observer.notify_all(*this);
 
     m_currentFile = filePath;
-    m_watcher->watch(filePath);
+    if (m_watcher)
+        m_watcher->watch(filePath);
 
     Logger::info("Loaded {} file: {}", m_typeString, filePath.string());
     return true;
@@ -90,7 +92,8 @@ bool vkShade::ConfigStore::save(std::filesystem::path filePath)
         }
 
         // Unwatch so we don't automatically reload
-        m_watcher->unwatch();
+        if (m_watcher)
+            m_watcher->unwatch();
 
         // Group by section
         std::map<std::string, std::vector<std::pair<std::string, std::string>>> sections;
@@ -143,7 +146,8 @@ bool vkShade::ConfigStore::save(std::filesystem::path filePath)
     Logger::info("Saved {} file: {}", m_typeString, filePath.string());
 
     m_currentFile = filePath;
-    m_watcher->watch(filePath);
+    if (m_watcher)
+        m_watcher->watch(filePath);
 
     return true;
 }
