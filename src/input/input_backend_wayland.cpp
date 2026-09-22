@@ -130,12 +130,21 @@ void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t
 void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t caps)
 {
     // Add keyboard handling
-    if (caps & WL_SEAT_CAPABILITY_KEYBOARD)
+    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !m_keyboard)
     {
         m_keyboard = wl_seat_get_keyboard(seat);
         wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_keyboard), m_queue);
         wl_keyboard_add_listener(m_keyboard, &kb_listener, this);  // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_keyboard");
+    }
+    else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && m_keyboard)
+    {
+        if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(m_keyboard)) >= WL_KEYBOARD_RELEASE_SINCE_VERSION)
+            wl_keyboard_release(m_keyboard);
+        else
+            wl_keyboard_destroy(m_keyboard);
+        m_keyboard = nullptr;
+        Logger::trace("Released wl_keyboard");
     }
 
     // Add pointer handling
