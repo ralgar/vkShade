@@ -36,7 +36,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateSwapchainKHR(VkDevice         
     // Create and store swapchain object
     {
         std::lock_guard<std::mutex> lock(g_runtimeMutex);
-        g_runtimes.try_emplace(*pSwapchain, thisDevice, *pSwapchain, *pCreateInfo);
+        g_runtimes.try_emplace(*pSwapchain, thisDevice, *pSwapchain, modifiedCreateInfo);
     }
 
     vkShade::Logger::debug("Swapchain created");
@@ -117,6 +117,19 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
 
         // Render layer
         runtime.render(imageIndex);
+    }
+
+    try
+    {
+        thisDevice.imageTracker->advance_frame();
+    }
+    catch (const std::exception& exception)
+    {
+        vkShade::Logger::warn("Buffer tracking failed: {}", exception.what());
+    }
+    catch (...)
+    {
+        vkShade::Logger::warn("Buffer tracking failed with an unknown error");
     }
 
     // Call down the chain to present

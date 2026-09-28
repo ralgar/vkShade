@@ -1,0 +1,19 @@
+#pragma once
+
+#include <atomic>
+#include <cstdint>
+
+namespace vkShade
+{
+    struct DiagnosticsState
+    {
+        std::atomic_bool showPerformanceOverlay {false};
+        std::atomic_bool showEffectsStatus {false};
+
+        std::atomic_bool gpuTimingSupported {false};
+        std::atomic_bool gpuTimingValid {false};
+        std::atomic<double> totalGpuMilliseconds {0.0};
+        std::atomic<double> effectsGpuMilliseconds {0.0};
+        std::atomic<uint32_t> gpuTimingSampleSequence {0};
+    };
+} // namespace vkShade
