@@ -54,6 +54,10 @@ void vkShade::ConfigManager::load_config_file()
 
 void vkShade::ConfigManager::load_preset_file()
 {
+    // Last loaded preset file path                                                    
+    bool useLastPresetPreference    = m_config.get<bool>("Preferences", "UseLastPreset").value_or(false);
+    std::string lastPresetPath      = useLastPresetPreference ? m_config.get<std::string>("Preferences", "LastPresetPath").value_or("") : "";
+
     // Custom config file path
     const char* customPresetEnv  = std::getenv("VKSHADE_PRESET_FILE");
     std::string customPresetFile = customPresetEnv ? std::string(customPresetEnv) : "";
@@ -68,7 +72,8 @@ void vkShade::ConfigManager::load_preset_file()
                                                     : std::string(std::getenv("HOME")) + "/.config/vkShade/ReShade.ini";
 
     // Allowed config paths
-    const std::array<std::string, 7> presetCandidates = {
+    const std::array<std::string, 8> presetCandidates = {
+        lastPresetPath,                                     // Last used preset
         customPresetFile,                                   // Custom preset (VKSHADE_PRESET_FILE=/path/to/ReShade.ini)
         "ReShade.ini",                                      // Per-game preset
         userCustomPresetFile,                               // User custom preset

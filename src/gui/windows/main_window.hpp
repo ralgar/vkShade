@@ -18,6 +18,7 @@ namespace vkShade
 
     private:
         ConfigStore& m_preset;
+        ConfigStore& m_config;
 
         // Panels
         EffectsPanel m_effectsPanel;
