@@ -91,14 +91,16 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     configManager.update();
     eventBus.update();
     input.update();
-
-    // Test input and shader loading
-    if (input.is_action_just_pressed("ToggleGui"))
-    {
-        gui.visible(!gui.visible());
-    }
-
     gui.update(1.f/60.f, it->second.extent());
+
+    // Update input actions
+    if (input.is_action_just_pressed("ToggleGui"))
+        gui.visible(!gui.visible());
+
+    auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();
+    const bool effectsEnabled = internalCfg.get<bool>("__INTERNAL__", "EffectsEnabled").value_or(true);
+    if (input.is_action_just_pressed("ToggleEffects"))
+        internalCfg.set<bool>("__INTERNAL__", "EffectsEnabled", !effectsEnabled);
 
     // For each swapchain being presented
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++)
