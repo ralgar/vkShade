@@ -207,11 +207,8 @@ void vkShade::Runtime::render(uint32_t imageIndex)
     m_depthDummy->transition_layout(m_commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     // Render effects if enabled
-    auto& input = vkShade::Locator<vkShade::InputManager>::get();
     auto& internalCfg = vkShade::Locator<vkShade::ConfigManager>::get().internal();
     const bool effectsEnabled = internalCfg.get<bool>("__INTERNAL__", "EffectsEnabled").value_or(true);
-    if (input.is_action_just_pressed("ToggleEffects"))
-        internalCfg.set<bool>("__INTERNAL__", "EffectsEnabled", !effectsEnabled);
 
     VulkanImage* readImage = m_pingPongA.get();
     VulkanImage* writeImage = m_pingPongB.get();
