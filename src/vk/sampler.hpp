@@ -15,7 +15,7 @@ namespace vkShade
     {
     public:
         VulkanSampler(VulkanDevice& device, const reshadefx::sampler& samplerInfo);
-        ~VulkanSampler();
+        ~VulkanSampler() override;
 
         VkSampler handle() const { return m_sampler; }
 
