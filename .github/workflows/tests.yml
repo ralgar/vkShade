@@ -87,7 +87,6 @@ jobs:
             -D__GNUC__=4 \
             -i subprojects \
             --suppress="*:subprojects/*" \
-            --suppress=missingIncludeSystem \
             --inline-suppr \
             --error-exitcode=1
 
