@@ -45,7 +45,6 @@ void vkShade::InputBackendWayland::bind_keyboard(wl_seat* seat)
         return;
 
     m_keyboard = wl_seat_get_keyboard(m_seat);
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_keyboard), m_queue);
     wl_keyboard_add_listener(m_keyboard, &kb_listener, this);
 
     Logger::trace("Bound to wl_keyboard");
@@ -57,7 +56,6 @@ void vkShade::InputBackendWayland::bind_pointer(wl_seat* seat)
         return;
 
     m_pointer = wl_seat_get_pointer(seat);
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_pointer), m_queue);
     wl_pointer_add_listener(m_pointer, &pointer_listener, this);
 
     Logger::trace("Bound to wl_pointer");
@@ -162,7 +160,6 @@ void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t
     {
         uint32_t seatVersion = std::min(version, 5u);
         m_seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, seatVersion));
-        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_seat), m_queue);
         wl_seat_add_listener(m_seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_seat");
     }
