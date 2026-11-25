@@ -16,10 +16,14 @@ vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
 
     m_queue = wl_display_create_queue(m_display);
 
-    wl_registry* reg = wl_display_get_registry(m_display);
+    // Create the registry on our queue from the start. The wrapper avoids a race
+    //  where it exists on the default queue while other threads dispatch it.
+    auto* wrapper = static_cast<wl_display*>(wl_proxy_create_wrapper(m_display));
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(wrapper), m_queue);
+    wl_registry* reg = wl_display_get_registry(wrapper);
+    wl_proxy_wrapper_destroy(wrapper);
 
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(reg), m_queue);
-    wl_registry_add_listener(reg, &reg_listener, this);     // Pass 'this' as void* in callbacks
+    wl_registry_add_listener(reg, &reg_listener, this);  // Pass 'this' as void* in callbacks
     wl_display_roundtrip_queue(m_display, m_queue);
 
     wl_registry_destroy(reg);
