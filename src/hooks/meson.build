@@ -2,6 +2,7 @@ hooks_source = [
   'hooks_device.cpp',
   'hooks_entrypoints.cpp',
   'hooks_instance.cpp',
+  'hooks_resources.cpp',
   'hooks_surface.cpp',
   'hooks_swapchain.cpp',
 ]

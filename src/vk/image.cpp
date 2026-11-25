@@ -110,6 +110,8 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         if (!found)
             throw std::runtime_error("Unable to find texture: " + fileName);
     }
+
+    this->register_tracking(TrackedImageOrigin::VkShade);
 }
 
 void vkShade::VulkanImage::load_from_file(const std::string& filePath)
@@ -180,9 +182,12 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkExtent2D size, VkForma
 
     this->create_image();
     this->create_image_view();
+    this->register_tracking(TrackedImageOrigin::VkShade);
 }
 
-vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2D size, VkFormat format)
+vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2D size,
+                                  VkFormat format, VkImageUsageFlags usageFlags,
+                                  uint32_t arrayLayers)
     : VulkanObject(device)
 {
     Logger::trace("Wrapping existing image (Size: {}x{}, Format: {})",
@@ -194,15 +199,27 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
     m_extent.height = size.height;
     m_extent.depth  = 1;
     m_format = format;
+    m_usageFlags = usageFlags;
     m_owning = false;  // IMPORTANT! We don't own the image here.
 
     // Only create the view (no image since we don't own it)
     this->create_image_view();
+    this->register_tracking(TrackedImageOrigin::Swapchain, arrayLayers);
 }
 
 vkShade::VulkanImage::~VulkanImage()
 {
     Logger::trace("Destroying VulkanImage");
+
+    try
+    {
+        m_device.imageTracker->unregister_view(m_imageView);
+        m_device.imageTracker->unregister_image(m_image);
+    }
+    catch (const std::exception& exception)
+    {
+        Logger::warn("Buffer tracking failed: {}", exception.what());
+    }
 
     if (m_imageView != VK_NULL_HANDLE)
         m_device.dispatch.DestroyImageView(m_device.handle, m_imageView, nullptr);
@@ -261,6 +278,63 @@ void vkShade::VulkanImage::create_image_view()
     };
 
 	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_imageView));
+}
+
+void vkShade::VulkanImage::register_tracking(TrackedImageOrigin origin,
+                                             uint32_t arrayLayers)
+{
+    const VkImageCreateInfo imageInfo = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = m_format,
+        .extent = {m_extent.width, m_extent.height, 1},
+        .mipLevels = 1,
+        .arrayLayers = arrayLayers,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = m_usageFlags,
+    };
+    const VkImageSubresourceRange viewRange = {
+        .aspectMask = m_format == VK_FORMAT_D32_SFLOAT
+                    ? VK_IMAGE_ASPECT_DEPTH_BIT
+                    : m_format == VK_FORMAT_S8_UINT
+                    ? VK_IMAGE_ASPECT_STENCIL_BIT
+                    : VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    };
+
+    try
+    {
+        m_device.imageTracker->register_image(m_image, imageInfo, origin);
+        m_device.imageTracker->register_view(m_imageView, m_image, viewRange);
+    }
+    catch (const std::exception& exception)
+    {
+        try
+        {
+            m_device.imageTracker->unregister_view(m_imageView);
+            m_device.imageTracker->unregister_image(m_image);
+        }
+        catch (...)
+        {
+        }
+        Logger::warn("Buffer tracking failed: {}", exception.what());
+    }
+    catch (...)
+    {
+        try
+        {
+            m_device.imageTracker->unregister_view(m_imageView);
+            m_device.imageTracker->unregister_image(m_image);
+        }
+        catch (...)
+        {
+        }
+        Logger::warn("Buffer tracking failed with an unknown error");
+    }
 }
 
 void vkShade::VulkanImage::blit_from(VkCommandBuffer cmd, VkImage source)

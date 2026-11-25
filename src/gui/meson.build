@@ -1,7 +1,9 @@
 libgui_source = [
+  'panels/buffer_panel.cpp',
   'panels/effects_panel.cpp',
   'panels/log_panel.cpp',
   'windows/about_window.cpp',
+  'windows/diagnostics_overlay.cpp',
   'windows/main_window.cpp',
   'gui_manager.cpp',
 ]

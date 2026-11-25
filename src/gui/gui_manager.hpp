@@ -4,6 +4,7 @@
 
 #include "hooks/hooks.hpp"
 #include "windows/main_window.hpp"
+#include "windows/diagnostics_overlay.hpp"
 
 namespace vkShade
 {
@@ -32,6 +33,7 @@ namespace vkShade
         bool m_dockspaceInitialized {false};
 
         MainWindow m_mainWindow;
+        DiagnosticsOverlay m_diagnosticsOverlay;
 
         void draw_cursor();
 
