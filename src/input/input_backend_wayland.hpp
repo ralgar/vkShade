@@ -10,6 +10,7 @@ namespace vkShade
     {
     public:
         InputBackendWayland(wl_display* waylandDisplay);
+        ~InputBackendWayland();
 
         // These get called by the static C callbacks
         void on_registry_global(wl_registry* reg, uint32_t name,
@@ -36,5 +37,12 @@ namespace vkShade
         wl_keyboard*    m_keyboard = nullptr;
         wl_pointer*     m_pointer = nullptr;
         wl_event_queue* m_queue = nullptr;
+
+        void bind_keyboard(wl_seat* seat);
+        void bind_pointer(wl_seat* seat);
+
+        void release_keyboard();
+        void release_pointer();
+        void release_seat();
     };
 }// namespace vkShade

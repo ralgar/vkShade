@@ -60,6 +60,7 @@ VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkShade_GetInstanceProcAddr(VkInst
     GETPROCADDR(CreateWaylandSurfaceKHR);
     GETPROCADDR(CreateXcbSurfaceKHR);
     GETPROCADDR(CreateXlibSurfaceKHR);
+    GETPROCADDR(DestroySurfaceKHR);
 
     // Acquire a reader lock
     {
