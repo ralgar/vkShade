@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -17,6 +18,11 @@ typedef uint32_t xkb_keysym_t;
 
 namespace vkShade
 {
+    namespace Platform
+    {
+        class WaylandClientState;
+    }
+
     constexpr KeyCode DEFAULT_KEY_EFFECTS_TOGGLE = KeyCode::KEY_INSERT;
     constexpr KeyCode DEFAULT_KEY_GUI_TOGGLE = KeyCode::KEY_HOME;
 
@@ -32,6 +38,10 @@ namespace vkShade
         bool is_action_just_released(const std::string& actionName) const;
 
         virtual void process_events() = 0;
+        virtual std::shared_ptr<Platform::WaylandClientState> get_wayland_client_state() const
+        {
+            return {};
+        }
 
         void update();
 

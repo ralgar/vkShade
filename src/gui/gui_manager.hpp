@@ -3,6 +3,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "hooks/hooks.hpp"
+#include "platform/clipboard.hpp"
 #include "windows/main_window.hpp"
 
 namespace vkShade
@@ -30,7 +31,7 @@ namespace vkShade
         VkDescriptorPool m_descriptorPool;
 
         bool m_dockspaceInitialized {false};
-
+        std::unique_ptr<Platform::Clipboard> m_clipboard;
         MainWindow m_mainWindow;
 
         void draw_cursor();
