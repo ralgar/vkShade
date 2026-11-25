@@ -16,10 +16,14 @@ vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
 
     m_queue = wl_display_create_queue(m_display);
 
-    wl_registry* reg = wl_display_get_registry(m_display);
+    // Create the registry on our queue from the start. The wrapper avoids a race
+    //  where it exists on the default queue while other threads dispatch it.
+    auto* wrapper = static_cast<wl_display*>(wl_proxy_create_wrapper(m_display));
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(wrapper), m_queue);
+    wl_registry* reg = wl_display_get_registry(wrapper);
+    wl_proxy_wrapper_destroy(wrapper);
 
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(reg), m_queue);
-    wl_registry_add_listener(reg, &reg_listener, this);     // Pass 'this' as void* in callbacks
+    wl_registry_add_listener(reg, &reg_listener, this);  // Pass 'this' as void* in callbacks
     wl_display_roundtrip_queue(m_display, m_queue);
 
     wl_registry_destroy(reg);
@@ -41,7 +45,6 @@ void vkShade::InputBackendWayland::bind_keyboard(wl_seat* seat)
         return;
 
     m_keyboard = wl_seat_get_keyboard(m_seat);
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_keyboard), m_queue);
     wl_keyboard_add_listener(m_keyboard, &kb_listener, this);
 
     Logger::trace("Bound to wl_keyboard");
@@ -53,7 +56,6 @@ void vkShade::InputBackendWayland::bind_pointer(wl_seat* seat)
         return;
 
     m_pointer = wl_seat_get_pointer(seat);
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_pointer), m_queue);
     wl_pointer_add_listener(m_pointer, &pointer_listener, this);
 
     Logger::trace("Bound to wl_pointer");
@@ -158,7 +160,6 @@ void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t
     {
         uint32_t seatVersion = std::min(version, 5u);
         m_seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, seatVersion));
-        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_seat), m_queue);
         wl_seat_add_listener(m_seat, &seat_listener, this);   // Pass 'this' as data* in callbacks
         Logger::trace("Bound to wl_seat");
     }
