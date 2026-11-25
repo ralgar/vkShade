@@ -64,7 +64,10 @@ vkShade::InputBackendXlib::InputBackendXlib(Display* display, Window window)
 vkShade::InputBackendXlib::~InputBackendXlib()
 {
     if (m_wheelDisplay)
+    {
         XCloseDisplay(m_wheelDisplay);
+        m_wheelDisplay = nullptr;
+    }
 }
 
 void vkShade::InputBackendXlib::process_events()
