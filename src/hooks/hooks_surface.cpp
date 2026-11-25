@@ -94,3 +94,19 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_CreateXlibSurfaceKHR(VkInstance     
 
     return result;
 }
+
+VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySurfaceKHR(VkInstance                   instance,
+                                                          VkSurfaceKHR                 surface,
+                                                          const VkAllocationCallbacks* pAllocator)
+{
+    vkShade::Logger::trace("Intercepted VkDestroySurfaceKHR");
+
+    // Destroy the InputManager before surface teardown.
+    // TODO: Need to add bookkeeping for VkSurfaceKHR, to make sure we
+    // destroy the correct handle in cases with multiple surfaces.
+    vkShade::Locator<vkShade::InputManager>::reset();
+
+    // Call down the chain.
+    auto& thisInstance = get_instance_from_handle(instance);
+    thisInstance.dispatch.DestroySurfaceKHR(instance, surface, pAllocator);
+}
