@@ -25,6 +25,40 @@ vkShade::InputBackendWayland::InputBackendWayland(wl_display* waylandDisplay)
     wl_registry_destroy(reg);
 }
 
+vkShade::InputBackendWayland::~InputBackendWayland()
+{
+    this->release_keyboard();
+    this->release_pointer();
+    this->release_seat();
+
+    if (m_queue)
+        wl_event_queue_destroy(m_queue);
+}
+
+void vkShade::InputBackendWayland::bind_keyboard(wl_seat* seat)
+{
+    if (seat != m_seat || m_keyboard)
+        return;
+
+    m_keyboard = wl_seat_get_keyboard(m_seat);
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_keyboard), m_queue);
+    wl_keyboard_add_listener(m_keyboard, &kb_listener, this);
+
+    Logger::trace("Bound to wl_keyboard");
+}
+
+void vkShade::InputBackendWayland::bind_pointer(wl_seat* seat)
+{
+    if (seat != m_seat || m_pointer)
+        return;
+
+    m_pointer = wl_seat_get_pointer(seat);
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_pointer), m_queue);
+    wl_pointer_add_listener(m_pointer, &pointer_listener, this);
+
+    Logger::trace("Bound to wl_pointer");
+}
+
 void vkShade::InputBackendWayland::on_keyboard_key(uint32_t key, uint32_t state)
 {
     uint32_t keyCode = key + 8;  // Wayland uses evdev codes, XKB expects +8
@@ -117,7 +151,10 @@ void vkShade::InputBackendWayland::on_pointer_axis_discrete(uint32_t axis, int32
 
 void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t name, const char* interface, uint32_t version)
 {
-    if (strcmp(interface, wl_seat_interface.name) == 0)
+    // Single-seat only: bind the first seat and ignore any others.
+    // The registry is destroyed after the initial roundtrip, so seats added
+    // or removed later (global/global_remove) are not tracked.
+    if (!m_seat && strcmp(interface, wl_seat_interface.name) == 0)
     {
         uint32_t seatVersion = std::min(version, 5u);
         m_seat = static_cast<wl_seat*>(wl_registry_bind(reg, name, &wl_seat_interface, seatVersion));
@@ -129,43 +166,17 @@ void vkShade::InputBackendWayland::on_registry_global(wl_registry* reg, uint32_t
 
 void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t caps)
 {
-    // Add keyboard handling
-    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !m_keyboard)
-    {
-        m_keyboard = wl_seat_get_keyboard(seat);
-        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_keyboard), m_queue);
-        wl_keyboard_add_listener(m_keyboard, &kb_listener, this);  // Pass 'this' as data* in callbacks
-        Logger::trace("Bound to wl_keyboard");
-    }
-    else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && m_keyboard)
-    {
-        if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(m_keyboard)) >= WL_KEYBOARD_RELEASE_SINCE_VERSION)
-            wl_keyboard_release(m_keyboard);
-        else
-            wl_keyboard_destroy(m_keyboard);
+    // Handle keyboard
+    if (caps & WL_SEAT_CAPABILITY_KEYBOARD)
+        this->bind_keyboard(seat);
+    else
+        this->release_keyboard();
 
-        m_keyboard = nullptr;
-        Logger::trace("Released wl_keyboard");
-    }
-
-    // Add pointer handling
-    if (caps & WL_SEAT_CAPABILITY_POINTER && !m_pointer)
-    {
-        m_pointer = wl_seat_get_pointer(seat);
-        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_pointer), m_queue);
-        wl_pointer_add_listener(m_pointer, &pointer_listener, this);
-        Logger::trace("Bound to wl_pointer");
-    }
-    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && m_pointer)
-    {
-        if (wl_pointer_get_version(m_pointer) >= WL_POINTER_RELEASE_SINCE_VERSION)
-            wl_pointer_release(m_pointer);
-        else
-            wl_pointer_destroy(m_pointer);
-
-        m_pointer = nullptr;
-        Logger::trace("Released wl_pointer");
-    }
+    // Handle pointer
+    if (caps & WL_SEAT_CAPABILITY_POINTER)
+        this->bind_pointer(seat);
+    else
+        this->release_pointer();
 }
 
 void vkShade::InputBackendWayland::process_events()
@@ -173,4 +184,46 @@ void vkShade::InputBackendWayland::process_events()
     // Process Wayland events on our own queue
     if (m_display && m_queue)
         wl_display_dispatch_queue_pending(m_display, m_queue);
+}
+
+void vkShade::InputBackendWayland::release_keyboard()
+{
+    if (!m_keyboard)
+        return;
+
+    if (wl_proxy_get_version(reinterpret_cast<wl_proxy*>(m_keyboard)) >= WL_KEYBOARD_RELEASE_SINCE_VERSION)
+        wl_keyboard_release(m_keyboard);
+    else
+        wl_keyboard_destroy(m_keyboard);
+
+    m_keyboard = nullptr;
+    Logger::trace("Released wl_keyboard");
+}
+
+void vkShade::InputBackendWayland::release_pointer()
+{
+    if (!m_pointer)
+        return;
+
+    if (wl_pointer_get_version(m_pointer) >= WL_POINTER_RELEASE_SINCE_VERSION)
+        wl_pointer_release(m_pointer);
+    else
+        wl_pointer_destroy(m_pointer);
+
+    m_pointer = nullptr;
+    Logger::trace("Released wl_pointer");
+}
+
+void vkShade::InputBackendWayland::release_seat()
+{
+    if (!m_seat)
+        return;
+
+    if (wl_seat_get_version(m_seat) >= WL_SEAT_RELEASE_SINCE_VERSION)
+        wl_seat_release(m_seat);
+    else
+        wl_seat_destroy(m_seat);
+
+    m_seat = nullptr;
+    Logger::trace("Released wl_seat");
 }
