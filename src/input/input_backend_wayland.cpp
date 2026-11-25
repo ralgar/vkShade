@@ -143,17 +143,28 @@ void vkShade::InputBackendWayland::on_seat_capabilities(wl_seat* seat, uint32_t 
             wl_keyboard_release(m_keyboard);
         else
             wl_keyboard_destroy(m_keyboard);
+
         m_keyboard = nullptr;
         Logger::trace("Released wl_keyboard");
     }
 
     // Add pointer handling
-    if (caps & WL_SEAT_CAPABILITY_POINTER)
+    if (caps & WL_SEAT_CAPABILITY_POINTER && !m_pointer)
     {
         m_pointer = wl_seat_get_pointer(seat);
         wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(m_pointer), m_queue);
         wl_pointer_add_listener(m_pointer, &pointer_listener, this);
         Logger::trace("Bound to wl_pointer");
+    }
+    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && m_pointer)
+    {
+        if (wl_pointer_get_version(m_pointer) >= WL_POINTER_RELEASE_SINCE_VERSION)
+            wl_pointer_release(m_pointer);
+        else
+            wl_pointer_destroy(m_pointer);
+
+        m_pointer = nullptr;
+        Logger::trace("Released wl_pointer");
     }
 }
 
