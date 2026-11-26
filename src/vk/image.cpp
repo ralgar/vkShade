@@ -110,6 +110,11 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         if (!found)
             throw std::runtime_error("Unable to find texture: " + fileName);
     }
+    else
+    {
+        // ReShade expects new textures to start out zeroed
+        this->clear_to_zero();
+    }
 }
 
 void vkShade::VulkanImage::load_from_file(const std::string& filePath)
@@ -303,6 +308,23 @@ void vkShade::VulkanImage::blit(VkCommandBuffer cmd, VkImage source, VkImage des
 	blitInfo.pRegions = &blitRegion;
 
 	m_device.dispatch.CmdBlitImage2(cmd, &blitInfo);
+}
+
+void vkShade::VulkanImage::clear_to_zero()
+{
+    immediate_submit([&](VkCommandBuffer cmd)
+    {
+        this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        const VkClearColorValue zero {};
+        const VkImageSubresourceRange range = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+
+        m_device.dispatch.CmdClearColorImage(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                             &zero, 1, &range);
+
+        // Leave it ready for sampling, the same as upload() does.
+        this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
 }
 
 VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)

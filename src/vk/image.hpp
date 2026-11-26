@@ -58,6 +58,7 @@ namespace vkShade
         // The actual blit implementation
         void blit(VkCommandBuffer cmd, VkImage src, VkImage dest);
 
+        void clear_to_zero();
         void create_image();
         void create_image_view();
 
