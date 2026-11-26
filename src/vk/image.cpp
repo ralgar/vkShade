@@ -1,5 +1,7 @@
 #include "image.hpp"
 
+#include <optional>
+
 #include <effect_module.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -42,53 +44,13 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         return a.name == "source";
     });
 
-    // If no explicit size is specified we need to extract it from the image file
-    if (it != info.annotations.end() && m_extent.width == 1 && m_extent.height == 1)
-    {
-        // Find the file and probe dimensions before creating the image
-        auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
-        auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
-        std::string fileName = it->value.string_data;
-
-        bool found = false;
-        for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
-        {
-            for (const auto& entry : std::filesystem::directory_iterator(path))
-            {
-                // Do a case insensitive comparison since ReShade is a Windows app
-                auto a = entry.path().filename().string();
-                auto b = fileName;
-                std::transform(a.begin(), a.end(), a.begin(), ::tolower);
-                std::transform(b.begin(), b.end(), b.begin(), ::tolower);
-                if (a == b)
-                {
-                    int w, h, c;
-                    if (stbi_info(entry.path().c_str(), &w, &h, &c))
-                    {
-                        m_extent.width  = w;
-                        m_extent.height = h;
-                    }
-
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        if (!found)
-            throw std::runtime_error("Unable to find texture: " + fileName);
-    }
-
-    this->create_image();
-    this->create_image_view();
-
+    std::optional<std::filesystem::path> sourcePath;
     if (it != info.annotations.end())
     {
         auto& config = vkShade::Locator<vkShade::ConfigManager>::get().app();
         auto searchPaths = config.get<std::vector<std::string>>("ReShade", "TextureSearchPaths");
         std::string fileName = it->value.string_data;
 
-        bool found = false;
         for (auto& path : searchPaths.value_or(std::vector<std::string>{}))
         {
             for (const auto& entry : std::filesystem::directory_iterator(path))
@@ -100,26 +62,49 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
                 std::transform(b.begin(), b.end(), b.begin(), ::tolower);
                 if (a == b)
                 {
-                    this->load_from_file(entry.path());
-                    found = true;
+                    sourcePath = entry.path();
                     break;
                 }
             }
+
+            if (sourcePath)
+                break;  // First match wins
         }
 
-        if (!found)
+        if (!sourcePath)
             throw std::runtime_error("Unable to find texture: " + fileName);
+
+        // If no explicit size is specified, take it from the image file.
+        if (m_extent.width == 1 && m_extent.height == 1)
+        {
+            int w, h, c;
+            if (stbi_info(sourcePath->c_str(), &w, &h, &c))
+            {
+                m_extent.width = w;
+                m_extent.height = h;
+            }
+        }
+    }
+
+    this->create_image();
+    this->create_image_view();
+
+    if (sourcePath)
+    {
+        Logger::debug("Loading texture '{}' ({}x{}): '{}'",
+                      info.unique_name, m_extent.width, m_extent.height, sourcePath->string());
+        this->load_from_file(*sourcePath);
     }
     else
     {
-        // ReShade expects new textures to start out zeroed
+        // ReShade expects new textures to be zeroed
         this->clear_to_zero();
     }
 }
 
 void vkShade::VulkanImage::load_from_file(const std::string& filePath)
 {
-    Logger::trace("Creating image from file: {}", filePath);
+    Logger::trace("Loading image from file: {}", filePath);
 
     int32_t channels;
     stbir_pixel_layout stbirLayout;
