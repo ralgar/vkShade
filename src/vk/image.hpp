@@ -46,6 +46,9 @@ namespace vkShade
         const VkExtent3D extent() const { return m_extent; }
 
     private:
+        // Delegation target, so the destructor runs if a delegating constructor throws.
+        explicit VulkanImage(VulkanDevice& device) : VulkanObject(device) {}
+
         bool              m_owning = true;
         VkExtent3D        m_extent {0, 0, 0};
         VkImage           m_image = VK_NULL_HANDLE;

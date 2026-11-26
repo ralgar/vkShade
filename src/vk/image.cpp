@@ -17,7 +17,7 @@
 #include "macros.hpp"
 
 vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture& info)
-    : VulkanObject(device)
+    : VulkanImage(device)
 {
     Logger::trace("Creating image from ReShade FX info");
 
