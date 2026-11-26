@@ -72,6 +72,7 @@ namespace vkShade
         std::unordered_map<std::string, std::unique_ptr<VulkanImage>> m_textures;
         std::vector<std::unique_ptr<VulkanSampler>> m_samplers;
         std::unique_ptr<VulkanImage> m_stencilBuffer;
+        bool m_imagesInitialized = false;
 
         std::vector<Pass> m_passes;
 
@@ -137,6 +138,5 @@ namespace vkShade
         static Uniform::UiType     convert_uniform_ui_type(const std::string& type);
 
         static uint32_t convert_color_space(VkColorSpaceKHR colorSpace);
-        static uint32_t format_bit_depth(VkFormat format);
     };
 } // namespace vkShade
