@@ -83,7 +83,14 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
     // Iterate and apply effect passes
     for (auto&& [pass, passInfo] : std::views::zip(m_passes, technique.passes))
     {
-        bool isFinalPass = (&passInfo == &technique.passes.back());
+        // Transition the textures this pass samples
+        for (const auto& binding : passInfo.texture_bindings)
+        {
+            const auto& name = m_module->samplers.at(binding.index).texture_name;
+
+            if (auto it = m_textures.find(name); it != m_textures.end())
+                it->second->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
 
         const VkClearValue clearValue = { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } };
         const VkClearValue* clear = passInfo.clear_render_targets ? &clearValue : nullptr;
@@ -181,19 +188,6 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         m_device.dispatch.CmdDraw(cmd, passInfo.num_vertices, 1, 0, 0);
 
         m_device.dispatch.CmdEndRendering(cmd);
-
-        // Transition intermediate render targets to SHADER_READ_ONLY_OPTIMAL for next pass
-        if (!isFinalPass)
-        {
-            for (const auto& name : passInfo.render_target_names)
-            {
-                if (name.empty())
-                    break;
-
-                auto* renderTarget = m_textures.at(name).get();
-                renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            }
-        }
     }
 }
 
