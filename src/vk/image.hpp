@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include <vk_mem_alloc.h>
@@ -59,6 +60,8 @@ namespace vkShade
 
         void create_image();
         void create_image_view();
+
+        void immediate_submit(const std::function<void(VkCommandBuffer cmd)>& function);
 
         void load_from_file(const std::string& filePath);
 

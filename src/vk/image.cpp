@@ -337,6 +337,39 @@ VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)
     std::unreachable();
 }
 
+void vkShade::VulkanImage::immediate_submit(const std::function<void(VkCommandBuffer)>& function)
+{
+    // Record and submit a one-time command buffer
+    VkCommandBufferAllocateInfo cmdBufAllocInfo = vkinit::command_buffer_allocate_info(m_device.commandPool);
+
+    VkCommandBuffer cmd;
+
+    // NOTE: Command buffers are dispatchable types. Their creation must go through our
+    //  own hook, not the dispatch table, to ensure the dispatch pointer fixup runs.
+    VK_CHECK(vkShade_AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd));
+
+    VkCommandBufferBeginInfo beginInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+    };
+    VK_CHECK(m_device.dispatch.BeginCommandBuffer(cmd, &beginInfo));
+
+    function(cmd);
+
+    VK_CHECK(m_device.dispatch.EndCommandBuffer(cmd));
+
+    VkSubmitInfo submitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &cmd,
+    };
+
+    VK_CHECK(m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, VK_NULL_HANDLE));
+    VK_CHECK(m_device.dispatch.QueueWaitIdle(m_device.queue));
+
+    m_device.dispatch.FreeCommandBuffers(m_device.handle, m_device.commandPool, 1, &cmd);
+}
+
 void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout)
 {
     VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -380,24 +413,6 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
     VulkanBuffer staging(m_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
     staging.write(data, size);
 
-    // Record and submit a one-time command buffer
-    VkCommandBufferAllocateInfo cmdBufAllocInfo = vkinit::command_buffer_allocate_info(m_device.commandPool);
-
-    VkCommandBuffer cmd;
-
-    // NOTE: Command buffers are dispatchable types. Their creation must go through our
-    //  own hook, not the dispatch table, to ensure the dispatch pointer fixup runs.
-    VK_CHECK(vkShade_AllocateCommandBuffers(m_device.handle, &cmdBufAllocInfo, &cmd));
-
-    VkCommandBufferBeginInfo beginInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-    };
-    VK_CHECK(m_device.dispatch.BeginCommandBuffer(cmd, &beginInfo));
-
-    // Transition UNDEFINED -> TRANSFER_DST_OPTIMAL
-    this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
     VkBufferImageCopy copyRegion = {
         .imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -412,22 +427,15 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
         }
     };
 
-    m_device.dispatch.CmdCopyBufferToImage(cmd, staging.buffer(), m_image,
-                                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+    this->immediate_submit([&](VkCommandBuffer cmd)
+    {
+        // Transition UNDEFINED -> TRANSFER_DST_OPTIMAL
+        this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    // Transition TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
-    this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        m_device.dispatch.CmdCopyBufferToImage(cmd, staging.buffer(), m_image,
+                                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-    VK_CHECK(m_device.dispatch.EndCommandBuffer(cmd));
-
-    VkSubmitInfo submitInfo = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &cmd,
-    };
-
-    VK_CHECK(m_device.dispatch.QueueSubmit(m_device.queue, 1, &submitInfo, VK_NULL_HANDLE));
-    VK_CHECK(m_device.dispatch.QueueWaitIdle(m_device.queue));
-
-    m_device.dispatch.FreeCommandBuffers(m_device.handle, m_device.commandPool, 1, &cmd);
+        // Transition TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
+        this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
 }
