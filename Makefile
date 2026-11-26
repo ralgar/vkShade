@@ -62,6 +62,11 @@ uninstall-lib32:
 test: install
 	ENABLE_VKSHADE=1 VKSHADE_LOG_LEVEL=trace $(VKCUBE_COMMAND)
 
+.PHONY: validate
+validate: install
+	VK_LOADER_LAYERS_ENABLE=VK_LAYER_KHRONOS_validation \
+	ENABLE_VKSHADE=1 $(VKCUBE_COMMAND)
+
 .PHONY: docs
 docs: venv
 	doxygen docs/Doxyfile
