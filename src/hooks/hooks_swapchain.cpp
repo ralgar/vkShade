@@ -2,6 +2,7 @@
 #include "runtime/runtime.hpp"
 #include "hooks.hpp"
 
+#include <chrono>
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -64,6 +65,15 @@ VK_LAYER_EXPORT void VKAPI_CALL vkShade_DestroySwapchainKHR(VkDevice            
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo)
 {
+    // Track delta time for ImGui
+    using Clock = std::chrono::steady_clock;
+    static auto lastTime = Clock::now();
+    auto currentTime = Clock::now();
+
+    // Minimum of 1 microsecond or ImGui assertion will fail after the first frame
+    float deltaTime = std::max(std::chrono::duration<float>(currentTime - lastTime).count(), 1e-6f);
+    lastTime = currentTime;
+
     // Get device
     auto& thisDevice = g_vulkanDevices[dispatch_key_from_handle(queue)];
 
@@ -91,7 +101,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL vkShade_QueuePresentKHR(VkQueue queue, const
     configManager.update();
     eventBus.update();
     input.update();
-    gui.update(1.f/60.f, it->second.extent());
+    gui.update(deltaTime, it->second.extent());
 
     // Update input actions
     if (input.is_action_just_pressed("ToggleGui"))
