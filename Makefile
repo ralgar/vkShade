@@ -3,6 +3,8 @@ BUILD32_DIR := build32
 
 DISTRO_ID := $(shell if [ -e /etc/os-release ] ; then source /etc/os-release; echo $$ID; fi)
 
+VKCUBE_COMMAND := vkcube --wsi xlib
+
 ifeq ($(DISTRO_ID),debian)
 	LIB32_DIR := lib/i386-linux-gnu
 else
@@ -32,7 +34,7 @@ debug:
 	meson setup --prefix "$(HOME)/.local" --buildtype=debug $(BUILD_DIR)
 	ninja -C $(BUILD_DIR)
 	meson install -C "$(BUILD_DIR)" --skip-subprojects
-	ENABLE_VKSHADE=1 gdb vkcube
+	ENABLE_VKSHADE=1 gdb -ex=run --args $(VKCUBE_COMMAND)
 
 .PHONY: install
 install: build
@@ -58,7 +60,7 @@ uninstall-lib32:
 
 .PHONY: test
 test: install
-	ENABLE_VKSHADE=1 VKSHADE_LOG_LEVEL=trace vkcube
+	ENABLE_VKSHADE=1 VKSHADE_LOG_LEVEL=trace $(VKCUBE_COMMAND)
 
 .PHONY: docs
 docs: venv
