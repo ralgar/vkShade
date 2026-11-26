@@ -8,7 +8,8 @@
 #include "core/service_locator.hpp"
 
 vkShade::MainWindow::MainWindow()
-    : m_preset(vkShade::Locator<ConfigManager>::get().preset())
+    :   m_preset(vkShade::Locator<ConfigManager>::get().preset()),
+        m_config(vkShade::Locator<ConfigManager>::get().app())
 {}
 
 void vkShade::MainWindow::render()
@@ -118,6 +119,10 @@ void vkShade::MainWindow::render_menu_bar()
         {
             std::string filePath = ImGuiFileDialog::Instance()->GetFilePathName();
             m_preset.load(filePath);
+
+            // Save last preset location
+            m_config.set("Preferences", "LastPresetPath", filePath);
+            m_config.save();
         }
 
         ImGuiFileDialog::Instance()->Close();
