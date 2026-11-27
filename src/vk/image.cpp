@@ -1,4 +1,5 @@
 #include "image.hpp"
+#include "hooks/hooks.hpp"
 
 #include <optional>
 
@@ -37,6 +38,15 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, const reshadefx::texture
         m_usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     if (info.storage_access)
         m_usageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
+
+    if (m_format == VK_FORMAT_D32_SFLOAT)
+        m_aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (m_format == VK_FORMAT_S8_UINT)
+        m_aspectFlags = VK_IMAGE_ASPECT_STENCIL_BIT;
+
+    m_mipLevels = info.levels;
+    if (m_mipLevels > 1)
+        m_usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     // If image has a source (file) annotation, load it.
     auto it = std::find_if(info.annotations.begin(), info.annotations.end(), [](const auto& a)
@@ -168,6 +178,11 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkExtent2D size, VkForma
     m_format = format;
     m_usageFlags = usageFlags;
 
+    if (m_format == VK_FORMAT_D32_SFLOAT)
+        m_aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (m_format == VK_FORMAT_S8_UINT)
+        m_aspectFlags = VK_IMAGE_ASPECT_STENCIL_BIT;
+
     this->create_image();
     this->create_image_view();
 }
@@ -186,6 +201,11 @@ vkShade::VulkanImage::VulkanImage(VulkanDevice& device, VkImage image, VkExtent2
     m_format = format;
     m_owning = false;  // IMPORTANT! We don't own the image here.
 
+    if (m_format == VK_FORMAT_D32_SFLOAT)
+        m_aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (m_format == VK_FORMAT_S8_UINT)
+        m_aspectFlags = VK_IMAGE_ASPECT_STENCIL_BIT;
+
     // Only create the view (no image since we don't own it)
     this->create_image_view();
 }
@@ -194,8 +214,11 @@ vkShade::VulkanImage::~VulkanImage()
 {
     Logger::trace("Destroying VulkanImage");
 
-    if (m_imageView != VK_NULL_HANDLE)
-        m_device.dispatch.DestroyImageView(m_device.handle, m_imageView, nullptr);
+    if (m_allMipsView != VK_NULL_HANDLE)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_allMipsView, nullptr);
+
+    if (m_baseMipView != VK_NULL_HANDLE)
+        m_device.dispatch.DestroyImageView(m_device.handle, m_baseMipView, nullptr);
 
     if (m_owning && m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE)
         vmaDestroyImage(m_device.allocator, m_image, m_allocation);
@@ -203,13 +226,37 @@ vkShade::VulkanImage::~VulkanImage()
 
 void vkShade::VulkanImage::create_image()
 {
+    // Pick the mip generation filter up front, since format support depends on the GPU.
+    // Not every format can be blitted, or filtered linearly (integer formats never can).
+    if (m_mipLevels > 1)
+    {
+        auto thisInstance = get_instance_from_handle(m_device.instance);
+        VkFormatProperties properties;
+        thisInstance.dispatch.GetPhysicalDeviceFormatProperties(
+            m_device.physicalDevice, m_format, &properties);
+        const VkFormatFeatureFlags features = properties.optimalTilingFeatures;
+
+        constexpr VkFormatFeatureFlags blitFeatures = VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+        if ((features & blitFeatures) == blitFeatures)
+        {
+            m_mipFilter = (features & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)
+                ? VK_FILTER_LINEAR
+                : VK_FILTER_NEAREST;
+        }
+        else
+        {
+            Logger::warn("Cannot generate mipmaps, format does not support blitting: {}",
+                         magic_enum::enum_name(m_format));
+        }
+    }
+
     VkImageCreateInfo imgInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = nullptr,
         .imageType = VK_IMAGE_TYPE_2D,
         .format = m_format,
         .extent = VkExtent3D {m_extent.width, m_extent.height, 1},
-        .mipLevels = 1,
+        .mipLevels = m_mipLevels,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,   // 1 sample per pixel = no MSAA
         .tiling = VK_IMAGE_TILING_OPTIMAL,  // Let the GPU move the data as it sees fit
@@ -244,13 +291,18 @@ void vkShade::VulkanImage::create_image_view()
         .subresourceRange = {
             .aspectMask = aspectFlags,
             .baseMipLevel = 0,
-            .levelCount = 1,
+            .levelCount = m_mipLevels,
             .baseArrayLayer = 0,
             .layerCount = 1,
         },
     };
 
-	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_imageView));
+    // Create a view containing the entire mip chain, for sampling purposes.
+	VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_allMipsView));
+
+    // Create a view containing only mip 0, for use as a render target.
+    viewInfo.subresourceRange.levelCount = 1;
+    VK_CHECK(m_device.dispatch.CreateImageView(m_device.handle, &viewInfo, nullptr, &m_baseMipView));
 }
 
 void vkShade::VulkanImage::blit_from(VkCommandBuffer cmd, VkImage source)
@@ -344,6 +396,100 @@ VkFormat vkShade::VulkanImage::convert_format(reshadefx::texture_format format)
     std::unreachable();
 }
 
+void vkShade::VulkanImage::generate_mipmaps(VkCommandBuffer cmd)
+{
+    if (!m_mipFilter)
+        return;
+
+    // Transition the whole image, so every level starts out matching.
+    this->transition_layout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Transitions one mip level from TRANSFER_DST to TRANSFER_SRC
+    VkImageMemoryBarrier2 levelBarrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .image = m_image,
+        .subresourceRange = { m_aspectFlags, 0, 1, 0, 1 },
+    };
+    VkDependencyInfo depInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &levelBarrier,
+    };
+
+    VkExtent2D currentMipSize = {m_extent.width, m_extent.height};
+    for (uint32_t mipLevel = 1; mipLevel < m_mipLevels; mipLevel++)
+    {
+        // Transition source mip level (mip - 1) to TRANSFER_SRC
+        levelBarrier.subresourceRange.baseMipLevel = mipLevel - 1;
+        m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
+
+        // Perform the blit from 'mip - 1' to 'mip'
+        VkExtent2D nextMipSize;
+        nextMipSize.width  = std::max(1u, currentMipSize.width / 2);
+        nextMipSize.height = std::max(1u, currentMipSize.height / 2);
+
+        VkImageBlit2 blitRegion = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+            .srcSubresource = {
+                .aspectMask = m_aspectFlags,
+                .mipLevel = mipLevel - 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+            .srcOffsets = {
+                {0, 0, 0},
+                {
+                    .x = static_cast<int32_t>(currentMipSize.width),
+                    .y = static_cast<int32_t>(currentMipSize.height),
+                    .z = 1,
+                }
+            },
+            .dstSubresource = {
+                .aspectMask = m_aspectFlags,
+                .mipLevel = mipLevel,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+            .dstOffsets = {
+                {0, 0, 0},
+                {
+                    .x = static_cast<int32_t>(nextMipSize.width),
+                    .y = static_cast<int32_t>(nextMipSize.height),
+                    .z = 1,
+                }
+            }
+        };
+
+        VkBlitImageInfo2 blitInfo = {
+            .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+            .srcImage = m_image,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstImage = m_image,
+            .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .regionCount = 1,
+            .pRegions = &blitRegion,
+            .filter = *m_mipFilter,
+        };
+
+        m_device.dispatch.CmdBlitImage2(cmd, &blitInfo);
+
+        // Update mip size for next iteration
+        currentMipSize = nextMipSize;
+    }
+
+    // Transition the last level too, so the entire chain matches again.
+    levelBarrier.subresourceRange.baseMipLevel = m_mipLevels - 1;
+    m_device.dispatch.CmdPipelineBarrier2(cmd, &depInfo);
+
+    m_currentLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+}
+
 void vkShade::VulkanImage::immediate_submit(const std::function<void(VkCommandBuffer)>& function)
 {
     // Record and submit a one-time command buffer
@@ -379,12 +525,6 @@ void vkShade::VulkanImage::immediate_submit(const std::function<void(VkCommandBu
 
 void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout newLayout)
 {
-    VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    if (m_format == VK_FORMAT_D32_SFLOAT)
-        aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (m_format == VK_FORMAT_S8_UINT)
-        aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-
     VkImageMemoryBarrier2 imageBarrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
@@ -395,9 +535,9 @@ void vkShade::VulkanImage::transition_layout(VkCommandBuffer cmd, VkImageLayout 
         .newLayout = newLayout,
         .image = m_image,
         .subresourceRange = {
-            .aspectMask = aspectMask,
+            .aspectMask = m_aspectFlags,
             .baseMipLevel = 0,
-            .levelCount = 1,
+            .levelCount = VK_REMAINING_MIP_LEVELS,
             .baseArrayLayer = 0,
             .layerCount = 1,
         },
@@ -441,6 +581,9 @@ void vkShade::VulkanImage::upload(const void* data, size_t size)
 
         m_device.dispatch.CmdCopyBufferToImage(cmd, staging.buffer(), m_image,
                                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+        if (m_mipLevels > 1)
+            this->generate_mipmaps(cmd);
 
         // Transition TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
         this->transition_layout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

@@ -243,7 +243,7 @@ void vkShade::Runtime::render(uint32_t imageIndex)
 
     // Begin dynamic rendering using our final image
     std::array<VkRenderingAttachmentInfo, 1> colorAttachments = {
-        vkinit::rendering_attachment_info(finalImage->image_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+        vkinit::rendering_attachment_info(finalImage->base_mip_view(), nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
     };
 
     VkRenderingInfo renderingInfo = vkinit::rendering_info(m_extent, colorAttachments, nullptr);

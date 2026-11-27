@@ -112,7 +112,7 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
                 attachmentExtent.height = renderTarget->extent().height;
             }
             renderTarget->transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            colorAttachments.push_back(vkinit::rendering_attachment_info(renderTarget->image_view(),
+            colorAttachments.push_back(vkinit::rendering_attachment_info(renderTarget->base_mip_view(),
                                                                          clear,
                                                                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
@@ -120,7 +120,7 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         if (colorAttachments.empty())
         {
             outputImage.transition_layout(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            colorAttachments.push_back(vkinit::rendering_attachment_info(outputImage.image_view(),
+            colorAttachments.push_back(vkinit::rendering_attachment_info(outputImage.base_mip_view(),
                                                                          clear,
                                                                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
         }
@@ -141,7 +141,7 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
             m_stencilBuffer->transition_layout(cmd, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
 
             stencilAttachmentInfo = vkinit::rendering_attachment_info(
-                m_stencilBuffer->image_view(),
+                m_stencilBuffer->base_mip_view(),
                 nullptr,
                 VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
 
@@ -188,6 +188,18 @@ void vkShade::ReshadeEffect::apply(VkCommandBuffer cmd, VulkanImage& outputImage
         m_device.dispatch.CmdDraw(cmd, passInfo.num_vertices, 1, 0, 0);
 
         m_device.dispatch.CmdEndRendering(cmd);
+
+        // Regenerate the mip chains of the textures this pass wrote
+        if (passInfo.generate_mipmaps)
+        {
+            for (const auto& name : passInfo.render_target_names)
+            {
+                if (name.empty())
+                    break;
+
+                m_textures.at(name)->generate_mipmaps(cmd);
+            }
+        }
     }
 }
 
@@ -208,9 +220,9 @@ void vkShade::ReshadeEffect::bind_input(VulkanImage& colorImage, VulkanImage& de
 
             VkImageView imageView;
             if (texIt->semantic == "COLOR")
-                imageView = colorImage.image_view();
+                imageView = colorImage.all_mips_view();
             else if (texIt->semantic == "DEPTH")
-                imageView = depthImage.image_view();
+                imageView = depthImage.all_mips_view();
             else
                 continue;  // Skip other textures (we only bind COLOR and DEPTH here)
 
@@ -617,7 +629,7 @@ void vkShade::ReshadeEffect::reflect_descriptors()
             imageInfos.push_back({
                 .sampler = sampler->handle(),
                 //.imageView = binding.srgb ? texture->srgbView() : texture->linearView(),  // TODO: linear/srgb views
-                .imageView = texture->image_view(),
+                .imageView = texture->all_mips_view(),
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             });
 
